@@ -1,0 +1,63 @@
+# Nanoha Gunlance Mod
+
+本项目用于制作《怪物猎人：世界》语音 Mod，将游戏中铳枪相关音效替换为《魔法少女奈叶》中奈叶的战斗语音。开发内容包括游戏音频事件分析、语音素材整理与处理，以及
+`.nbnk` Mod 文件的生成和验证。
+
+## 基本步骤
+
+1. 逆向分析现有 Mod 或游戏源文件，整理“游戏事件—音频文件”映射关系。
+2. 收集并筛选《魔法少女奈叶》动画或游戏中的语音素材，完成裁剪、降噪、音量调整及格式转换。
+3. 根据事件映射替换对应音频，生成 `.nbnk` 文件。
+4. 在可恢复的测试环境中安装并验证 Mod，确认触发事件、语音内容和播放效果符合预期。
+
+## 目录结构
+
+- `assets/`：存放项目资源及测试文件。
+    - `assets/mod_samples/`：存放用于逆向分析的参考 Mod 样本；样本文件应保持不变。
+    - `assets/source_audio/`：存放《魔法少女奈叶》相关游戏及动画语音素材；`assets/source_audio/testing/` 存放测试音频。
+    - `assets/testing_mod_files/`：存放用于测试的 Mod 文件。
+- `docs/`：存放招式、语音和其他研究资料。
+- `mapping/`：存放逆向分析记录、文件格式说明及游戏事件与音频文件的映射表。
+- `original/`：存放从《怪物猎人：世界》提取的游戏原版数据；样本文件应保持不变。
+    - `original/soundbank/`：存放原版 `.nbnk` SoundBank 文件。
+    - `original/audio_files/<SoundBank>/{wav,wem}/`：存放按 SoundBank 分类提取的原版音频文件及其 WAV 转换文件。
+- `tools/`：存放用于分析、提取、转换音频和重建 SoundBank 的工具脚本。
+    - `tools/pyvgmstream/pyvgmstream.py`：封装 pyvgmstream 的检查、单文件解码和批量转换功能。
+    - `tools/wwiser/`：解析 Wwise SoundBank 结构、HIRC 关系并生成分析结果。
+
+## 本地开发环境
+
+本项目专用 mamba 环境 `nanoha-gunlance-mod`，Python 版本为 3.12，完整依赖声明见 `environment.yml`。 环境包含 `ffmpeg`、
+`pyvgmstream`，以及用于 PDF、文档、表格和网页解析的常用包。
+
+```sh
+# 运行单个命令
+mamba run -n nanoha-gunlance-mod mycommand
+
+# 运行多行命令
+mamba run -n nanoha-gunlance-mod python <<'PY' ... PY
+```
+
+## 项目工具
+
+- `ffmpeg`：用于音视频格式转换、裁剪、提取等处理。使用 `mamba run -n nanoha-gunlance-mod ffmpeg -i <输入文件> <输出文件>`
+  执行，并通过指定参数完成相应处理。
+- `pyvgmstream`：用于识别 Wwise `.wem` 元数据、将 WEM 解码为 WAV 以及批量转换。项目统一通过
+  `tools/pyvgmstream/pyvgmstream.py` 调用，例如：
+  `mamba run -n nanoha-gunlance-mod python tools/pyvgmstream/pyvgmstream.py inspect <文件.wem>`，或添加 `-h` 查看完整参数。
+- `tools/wwiser/`：通过 Git Submodule 管理的 [wwiser](https://github.com/bnnm/wwiser)，用于解析 Wwise `.bnk`/`.nbnk` 的区块和
+  HIRC 音频事件关系、导出结构信息及生成 TXTP。克隆主仓库后运行 `git submodule update --init --recursive` 获取工具。使用
+  `mamba run -n nanoha-gunlance-mod python tools/wwiser/wwiser.py <文件.nbnk>` 解析文件，或添加 `-h` 查看完整参数。
+
+### Agent Skills
+
+- `SoundBank Workflow`：操作 `.nbnk` 时使用 `.agents/skills/soundbank-workflow/`。
+
+## 参考资料
+
+- [MHW:IB Labelled Audio](https://docs.google.com/spreadsheets/d/10A_YEfm7KV0ATw7uD-3_o_ZOGSlGXtzWWMGXKs_neYM/edit)
+  ：社区维护的《怪物猎人：世界／冰原》音频标注表，包含 `.nbnk`/`.npck` 用途、内部 WEM 编号、Bank Index、角色语音预设和部分人工试听说明。内容并不完整，带
+  `?` 的标注及旧版本编号需要自行验证。
+- [Modding MH:W — wwiseutil Wiki](https://github.com/hpxro7/wwiseutil/wiki/Modding-MH%3AW)：介绍《怪物猎人：世界》的
+  `.nbnk`/`.npck`、`.wem` 音频结构及提取、替换流程，并链接上述社区标注表。`wwiseutil` 已较旧，资料可作为参考；实际结构解析优先使用项目中的
+  `wwiser`。
