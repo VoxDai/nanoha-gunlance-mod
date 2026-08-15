@@ -1,0 +1,3 @@
+[submodule "tools/wwiser"]
+	path = tools/wwiser
+	url = https://github.com/bnnm/wwiser.git

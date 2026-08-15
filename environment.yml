@@ -1,0 +1,27 @@
+name: nanoha-gunlance-mod
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - ffmpeg
+  - libogg
+  - libvorbis
+  - poppler
+  - pip
+  - pillow
+  - pypdf
+  - pdfplumber
+  - pymupdf
+  - pdf2image
+  - pypdfium2
+  - python-docx
+  - openpyxl
+  - xlsxwriter
+  - reportlab
+  - requests
+  - beautifulsoup4
+  - lxml
+  - rich
+  - tqdm
+  - pip:
+      - pyvgmstream==0.1.1
