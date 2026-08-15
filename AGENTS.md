@@ -27,27 +27,27 @@
 
 ## 本地开发环境
 
-本项目专用 mamba 环境 `nanoha-gunlance-mod`，Python 版本为 3.12，完整依赖声明见 `environment.yml`。 环境包含 `ffmpeg`、
+本项目专用 conda 环境 `nanoha-gunlance-mod`，Python 版本为 3.12，完整依赖声明见 `environment.yml`。 环境包含 `ffmpeg`、
 `pyvgmstream`，以及用于 PDF、文档、表格和网页解析的常用包。
 
 ```sh
 # 运行单个命令
-mamba run -n nanoha-gunlance-mod mycommand
+conda run -n nanoha-gunlance-mod mycommand
 
 # 运行多行命令
-mamba run -n nanoha-gunlance-mod python <<'PY' ... PY
+conda run -n nanoha-gunlance-mod python <<'PY' ... PY
 ```
 
 ## 项目工具
 
-- `ffmpeg`：用于音视频格式转换、裁剪、提取等处理。使用 `mamba run -n nanoha-gunlance-mod ffmpeg -i <输入文件> <输出文件>`
+- `ffmpeg`：用于音视频格式转换、裁剪、提取等处理。使用 `conda run -n nanoha-gunlance-mod ffmpeg -i <输入文件> <输出文件>`
   执行，并通过指定参数完成相应处理。
 - `pyvgmstream`：用于识别 Wwise `.wem` 元数据、将 WEM 解码为 WAV 以及批量转换。项目统一通过
   `tools/pyvgmstream/pyvgmstream.py` 调用，例如：
-  `mamba run -n nanoha-gunlance-mod python tools/pyvgmstream/pyvgmstream.py inspect <文件.wem>`，或添加 `-h` 查看完整参数。
+  `conda run -n nanoha-gunlance-mod python tools/pyvgmstream/pyvgmstream.py inspect <文件.wem>`，或添加 `-h` 查看完整参数。
 - `tools/wwiser/`：通过 Git Submodule 管理的 [wwiser](https://github.com/bnnm/wwiser)，用于解析 Wwise `.bnk`/`.nbnk` 的区块和
   HIRC 音频事件关系、导出结构信息及生成 TXTP。克隆主仓库后运行 `git submodule update --init --recursive` 获取工具。使用
-  `mamba run -n nanoha-gunlance-mod python tools/wwiser/wwiser.py <文件.nbnk>` 解析文件，或添加 `-h` 查看完整参数。
+  `conda run -n nanoha-gunlance-mod python tools/wwiser/wwiser.py <文件.nbnk>` 解析文件，或添加 `-h` 查看完整参数。
 
 ### Agent Skills
 

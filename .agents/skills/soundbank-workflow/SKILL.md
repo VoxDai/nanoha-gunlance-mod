@@ -25,8 +25,8 @@ trap 'rm -rf -- "$temp_dir"' EXIT INT TERM
 Check the required tools:
 
 ```sh
-mamba run -n nanoha-gunlance-mod ffmpeg -version
-mamba run -n nanoha-gunlance-mod python -c "import pyvgmstream; print('pyvgmstream available')"
+conda run -n nanoha-gunlance-mod ffmpeg -version
+conda run -n nanoha-gunlance-mod python -c "import pyvgmstream; print('pyvgmstream available')"
 test -f tools/wwiser/wwiser.py
 ```
 
@@ -35,14 +35,14 @@ test -f tools/wwiser/wwiser.py
 Inspect chunk order, sizes, DIDX indices, Media IDs, offsets, and alignment:
 
 ```sh
-mamba run -n nanoha-gunlance-mod python \
+conda run -n nanoha-gunlance-mod python \
   .agents/skills/soundbank-workflow/scripts/nbnk_media.py inspect input.nbnk
 ```
 
 Use wwiser for HIRC objects, events, and media relationships:
 
 ```sh
-mamba run -n nanoha-gunlance-mod python tools/wwiser/wwiser.py -d none input.nbnk
+conda run -n nanoha-gunlance-mod python tools/wwiser/wwiser.py -d none input.nbnk
 ```
 
 ## Extract and Decode Media
@@ -50,7 +50,7 @@ mamba run -n nanoha-gunlance-mod python tools/wwiser/wwiser.py -d none input.nbn
 Extract one entry by DIDX index or Media ID:
 
 ```sh
-mamba run -n nanoha-gunlance-mod python \
+conda run -n nanoha-gunlance-mod python \
   .agents/skills/soundbank-workflow/scripts/nbnk_media.py extract \
   input.nbnk --index 22 -o "$temp_dir/22.wem"
 ```
@@ -58,7 +58,7 @@ mamba run -n nanoha-gunlance-mod python \
 Use `--media-id ID` instead of `--index`, or extract every entry with:
 
 ```sh
-mamba run -n nanoha-gunlance-mod python \
+conda run -n nanoha-gunlance-mod python \
   .agents/skills/soundbank-workflow/scripts/nbnk_media.py extract \
   input.nbnk --all -o "$temp_dir/wem"
 ```
@@ -66,8 +66,8 @@ mamba run -n nanoha-gunlance-mod python \
 Inspect or decode extracted media with the project CLI:
 
 ```sh
-mamba run -n nanoha-gunlance-mod python tools/pyvgmstream/pyvgmstream.py inspect "$temp_dir/22.wem"
-mamba run -n nanoha-gunlance-mod python tools/pyvgmstream/pyvgmstream.py decode \
+conda run -n nanoha-gunlance-mod python tools/pyvgmstream/pyvgmstream.py inspect "$temp_dir/22.wem"
+conda run -n nanoha-gunlance-mod python tools/pyvgmstream/pyvgmstream.py decode \
   "$temp_dir/22.wem" "$temp_dir/22.wav"
 ```
 
@@ -76,7 +76,7 @@ mamba run -n nanoha-gunlance-mod python tools/pyvgmstream/pyvgmstream.py decode 
 Convert replacement audio to the verified 48 kHz, 16-bit, stereo Wwise PCM layout:
 
 ```sh
-mamba run -n nanoha-gunlance-mod python \
+conda run -n nanoha-gunlance-mod python \
   .agents/skills/soundbank-workflow/scripts/wav_to_wem.py \
   replacement.wav "$temp_dir/replacement.wem"
 ```
@@ -84,7 +84,7 @@ mamba run -n nanoha-gunlance-mod python \
 Inspect the converted WEM, then rebuild the Bank. Omit the output argument to write the final Bank to `output/<input filename>`:
 
 ```sh
-mamba run -n nanoha-gunlance-mod python \
+conda run -n nanoha-gunlance-mod python \
   .agents/skills/soundbank-workflow/scripts/nbnk_media.py replace \
   original/soundbank/input.nbnk \
   --replace 22="$temp_dir/replacement.wem"
