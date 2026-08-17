@@ -52,6 +52,5 @@ ENV/
 
 # Local assets
 /assets/
-
-# Generated SoundBanks
 /output/
+/release/
