@@ -1,4 +1,4 @@
 interface:
   display_name: "Build Mods"
-  short_description: "Build and validate all project NBNK mod files"
-  default_prompt: "Use $build-mod to build every mapped NBNK mod and publish validated files to release/."
+  short_description: "Build all NBNK files through project builders"
+  default_prompt: "Use $build-mod to build and validate every registered NBNK through the project builders and publish the complete release/."

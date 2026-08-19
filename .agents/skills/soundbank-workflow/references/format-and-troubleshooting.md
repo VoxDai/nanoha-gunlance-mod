@@ -22,19 +22,32 @@ When rebuilding:
 2. Replace only explicitly selected payloads.
 3. Rebuild DATA with 16-byte media alignment.
 4. Rewrite DIDX offsets and sizes.
-5. Preserve BKHD, HIRC, and unknown chunks byte-for-byte.
+5. Preserve BKHD, HIRC, and unknown chunks byte-for-byte for a media-only rebuild.
+
+An explicitly configured project builder may change HIRC after the media rebuild.
+In that case it must identify objects by HIRC type and ID, assert every old
+field value, preserve all undeclared fields and chunks, and report the exact
+HIRC changed-byte count. Absolute Bank offsets are not stable because rebuilding
+DATA moves the HIRC chunk.
 
 Known working MHW replacement Banks retain original HIRC Source and memory-size fields when embedding PCM WEMs. Do not generalize this rule to other games or Wwise versions.
+
+A Media ID is not a playback path. Multiple Sound objects can reference the same
+media through different Events, containers, parent properties, or positioning
+paths. Trace every route before changing volume, pitch, or Aux settings.
 
 ## Silence Troubleshooting
 
 1. Inspect the Bank and confirm both the 1-based DIDX index and Media ID.
-2. Extract the rebuilt entry and inspect it with `tools/pyvgmstream/pyvgmstream.py`.
+2. Extract the rebuilt entry and inspect it with `tools/utils/pyvgmstream.py`.
 3. Decode the entry to WAV and confirm that it contains audible audio with the intended duration and channels.
 4. Parse the rebuilt Bank with `tools/wwiser/wwiser.py -d none`.
-5. Confirm the installed Bank filename and path match the original game Bank.
-6. Remove conflicting mods that provide the same Bank.
-7. Restore the original Bank to verify the game environment, then compare with a known-working reference.
+5. If the symptom is reverb, spatialization, or channel imbalance, inspect every
+   Sound path for inherited Aux sends, positioning, parent pitch, and asymmetric
+   volume settings.
+6. Confirm the installed Bank filename and path match the original game Bank.
+7. Remove conflicting mods that provide the same Bank.
+8. Restore the original Bank to verify the game environment, then compare with a known-working reference.
 
 ## Validation Boundaries
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect and decode game audio with the installed pyvgmstream package."""
+"""Project utility for inspecting and decoding audio with pyvgmstream."""
 
 from __future__ import annotations
 

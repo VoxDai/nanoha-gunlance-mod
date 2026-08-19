@@ -1,4 +1,4 @@
 interface:
   display_name: "SoundBank Workflow"
-  short_description: "Analyze and rebuild MHW NBNK SoundBanks"
-  default_prompt: "Use $soundbank-workflow to inspect, extract, replace, and validate media in an MHW NBNK SoundBank."
+  short_description: "Analyze media, HIRC routes, and NBNK settings"
+  default_prompt: "Use $soundbank-workflow to inspect NBNK media, trace HIRC routes, apply guarded Bank settings, and validate the result."

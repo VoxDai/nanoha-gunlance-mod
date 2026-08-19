@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert audio to the Wwise PCM WEM layout known to work in MHW."""
+"""Project utility for converting audio to the MHW Wwise PCM WEM layout."""
 
 from __future__ import annotations
 

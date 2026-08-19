@@ -1,0 +1,84 @@
+# HIRC Routing and Node Settings
+
+Read this reference when a task requires more than replacing embedded media:
+tracing a game Event, identifying every Sound path that uses a Media ID, or
+changing volume, pitch, positioning, or Aux behavior.
+
+## Object and Route Model
+
+The HIRC chunk begins with an object count. Each record contains a one-byte type,
+a little-endian body size, and a body whose first four bytes are the object ID.
+Common object types in these MHW Banks are:
+
+- `0x02`: Sound
+- `0x03`: Action
+- `0x04`: Event
+- `0x05`: Random/Sequence Container
+
+A typical playback route is:
+
+```text
+Event ulActionID
+  -> Action idExt
+  -> Sound or Container
+  -> Container child IDs, possibly through more parents
+  -> Sound sourceID
+  -> DIDX Media ID
+```
+
+Do not stop after finding one `sourceID`. The same media can appear in multiple
+Sound objects, and separate Events or containers may apply different pitch,
+volume, positioning, or Aux settings. Also inspect `DirectParentID`, every
+container child, and inherited parent properties.
+
+## Trace a Route
+
+Create the dump in the task's `/tmp` workspace:
+
+```sh
+conda run -n nanoha-gunlance-mod python tools/wwiser/wwiser.py \
+  -d txt -dn "$temp_dir/bank-hirc" input.nbnk
+```
+
+Start from the known DIDX Media ID or Event ID and search the dump. Record the
+complete Event -> Action -> Container -> Sound route, including sibling paths
+that reach the same media. Use object IDs as stable anchors; displayed file
+offsets are diagnostic only and change when DATA is rebuilt.
+
+## Common Node Properties
+
+`NodeInitialParams` contains a property count, an array of property IDs, and a
+corresponding array of values. Relevant IDs observed in this project include:
+
+- `0x00` Volume, stored as a float in dB.
+- `0x02` Pitch, stored as a float in cents.
+- `0x0E` CenterPCT, stored as a float percentage.
+- `0x17` GameAuxSendVolume, stored as a float in dB.
+
+`AuxParams` contains a version-specific bit vector and, when present, Aux Bus
+IDs. Use wwiser to interpret the exact node layout. Do not reuse a flag offset or
+bit pattern across Banks without checking the target object, because optional
+fields change later body offsets.
+
+## Implement a Project Setting
+
+1. Start from `original/soundbank/<bank>.nbnk` and trace all affected routes in
+   a wwiser text dump.
+2. Add the setting to `apply_settings()` in `builders/<bank>.py`; keep the route,
+   audible intent, units, and reason in comments.
+3. Locate each target through `HircEditor` by object type and ID. Patch only an
+   object-relative field and supply the exact expected old value.
+4. Adjust every paired or layered path symmetrically unless asymmetry is the
+   intended result. A pitch-shifted duplicate or one-sided volume edit can sound
+   like surround processing or a channel imbalance.
+5. Keep edits length-preserving. The current editor intentionally rejects
+   adding or removing bytes; a structural change requires extending the parser
+   to rebuild object and chunk sizes explicitly.
+6. Run the builder `--dry-run`, build to a temporary output, parse it with
+   wwiser, and compare semantic dumps. Only declared fields may differ.
+7. Re-extract and decode all replaced media, then perform in-game trigger,
+   loudness, channel, camera-position, and conflict tests.
+
+`tools/utils/nbnk_media.py replace` remains a media-only tool and intentionally
+rejects HIRC changes during read-back verification. Use the per-Bank builders
+for persistent HIRC settings rather than weakening that invariant.

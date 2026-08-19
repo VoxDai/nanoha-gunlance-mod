@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect, extract, and replace embedded WEM media in MHW NBNK files."""
+"""Project utility for inspecting, extracting, and replacing NBNK media."""
 
 from __future__ import annotations
 
