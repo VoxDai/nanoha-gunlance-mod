@@ -41,11 +41,13 @@ For one Bank, run `python -m builders.<bank-name>`. A single builder writes to
    bank-specific HIRC guards, and required tools.
 2. Convert mapped audio to the verified 48 kHz, 16-bit, stereo Wwise PCM WEM
    layout in one task-specific `/tmp` workspace.
-3. Rebuild media from the original Bank and apply only the HIRC settings declared
-   by its builder. Banks with neither change remain byte-for-byte identical.
-4. Run `tools/utils/nbnk_media.py inspect` and `wwiser.py -d none` for every staged Bank.
-5. Re-extract every replaced DIDX entry, then inspect and decode it with
-   `tools/utils/pyvgmstream.py`; require a non-empty WAV.
+3. Create `tools.soundbank_editor.SoundBankEditor` from the original Bank,
+   apply mapped media replacements, then execute only the Python edits declared
+   by its `BankBuildPlan`. Banks with neither change remain byte-for-byte identical.
+4. Reparse every staged Bank with `SoundBank.from_file()` and run
+   `wwiser.py -d none`; for HIRC edits, also generate a normalized semantic diff.
+5. Re-extract every replaced or appended DIDX entry through the Library, then
+   inspect and decode it with `tools/utils/pyvgmstream.py`; require a non-empty WAV.
 6. Publish only after all staged Banks pass. Report each path, SHA-256,
    replacement DIDX/Media ID, and HIRC changed-byte count.
 

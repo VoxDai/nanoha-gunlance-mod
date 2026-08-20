@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from .base import BankSpec, BuildError, HircEditor, run_single_cli
+from tools import soundbank_editor
+
+from .base import BankBuildPlan, BuildError, run_single_cli
 
 
 HIRC_SOUND = 0x02
@@ -11,7 +13,10 @@ FULL_BURST_AUX_BUS = 3015692424
 
 
 def _disable_populated_aux(
-    editor: HircEditor, sound_id: int, flag_offset: int, bus_offset: int
+    editor: soundbank_editor.HircEditor,
+    sound_id: int,
+    flag_offset: int,
+    bus_offset: int,
 ) -> None:
     """Override User Aux Sends and clear the populated reverb bus."""
 
@@ -33,7 +38,9 @@ def _disable_populated_aux(
     )
 
 
-def _disable_empty_aux(editor: HircEditor, sound_id: int, flag_offset: int) -> None:
+def _disable_empty_aux(
+    editor: soundbank_editor.HircEditor, sound_id: int, flag_offset: int
+) -> None:
     """Override inherited User Aux Sends on a node with no local Aux Bus array."""
 
     editor.patch_u8(
@@ -46,7 +53,7 @@ def _disable_empty_aux(editor: HircEditor, sound_id: int, flag_offset: int) -> N
     )
 
 
-def apply_settings(editor: HircEditor) -> None:
+def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
     """Apply the full-burst HIRC settings verified in game.
 
     A Media ID is not a unique playback path in this Bank. Three, four, and
@@ -63,6 +70,8 @@ def apply_settings(editor: HircEditor) -> None:
     The working mix therefore keeps both routes, removes the -50-cent detune,
     disables the reverb Aux path, and adjusts both sides symmetrically.
     """
+
+    editor = bank.hirc
 
     # One-shell (Sound 219848096 / Media 768048455) and two-shell
     # (Sound 46149961 / Media 669932693) use one populated Aux route each.
@@ -173,8 +182,8 @@ def apply_settings(editor: HircEditor) -> None:
         )
 
 
-SPEC = BankSpec(name="wp07_gun_epvsp_shell", apply_settings=apply_settings)
+PLAN = BankBuildPlan(name="wp07_gun_epvsp_shell", apply_edits=apply_edits)
 
 
 if __name__ == "__main__":
-    raise SystemExit(run_single_cli(SPEC))
+    raise SystemExit(run_single_cli(PLAN))

@@ -4,37 +4,23 @@ import struct
 from pathlib import Path
 import unittest
 
-from builders.__main__ import SPECS
-from builders.base import (
-    BuildError,
-    HircEditor,
-    get_chunk_payload,
-    parse_mapping,
-    validate_registry,
-)
-from builders.wp07_gun_epvsp_shell import apply_settings as apply_wp07_settings
+from builders.__main__ import PLANS
+from builders.base import parse_mapping, validate_registry
+from builders.wp07_gun_epvsp_shell import apply_edits as apply_wp07_edits
+from tools import soundbank_editor
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-
-def make_hirc(*records: tuple[int, int, bytes]) -> bytes:
-    payload = bytearray(struct.pack("<I", len(records)))
-    for object_type, object_id, tail in records:
-        body = struct.pack("<I", object_id) + tail
-        payload += struct.pack("<BI", object_type, len(body)) + body
-    return bytes(payload)
-
-
 class MappingTests(unittest.TestCase):
     def test_registry_matches_every_mapping_and_soundbank(self) -> None:
         validate_registry(
-            SPECS,
+            PLANS,
             PROJECT_ROOT / "mapping",
             PROJECT_ROOT / "original" / "soundbank",
         )
         self.assertEqual(
-            {spec.name for spec in SPECS},
+            {plan.name for plan in PLANS},
             {
                 "cm_hitmark_epvsp",
                 "hm_cm00_epvsp",
@@ -68,34 +54,6 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(len(parsed["wp_gun_cmn"].unresolved_rows), 1)
 
 
-class HircEditorTests(unittest.TestCase):
-    def test_noop_round_trip_is_byte_exact(self) -> None:
-        payload = make_hirc((0x02, 10, b"\x01\x02"), (0x05, 20, b"\x03"))
-        self.assertEqual(HircEditor(payload).build(), payload)
-
-    def test_typed_patch_uses_object_relative_offset(self) -> None:
-        payload = make_hirc((0x02, 10, b"\x01\x02\x03\x04"))
-        editor = HircEditor(payload)
-        editor.patch_u8(0x02, 10, 5, 0x02, 0x09, label="test field")
-        self.assertEqual(editor.object_body(0x02, 10)[4:], b"\x01\x09\x03\x04")
-        self.assertEqual(editor.changed_byte_count, 1)
-
-    def test_missing_object_fails(self) -> None:
-        editor = HircEditor(make_hirc((0x02, 10, b"\0")))
-        with self.assertRaisesRegex(BuildError, "object not found"):
-            editor.object_body(0x02, 99)
-
-    def test_duplicate_object_fails(self) -> None:
-        payload = make_hirc((0x02, 10, b"\0"), (0x02, 10, b"\1"))
-        with self.assertRaisesRegex(BuildError, "duplicate"):
-            HircEditor(payload)
-
-    def test_expected_old_value_mismatch_fails(self) -> None:
-        editor = HircEditor(make_hirc((0x02, 10, b"\x01")))
-        with self.assertRaisesRegex(BuildError, "expected 02 but found 01"):
-            editor.patch_u8(0x02, 10, 4, 0x02, 0x03, label="test field")
-
-
 class Wp07SettingsTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -105,12 +63,13 @@ class Wp07SettingsTests(unittest.TestCase):
             / "soundbank"
             / "wp07_gun_epvsp_shell.nbnk"
         )
-        cls.original_hirc = get_chunk_payload(source.read_bytes(), b"HIRC")
-        editor = HircEditor(cls.original_hirc)
-        apply_wp07_settings(editor)
-        cls.changed_byte_count = editor.changed_byte_count
-        cls.patched_hirc = editor.build()
-        cls.patched = HircEditor(cls.patched_hirc)
+        bank = soundbank_editor.SoundBank.from_file(source)
+        editor = soundbank_editor.SoundBankEditor(bank)
+        cls.original_hirc = bank.hirc_payload
+        apply_wp07_edits(editor)
+        cls.changed_byte_count = editor.hirc.changed_byte_count
+        cls.patched_hirc = editor.hirc.build()
+        cls.patched = soundbank_editor.HircEditor(cls.patched_hirc)
 
     def test_exact_change_count_and_length(self) -> None:
         self.assertEqual(self.changed_byte_count, 54)
@@ -159,13 +118,16 @@ class Wp07SettingsTests(unittest.TestCase):
             self.assertEqual(struct.unpack_from("<f", body, 0x25)[0], 100.0)
 
     def test_other_builders_are_hirc_noops(self) -> None:
-        for spec in SPECS:
-            if spec.name == "wp07_gun_epvsp_shell":
+        for plan in PLANS:
+            if plan.name == "wp07_gun_epvsp_shell":
                 continue
-            editor = HircEditor(self.original_hirc)
-            spec.apply_settings(editor)
-            self.assertEqual(editor.build(), self.original_hirc, spec.name)
-            self.assertEqual(editor.changed_byte_count, 0, spec.name)
+            bank = soundbank_editor.SoundBank.from_file(
+                PROJECT_ROOT / "original" / "soundbank" / f"{plan.name}.nbnk"
+            )
+            editor = soundbank_editor.SoundBankEditor(bank)
+            plan.apply_edits(editor)
+            self.assertEqual(editor.build(), bank.to_bytes(), plan.name)
+            self.assertEqual(editor.hirc.changed_byte_count, 0, plan.name)
 
 
 if __name__ == "__main__":

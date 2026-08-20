@@ -64,21 +64,26 @@ fields change later body offsets.
 
 1. Start from `original/soundbank/<bank>.nbnk` and trace all affected routes in
    a wwiser text dump.
-2. Add the setting to `apply_settings()` in `builders/<bank>.py`; keep the route,
+2. Add the setting to `apply_edits()` in `builders/<bank>.py`; keep the route,
    audible intent, units, and reason in comments.
-3. Locate each target through `HircEditor` by object type and ID. Patch only an
+3. Use `editor.hirc` to locate each target by HIRC type and ID. Patch only an
    object-relative field and supply the exact expected old value.
 4. Adjust every paired or layered path symmetrically unless asymmetry is the
    intended result. A pitch-shifted duplicate or one-sided volume edit can sound
    like surround processing or a channel imbalance.
-5. Keep edits length-preserving. The current editor intentionally rejects
-   adding or removing bytes; a structural change requires extending the parser
-   to rebuild object and chunk sizes explicitly.
+5. Use `insert_object()`, `append_event_action()`, `add_play_event_action()`, or
+   `add_custom_sound_action()` for reviewed Wwise v120 structural changes. These
+   APIs rebuild object and chunk sizes and reject ID collisions. In the original
+   v120 Banks every Event Action is serialized before the Event that references
+   it; use the high-level APIs, which insert a new Action immediately before its
+   owning Event, and treat forward Action references as invalid. Unknown object
+   types remain raw bodies and must not be structurally authored.
 6. Run the builder `--dry-run`, build to a temporary output, parse it with
    wwiser, and compare semantic dumps. Only declared fields may differ.
 7. Re-extract and decode all replaced media, then perform in-game trigger,
    loudness, channel, camera-position, and conflict tests.
 
-`tools/utils/nbnk_media.py replace` remains a media-only tool and intentionally
-rejects HIRC changes during read-back verification. Use the per-Bank builders
-for persistent HIRC settings rather than weakening that invariant.
+`tools.soundbank_editor` is a Python Library, not a CLI. Use a per-Bank
+`BankBuildPlan` for persistent media and HIRC changes. The builder's mapping
+replacement phase remains media-only; bank-specific structural changes belong
+only in its Python `apply_edits()` callback.

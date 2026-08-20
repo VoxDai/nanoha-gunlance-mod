@@ -24,7 +24,11 @@ When rebuilding:
 4. Rewrite DIDX offsets and sizes.
 5. Preserve BKHD, HIRC, and unknown chunks byte-for-byte for a media-only rebuild.
 
-An explicitly configured project builder may change HIRC after the media rebuild.
+`SoundBankEditor.append_media()` appends a new DIDX record and WEM payload while
+preserving existing order. It requires a new explicit Media ID, rejects HIRC or
+media ID collisions, and applies the same 16-byte alignment during rebuilding.
+
+An explicitly configured `BankBuildPlan` may change HIRC after mapped media edits.
 In that case it must identify objects by HIRC type and ID, assert every old
 field value, preserve all undeclared fields and chunks, and report the exact
 HIRC changed-byte count. Absolute Bank offsets are not stable because rebuilding

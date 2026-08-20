@@ -1,24 +1,23 @@
 #!/usr/bin/env python3
-"""Shared mapping, NBNK rebuild, HIRC editing, and validation support."""
+"""Shared mapping, conversion, validation, and publication support."""
 
 from __future__ import annotations
 
 import argparse
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+import difflib
 import hashlib
-import importlib.util
 import os
 from pathlib import Path
 import re
 import shutil
-import struct
 import subprocess
 import sys
 import tempfile
-from types import ModuleType
-from typing import Any
 from urllib.parse import unquote, urlsplit
+
+from tools import soundbank_editor
 
 
 EXPECTED_WEM_HEADER = "wem# new(old)"
@@ -26,7 +25,6 @@ EXPECTED_AUDIO_HEADER = "audio"
 LINK_RE = re.compile(r"\]\((?:<([^>]+)>|([^\s)]+))\)")
 BOLD_INDEX_RE = re.compile(r"\*\*(\d+)\*\*")
 BANK_NAME_RE = re.compile(r"[a-z0-9_]+")
-HIRC_TAG = b"HIRC"
 
 
 class BuildError(Exception):
@@ -55,225 +53,33 @@ class MappingInfo:
     unresolved_rows: list[str]
 
 
-@dataclass
-class HircObject:
-    """One mutable object body from a HIRC chunk."""
-
-    index: int
-    object_type: int
-    object_id: int
-    body: bytearray
-
-
-class HircEditor:
-    """Edit HIRC object bodies by type and ID using guarded relative offsets.
-
-    The editor deliberately supports only length-preserving field patches. This
-    keeps every HIRC object size and the enclosing chunk size stable while still
-    allowing the node properties currently required by this project.
-    """
-
-    def __init__(self, payload: bytes):
-        if len(payload) < 4:
-            raise BuildError("HIRC payload is missing its object count")
-
-        self._count = struct.unpack_from("<I", payload, 0)[0]
-        self._objects: list[HircObject] = []
-        self._by_key: dict[tuple[int, int], HircObject] = {}
-        self._patched_ranges: dict[tuple[int, int], list[tuple[int, int]]] = {}
-        self._changed_byte_count = 0
-
-        position = 4
-        for index in range(self._count):
-            if position + 5 > len(payload):
-                raise BuildError(f"HIRC object #{index} is missing its header")
-            object_type = payload[position]
-            size = struct.unpack_from("<I", payload, position + 1)[0]
-            body_start = position + 5
-            body_end = body_start + size
-            if body_end > len(payload):
-                raise BuildError(f"HIRC object #{index} extends beyond the chunk")
-            if size < 4:
-                raise BuildError(f"HIRC object #{index} is too small to contain an ID")
-
-            body = bytearray(payload[body_start:body_end])
-            object_id = struct.unpack_from("<I", body, 0)[0]
-            key = (object_type, object_id)
-            if key in self._by_key:
-                raise BuildError(
-                    f"HIRC contains duplicate type 0x{object_type:02X} "
-                    f"object ID {object_id}"
-                )
-            item = HircObject(index, object_type, object_id, body)
-            self._objects.append(item)
-            self._by_key[key] = item
-            position = body_end
-
-        if position != len(payload):
-            raise BuildError(
-                f"HIRC has {len(payload) - position} trailing bytes after its objects"
-            )
-
-    @property
-    def changed_byte_count(self) -> int:
-        """Number of byte positions whose values were changed."""
-
-        return self._changed_byte_count
-
-    def object_body(self, object_type: int, object_id: int) -> bytes:
-        """Return a read-only copy of one HIRC object body."""
-
-        return bytes(self._get_object(object_type, object_id).body)
-
-    def _get_object(self, object_type: int, object_id: int) -> HircObject:
-        try:
-            return self._by_key[(object_type, object_id)]
-        except KeyError as error:
-            raise BuildError(
-                f"HIRC object not found: type 0x{object_type:02X}, ID {object_id}"
-            ) from error
-
-    def patch_bytes(
-        self,
-        object_type: int,
-        object_id: int,
-        offset: int,
-        expected: bytes,
-        replacement: bytes,
-        *,
-        label: str,
-    ) -> None:
-        """Replace bytes inside one object after checking the exact old value."""
-
-        if len(expected) != len(replacement):
-            raise BuildError(f"{label}: HIRC patches must preserve field length")
-        if not expected:
-            raise BuildError(f"{label}: HIRC patch may not be empty")
-        if offset < 4:
-            raise BuildError(f"{label}: patch may not alter the HIRC object ID")
-
-        item = self._get_object(object_type, object_id)
-        end = offset + len(expected)
-        if end > len(item.body):
-            raise BuildError(
-                f"{label}: object ID {object_id} range 0x{offset:X}..0x{end:X} "
-                f"exceeds its {len(item.body)}-byte body"
-            )
-
-        key = (object_type, object_id)
-        for prior_start, prior_end in self._patched_ranges.get(key, []):
-            if offset < prior_end and prior_start < end:
-                raise BuildError(
-                    f"{label}: patch overlaps an earlier edit to object ID {object_id}"
-                )
-
-        actual = bytes(item.body[offset:end])
-        if actual != expected:
-            raise BuildError(
-                f"{label}: object type 0x{object_type:02X} ID {object_id} "
-                f"at body+0x{offset:X} expected {expected.hex()} but found {actual.hex()}"
-            )
-
-        item.body[offset:end] = replacement
-        self._patched_ranges.setdefault(key, []).append((offset, end))
-        self._changed_byte_count += sum(
-            before != after for before, after in zip(expected, replacement)
-        )
-
-    def patch_u8(
-        self,
-        object_type: int,
-        object_id: int,
-        offset: int,
-        expected: int,
-        replacement: int,
-        *,
-        label: str,
-    ) -> None:
-        self.patch_bytes(
-            object_type,
-            object_id,
-            offset,
-            struct.pack("<B", expected),
-            struct.pack("<B", replacement),
-            label=label,
-        )
-
-    def patch_u32(
-        self,
-        object_type: int,
-        object_id: int,
-        offset: int,
-        expected: int,
-        replacement: int,
-        *,
-        label: str,
-    ) -> None:
-        self.patch_bytes(
-            object_type,
-            object_id,
-            offset,
-            struct.pack("<I", expected),
-            struct.pack("<I", replacement),
-            label=label,
-        )
-
-    def patch_float(
-        self,
-        object_type: int,
-        object_id: int,
-        offset: int,
-        expected: float,
-        replacement: float,
-        *,
-        label: str,
-    ) -> None:
-        self.patch_bytes(
-            object_type,
-            object_id,
-            offset,
-            struct.pack("<f", expected),
-            struct.pack("<f", replacement),
-            label=label,
-        )
-
-    def build(self) -> bytes:
-        """Serialize the edited HIRC payload without reordering objects."""
-
-        output = bytearray(struct.pack("<I", self._count))
-        for item in self._objects:
-            output += struct.pack("<BI", item.object_type, len(item.body))
-            output += item.body
-        return bytes(output)
-
-
-SettingsHook = Callable[[HircEditor], None]
+EditHook = Callable[[soundbank_editor.SoundBankEditor], None]
 
 
 @dataclass(frozen=True)
-class BankSpec:
-    """Declarative identity and bank-specific HIRC settings for one builder."""
+class BankBuildPlan:
+    """Declarative identity and bank-specific edits for one builder."""
 
     name: str
-    apply_settings: SettingsHook
+    apply_edits: EditHook
 
     def __post_init__(self) -> None:
         if not BANK_NAME_RE.fullmatch(self.name):
             raise ValueError(f"Invalid Bank builder name: {self.name}")
-        if not callable(self.apply_settings):
-            raise TypeError("apply_settings must be callable")
+        if not callable(self.apply_edits):
+            raise TypeError("apply_edits must be callable")
 
 
 @dataclass
-class BankPlan:
-    """A source Bank and all expected media/HIRC changes."""
+class PreparedBank:
+    """One preflighted project Bank build."""
 
-    spec: BankSpec
+    plan: BankBuildPlan
     source: Path
     mapping: MappingInfo
-    original_bank: Any
-    expected_hirc: bytes
-    hirc_changed_bytes: int
+    original_bank: soundbank_editor.SoundBank
+    preview_summary: soundbank_editor.EditSummary
+    editor: soundbank_editor.SoundBankEditor | None = None
     staged: Path | None = None
 
 
@@ -281,7 +87,6 @@ class BankPlan:
 class ToolPaths:
     """Project tools used by the build and validation pipeline."""
 
-    media: Path
     converter: Path
     pyvgmstream: Path
     wwiser: Path
@@ -294,7 +99,11 @@ class BuildResult:
     path: Path
     sha256: str
     replacements: tuple[tuple[int, int], ...]
+    added_media: tuple[tuple[int, int], ...]
     hirc_changed_bytes: int
+    added_hirc_objects: tuple[tuple[int, int], ...]
+    resized_hirc_objects: tuple[tuple[int, int, int, int], ...]
+    hirc_size_delta: int
 
 
 def normalize_header(value: str) -> str:
@@ -497,16 +306,6 @@ def resolve_project_path(project_root: Path, value: str | Path) -> Path:
     return path.resolve() if path.is_absolute() else (project_root / path).resolve()
 
 
-def load_media_module(path: Path) -> ModuleType:
-    spec = importlib.util.spec_from_file_location("project_nbnk_media", path)
-    if spec is None or spec.loader is None:
-        raise BuildError(f"Could not load NBNK helper: {path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
 def run_tool(
     command: list[str], label: str, working_directory: Path
 ) -> subprocess.CompletedProcess[str]:
@@ -535,14 +334,13 @@ def make_tool_paths(project_root: Path) -> ToolPaths:
     tools_root = project_root / "tools"
     utils_root = tools_root / "utils"
     paths = ToolPaths(
-        media=utils_root / "nbnk_media.py",
         converter=utils_root / "wav_to_wem.py",
         pyvgmstream=utils_root / "pyvgmstream.py",
         wwiser=tools_root / "wwiser" / "wwiser.py",
     )
     missing = [
         str(path)
-        for path in (paths.media, paths.converter, paths.pyvgmstream, paths.wwiser)
+        for path in (paths.converter, paths.pyvgmstream, paths.wwiser)
         if not path.is_file()
     ]
     if missing:
@@ -554,69 +352,26 @@ def make_tool_paths(project_root: Path) -> ToolPaths:
     return paths
 
 
-def _iter_raw_chunks(data: bytes) -> list[tuple[bytes, bytes]]:
-    chunks: list[tuple[bytes, bytes]] = []
-    position = 0
-    while position < len(data):
-        if position + 8 > len(data):
-            raise BuildError(f"NBNK is missing a chunk header at 0x{position:X}")
-        tag = data[position : position + 4]
-        size = struct.unpack_from("<I", data, position + 4)[0]
-        end = position + 8 + size
-        if end > len(data):
-            raise BuildError(f"NBNK chunk {tag!r} extends beyond the file boundary")
-        chunks.append((tag, data[position + 8 : end]))
-        position = end
-    return chunks
-
-
-def get_chunk_payload(data: bytes, tag: bytes) -> bytes:
-    """Return the payload of the one chunk matching ``tag``."""
-
-    matches = [payload for chunk_tag, payload in _iter_raw_chunks(data) if chunk_tag == tag]
-    if len(matches) != 1:
-        raise BuildError(f"Expected exactly one {tag!r} chunk, found {len(matches)}")
-    return matches[0]
-
-
-def replace_chunk_payload(data: bytes, tag: bytes, replacement: bytes) -> bytes:
-    """Replace exactly one chunk payload while preserving order and other bytes."""
-
-    output = bytearray()
-    matches = 0
-    for chunk_tag, payload in _iter_raw_chunks(data):
-        if chunk_tag == tag:
-            payload = replacement
-            matches += 1
-        output += chunk_tag + struct.pack("<I", len(payload)) + payload
-    if matches != 1:
-        raise BuildError(f"Expected exactly one {tag!r} chunk, found {matches}")
-    return bytes(output)
-
-
-def load_bank(media_module: ModuleType, path: Path) -> Any:
-    try:
-        return media_module.read_bank(path)
-    except Exception as error:
-        raise BuildError(f"Could not read Bank {path}: {error}") from error
-
-
 def prepare_plan(
-    spec: BankSpec,
+    build_plan: BankBuildPlan,
     project_root: Path,
     mapping_dir: Path,
     soundbank_dir: Path,
-    media_module: ModuleType,
-) -> BankPlan:
-    mapping_path = mapping_dir / f"{spec.name}.md"
-    source = soundbank_dir / f"{spec.name}.nbnk"
+) -> PreparedBank:
+    mapping_path = mapping_dir / f"{build_plan.name}.md"
+    source = soundbank_dir / f"{build_plan.name}.nbnk"
     if not mapping_path.is_file():
-        raise BuildError(f"Mapping table does not exist for {spec.name}: {mapping_path}")
+        raise BuildError(
+            f"Mapping table does not exist for {build_plan.name}: {mapping_path}"
+        )
     if not source.is_file():
-        raise BuildError(f"Source Bank does not exist for {spec.name}: {source}")
+        raise BuildError(f"Source Bank does not exist for {build_plan.name}: {source}")
 
     mapping = parse_mapping(mapping_path, project_root)
-    original_bank = load_bank(media_module, source)
+    try:
+        original_bank = soundbank_editor.SoundBank.from_file(source)
+    except soundbank_editor.SoundBankError as error:
+        raise BuildError(f"Could not read Bank {source}: {error}") from error
     for replacement in mapping.replacements:
         if not 1 <= replacement.index <= len(original_bank.entries):
             raise BuildError(
@@ -626,27 +381,34 @@ def prepare_plan(
             )
         replacement.media_id = original_bank.entries[replacement.index - 1].media_id
 
-    original_hirc = get_chunk_payload(source.read_bytes(), HIRC_TAG)
-    editor = HircEditor(original_hirc)
-    spec.apply_settings(editor)
-    expected_hirc = editor.build()
-    if len(expected_hirc) != len(original_hirc):
-        raise BuildError(f"{spec.name}: bank-specific HIRC settings changed chunk length")
+    preview = soundbank_editor.SoundBankEditor(original_bank)
+    try:
+        build_plan.apply_edits(preview)
+        preview.validate()
+    except soundbank_editor.SoundBankError as error:
+        raise BuildError(f"{build_plan.name}: invalid Bank edit plan: {error}") from error
+    mapped_indices = {replacement.index for replacement in mapping.replacements}
+    callback_indices = {index for index, _ in preview.summary.replaced_media}
+    overlap = sorted(mapped_indices & callback_indices)
+    if overlap:
+        raise BuildError(
+            f"{build_plan.name}: mapped media and apply_edits both replace DIDX "
+            + ", ".join(f"#{index}" for index in overlap)
+        )
 
-    return BankPlan(
-        spec=spec,
+    return PreparedBank(
+        plan=build_plan,
         source=source,
         mapping=mapping,
         original_bank=original_bank,
-        expected_hirc=expected_hirc,
-        hirc_changed_bytes=editor.changed_byte_count,
+        preview_summary=preview.summary,
     )
 
 
 def validate_registry(
-    specs: Sequence[BankSpec], mapping_dir: Path, soundbank_dir: Path
+    plans: Sequence[BankBuildPlan], mapping_dir: Path, soundbank_dir: Path
 ) -> None:
-    names = [spec.name for spec in specs]
+    names = [plan.name for plan in plans]
     if len(names) != len(set(names)):
         duplicate = next(name for name in names if names.count(name) > 1)
         raise BuildError(f"Duplicate builder registration: {duplicate}")
@@ -672,16 +434,15 @@ def validate_registry(
 
 
 def prepare_all_plans(
-    specs: Sequence[BankSpec],
+    plans: Sequence[BankBuildPlan],
     project_root: Path,
     mapping_dir: Path,
     soundbank_dir: Path,
-    media_module: ModuleType,
-) -> list[BankPlan]:
-    validate_registry(specs, mapping_dir, soundbank_dir)
+) -> list[PreparedBank]:
+    validate_registry(plans, mapping_dir, soundbank_dir)
     return [
-        prepare_plan(spec, project_root, mapping_dir, soundbank_dir, media_module)
-        for spec in sorted(specs, key=lambda item: item.name)
+        prepare_plan(plan, project_root, mapping_dir, soundbank_dir)
+        for plan in sorted(plans, key=lambda item: item.name)
     ]
 
 
@@ -694,11 +455,10 @@ def sha256(path: Path) -> str:
 
 
 def convert_replacements(
-    plan: BankPlan,
+    plan: PreparedBank,
     converted_dir: Path,
     project_root: Path,
     tools: ToolPaths,
-    media_module: ModuleType,
 ) -> dict[int, bytes]:
     converted_dir.mkdir(parents=True, exist_ok=True)
     payloads: dict[int, bytes] = {}
@@ -716,8 +476,8 @@ def convert_replacements(
             project_root,
         )
         try:
-            payload = media_module.validate_wem(wem_path)
-        except Exception as error:
+            payload = soundbank_editor.validate_wem(wem_path)
+        except soundbank_editor.SoundBankError as error:
             raise BuildError(f"Converted WEM is invalid: {wem_path}: {error}") from error
         replacement.wem_path = wem_path
         payloads[replacement.index - 1] = payload
@@ -725,90 +485,58 @@ def convert_replacements(
 
 
 def validate_stage(
-    plan: BankPlan,
+    plan: PreparedBank,
     stage: Path,
-    replacement_payloads: dict[int, bytes],
     validation_dir: Path,
     project_root: Path,
     tools: ToolPaths,
-    media_module: ModuleType,
 ) -> None:
     validation_dir.mkdir(parents=True, exist_ok=True)
-    staged_bank = load_bank(media_module, stage)
-    original_bank = plan.original_bank
+    if plan.editor is None:
+        raise BuildError(f"{stage.name}: editor was not initialized")
+    try:
+        staged_bank = soundbank_editor.SoundBank.from_file(stage)
+        expected_bank = plan.editor.validate()
+    except soundbank_editor.SoundBankError as error:
+        raise BuildError(f"{stage.name}: SoundBank read-back failed: {error}") from error
+    if stage.read_bytes() != plan.editor.build() or staged_bank.to_bytes() != expected_bank.to_bytes():
+        raise BuildError(f"{stage.name}: staged bytes do not match the editor result")
+    summary = plan.editor.summary
+    diff = plan.editor.diff()
+    allowed_chunks: set[bytes] = set()
+    if summary.replaced_media or summary.added_media:
+        allowed_chunks.update((b"DIDX", b"DATA"))
+    if summary.hirc_changed_bytes or summary.added_hirc_objects or summary.hirc_size_delta:
+        allowed_chunks.add(b"HIRC")
+    unexpected_chunks = set(diff.changed_chunks) - allowed_chunks
+    if unexpected_chunks:
+        raise BuildError(
+            f"{stage.name}: unexpected changed chunks: {sorted(unexpected_chunks)}"
+        )
+    if not allowed_chunks and stage.read_bytes() != plan.source.read_bytes():
+        raise BuildError(f"{stage.name}: unchanged Bank was not copied byte-for-byte")
 
-    if len(original_bank.entries) != len(staged_bank.entries):
-        raise BuildError(f"{stage.name}: media count changed")
-    if [entry.media_id for entry in original_bank.entries] != [
-        entry.media_id for entry in staged_bank.entries
-    ]:
-        raise BuildError(f"{stage.name}: Media IDs or DIDX order changed")
-    for index, (before, after) in enumerate(
-        zip(original_bank.entries, staged_bank.entries)
-    ):
-        expected = replacement_payloads.get(index, before.payload)
-        if after.payload != expected:
-            raise BuildError(
-                f"{stage.name}: DIDX #{index + 1} payload is not the expected media"
-            )
-        if after.offset % media_module.ALIGNMENT:
-            raise BuildError(f"{stage.name}: DIDX #{index + 1} is not 16-byte aligned")
-
-    if len(original_bank.chunks) != len(staged_bank.chunks):
-        raise BuildError(f"{stage.name}: chunk count changed")
-    for before, after in zip(original_bank.chunks, staged_bank.chunks):
-        if before.tag != after.tag:
-            raise BuildError(f"{stage.name}: chunk order changed")
-        if before.tag in {b"DIDX", b"DATA"}:
-            continue
-        expected = plan.expected_hirc if before.tag == HIRC_TAG else before.payload
-        if after.payload != expected:
-            raise BuildError(
-                f"{stage.name}: unexpected change in {before.tag.decode(errors='replace')} chunk"
-            )
-
-    if not replacement_payloads and plan.hirc_changed_bytes == 0:
-        if stage.read_bytes() != plan.source.read_bytes():
-            raise BuildError(f"{stage.name}: unchanged Bank was not copied byte-for-byte")
-
-    # Parsing the expected result catches malformed object sizes before wwiser.
-    HircEditor(plan.expected_hirc)
-    run_tool(
-        [sys.executable, str(tools.media), "inspect", str(stage)],
-        f"inspect {stage.name}",
-        project_root,
-    )
     run_tool(
         [sys.executable, str(tools.wwiser), "-d", "none", str(stage)],
         f"wwiser {stage.name}",
         validation_dir,
     )
 
+    if b"HIRC" in allowed_chunks:
+        _write_wwiser_hirc_diff(plan.source, stage, validation_dir, tools, project_root)
+
     extract_dir = validation_dir / "extracted"
     decode_dir = validation_dir / "decoded"
     extract_dir.mkdir(parents=True, exist_ok=True)
     decode_dir.mkdir(parents=True, exist_ok=True)
-    for replacement in plan.mapping.replacements:
-        extracted = extract_dir / f"{plan.source.stem}_{replacement.index:03d}.wem"
-        decoded = decode_dir / f"{plan.source.stem}_{replacement.index:03d}.wav"
-        run_tool(
-            [
-                sys.executable,
-                str(tools.media),
-                "extract",
-                str(stage),
-                "--index",
-                str(replacement.index),
-                "-o",
-                str(extracted),
-                "--force",
-            ],
-            f"extract {stage.name} DIDX #{replacement.index}",
-            project_root,
-        )
+    changed_media = (*summary.replaced_media, *summary.added_media)
+    for index, media_id in changed_media:
+        extracted = extract_dir / f"{plan.source.stem}_{index:03d}_{media_id}.wem"
+        decoded = decode_dir / f"{plan.source.stem}_{index:03d}_{media_id}.wav"
+        atomic_write(extracted, staged_bank.extract_media(index=index))
         run_tool(
             [sys.executable, str(tools.pyvgmstream), "inspect", str(extracted)],
-            f"inspect extracted DIDX #{replacement.index}",
+            f"inspect extracted DIDX #{index}",
             project_root,
         )
         run_tool(
@@ -820,11 +548,67 @@ def validate_stage(
                 str(decoded),
                 "--force",
             ],
-            f"decode extracted DIDX #{replacement.index}",
+            f"decode extracted DIDX #{index}",
             project_root,
         )
         if not decoded.is_file() or decoded.stat().st_size == 0:
             raise BuildError(f"Decoded validation WAV is empty: {decoded}")
+
+
+def _normalize_wwiser_hirc_dump(path: Path) -> list[str]:
+    lines = path.read_text(encoding="utf-8").splitlines()
+    start = next(
+        (index for index, line in enumerate(lines) if line.strip() == "obj  HircChunk"),
+        None,
+    )
+    if start is None:
+        raise BuildError(f"wwiser dump does not contain a HircChunk: {path}")
+    section: list[str] = []
+    for index, line in enumerate(lines[start:], start):
+        if index > start and line.startswith("             obj  "):
+            break
+        section.append(re.sub(r"^[0-9a-fA-F]{8}", "OFFSET__", line).rstrip())
+    return section
+
+
+def _write_wwiser_hirc_diff(
+    original: Path,
+    staged: Path,
+    validation_dir: Path,
+    tools: ToolPaths,
+    project_root: Path,
+) -> None:
+    original_prefix = validation_dir / "original-hirc"
+    staged_prefix = validation_dir / "staged-hirc"
+    for source, prefix, label in (
+        (original, original_prefix, "original"),
+        (staged, staged_prefix, "staged"),
+    ):
+        run_tool(
+            [
+                sys.executable,
+                str(tools.wwiser),
+                "-d",
+                "txt",
+                "-dn",
+                str(prefix),
+                str(source),
+            ],
+            f"wwiser {label} HIRC dump {source.name}",
+            project_root,
+        )
+    before = _normalize_wwiser_hirc_dump(original_prefix.with_suffix(".txt"))
+    after = _normalize_wwiser_hirc_dump(staged_prefix.with_suffix(".txt"))
+    semantic_diff = "\n".join(
+        difflib.unified_diff(
+            before,
+            after,
+            fromfile=f"{original.name}:HIRC",
+            tofile=f"{staged.name}:HIRC",
+            lineterm="",
+        )
+    )
+    atomic_write(validation_dir / "hirc-semantic.diff", semantic_diff.encode("utf-8"))
 
 
 def atomic_write(path: Path, data: bytes) -> None:
@@ -844,41 +628,40 @@ def atomic_write(path: Path, data: bytes) -> None:
 
 
 def build_plan(
-    plan: BankPlan,
+    plan: PreparedBank,
     stage_dir: Path,
     converted_dir: Path,
     validation_dir: Path,
     project_root: Path,
     tools: ToolPaths,
-    media_module: ModuleType,
 ) -> None:
     stage = stage_dir / plan.source.name
     stage_dir.mkdir(parents=True, exist_ok=True)
-    replacement_payloads = convert_replacements(
-        plan, converted_dir, project_root, tools, media_module
-    )
-
-    if replacement_payloads:
-        try:
-            payload = media_module.rebuild(plan.original_bank, replacement_payloads)
-        except Exception as error:
-            raise BuildError(f"Could not rebuild media in {plan.source}: {error}") from error
-    else:
-        payload = plan.source.read_bytes()
-
-    original_hirc = get_chunk_payload(payload, HIRC_TAG)
-    if original_hirc != plan.expected_hirc:
-        payload = replace_chunk_payload(payload, HIRC_TAG, plan.expected_hirc)
+    replacement_payloads = convert_replacements(plan, converted_dir, project_root, tools)
+    editor = soundbank_editor.SoundBankEditor(plan.original_bank)
+    try:
+        for replacement in plan.mapping.replacements:
+            if replacement.media_id is None:
+                raise BuildError(f"Missing Media ID for DIDX #{replacement.index}")
+            editor.replace_media(
+                replacement_payloads[replacement.index - 1],
+                index=replacement.index,
+                expected_media_id=replacement.media_id,
+            )
+        plan.plan.apply_edits(editor)
+        editor.validate()
+    except soundbank_editor.SoundBankError as error:
+        raise BuildError(f"Could not edit {plan.source}: {error}") from error
+    plan.editor = editor
+    payload = editor.build()
     atomic_write(stage, payload)
 
     validate_stage(
         plan,
         stage,
-        replacement_payloads,
         validation_dir,
         project_root,
         tools,
-        media_module,
     )
     plan.staged = stage
 
@@ -901,7 +684,7 @@ def atomic_publish(source: Path, target: Path) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def print_preflight(plans: Sequence[BankPlan]) -> None:
+def print_preflight(plans: Sequence[PreparedBank]) -> None:
     print(f"Builders: {len(plans)}")
     for plan in plans:
         replacements = ", ".join(
@@ -911,13 +694,17 @@ def print_preflight(plans: Sequence[BankPlan]) -> None:
         print(
             f"  {plan.mapping.path.name}: {plan.mapping.data_rows} rows, "
             f"replacements={replacements}, "
-            f"HIRC changed bytes={plan.hirc_changed_bytes}"
+            f"HIRC changed bytes={plan.preview_summary.hirc_changed_bytes}, "
+            f"HIRC added objects={len(plan.preview_summary.added_hirc_objects)}, "
+            f"HIRC size delta={plan.preview_summary.hirc_size_delta:+d}"
         )
         for unresolved in plan.mapping.unresolved_rows:
             print(f"  warning: {unresolved}")
 
 
-def _ensure_safe_target(plan: BankPlan, target: Path, *, allow_existing: bool) -> None:
+def _ensure_safe_target(
+    plan: PreparedBank, target: Path, *, allow_existing: bool
+) -> None:
     if target.resolve() == plan.source.resolve():
         raise BuildError(f"Refusing to overwrite original Bank: {target}")
     if target.exists() and not allow_existing:
@@ -926,17 +713,19 @@ def _ensure_safe_target(plan: BankPlan, target: Path, *, allow_existing: bool) -
         )
 
 
-def _make_result(plan: BankPlan, target: Path) -> BuildResult:
-    replacements: list[tuple[int, int]] = []
-    for item in plan.mapping.replacements:
-        if item.media_id is None:
-            raise BuildError(f"Missing Media ID for DIDX #{item.index}")
-        replacements.append((item.index, item.media_id))
+def _make_result(plan: PreparedBank, target: Path) -> BuildResult:
+    if plan.editor is None:
+        raise BuildError(f"Bank editor is missing for {plan.source}")
+    summary = plan.editor.summary
     return BuildResult(
         path=target,
         sha256=sha256(target),
-        replacements=tuple(replacements),
-        hirc_changed_bytes=plan.hirc_changed_bytes,
+        replacements=summary.replaced_media,
+        added_media=summary.added_media,
+        hirc_changed_bytes=summary.hirc_changed_bytes,
+        added_hirc_objects=summary.added_hirc_objects,
+        resized_hirc_objects=summary.resized_hirc_objects,
+        hirc_size_delta=summary.hirc_size_delta,
     )
 
 
@@ -944,15 +733,22 @@ def _print_result(result: BuildResult) -> None:
     replacements = ", ".join(
         f"#{index}/Media ID {media_id}" for index, media_id in result.replacements
     ) or "none"
+    added_media = ", ".join(
+        f"#{index}/Media ID {media_id}" for index, media_id in result.added_media
+    ) or "none"
     print(
         f"Published {result.path} | SHA-256 {result.sha256} | "
         f"replacements: {replacements} | "
-        f"HIRC changed bytes: {result.hirc_changed_bytes}"
+        f"added media: {added_media} | "
+        f"HIRC changed bytes: {result.hirc_changed_bytes} | "
+        f"HIRC added objects: {len(result.added_hirc_objects)} | "
+        f"HIRC resized objects: {len(result.resized_hirc_objects)} | "
+        f"HIRC size delta: {result.hirc_size_delta:+d}"
     )
 
 
 def build_one(
-    spec: BankSpec,
+    build_plan_config: BankBuildPlan,
     *,
     root: Path | None = None,
     mapping_dir: str | Path = "mapping",
@@ -968,13 +764,12 @@ def build_one(
     resolved_soundbank = resolve_project_path(project_root, soundbank_dir)
     resolved_output = resolve_project_path(project_root, output_dir)
     tools = make_tool_paths(project_root)
-    media_module = load_media_module(tools.media)
-    plan = prepare_plan(
-        spec, project_root, resolved_mapping, resolved_soundbank, media_module
+    prepared = prepare_plan(
+        build_plan_config, project_root, resolved_mapping, resolved_soundbank
     )
-    print_preflight([plan])
-    target = resolved_output / plan.source.name
-    _ensure_safe_target(plan, target, allow_existing=force or dry_run)
+    print_preflight([prepared])
+    target = resolved_output / prepared.source.name
+    _ensure_safe_target(prepared, target, allow_existing=force or dry_run)
 
     if dry_run:
         print("Dry run complete; no output files were written.")
@@ -983,25 +778,24 @@ def build_one(
     with tempfile.TemporaryDirectory(prefix="nbnk-builder.", dir="/tmp") as directory:
         task_dir = Path(directory)
         build_plan(
-            plan,
+            prepared,
             task_dir / "banks",
             task_dir / "converted",
-            task_dir / "validation" / plan.spec.name,
+            task_dir / "validation" / prepared.plan.name,
             project_root,
             tools,
-            media_module,
         )
-        if plan.staged is None:
-            raise BuildError(f"Bank was not staged: {plan.source}")
-        atomic_publish(plan.staged, target)
+        if prepared.staged is None:
+            raise BuildError(f"Bank was not staged: {prepared.source}")
+        atomic_publish(prepared.staged, target)
 
-    result = _make_result(plan, target)
+    result = _make_result(prepared, target)
     _print_result(result)
     return result
 
 
 def build_all(
-    specs: Sequence[BankSpec],
+    build_plan_configs: Sequence[BankBuildPlan],
     *,
     root: Path | None = None,
     mapping_dir: str | Path = "mapping",
@@ -1016,13 +810,11 @@ def build_all(
     resolved_soundbank = resolve_project_path(project_root, soundbank_dir)
     resolved_release = resolve_project_path(project_root, release_dir)
     tools = make_tool_paths(project_root)
-    media_module = load_media_module(tools.media)
     plans = prepare_all_plans(
-        specs,
+        build_plan_configs,
         project_root,
         resolved_mapping,
         resolved_soundbank,
-        media_module,
     )
     print_preflight(plans)
     for plan in plans:
@@ -1041,11 +833,10 @@ def build_all(
             build_plan(
                 plan,
                 task_dir / "banks",
-                task_dir / "converted" / plan.spec.name,
-                task_dir / "validation" / plan.spec.name,
+                task_dir / "converted" / plan.plan.name,
+                task_dir / "validation" / plan.plan.name,
                 project_root,
                 tools,
-                media_module,
             )
 
         for plan in plans:
@@ -1078,9 +869,9 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def run_single_cli(spec: BankSpec, argv: list[str] | None = None) -> int:
+def run_single_cli(plan: BankBuildPlan, argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description=f"Build and validate {spec.name}.nbnk from its mapping table."
+        description=f"Build and validate {plan.name}.nbnk from its mapping table."
     )
     _add_common_arguments(parser)
     parser.add_argument(
@@ -1092,7 +883,7 @@ def run_single_cli(spec: BankSpec, argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         build_one(
-            spec,
+            plan,
             root=args.root,
             mapping_dir=args.mapping_dir,
             soundbank_dir=args.soundbank_dir,
@@ -1106,7 +897,7 @@ def run_single_cli(spec: BankSpec, argv: list[str] | None = None) -> int:
         return 2
 
 
-def run_all_cli(specs: Sequence[BankSpec], argv: list[str] | None = None) -> int:
+def run_all_cli(plans: Sequence[BankBuildPlan], argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Build and validate every registered project NBNK mod Bank."
     )
@@ -1119,7 +910,7 @@ def run_all_cli(specs: Sequence[BankSpec], argv: list[str] | None = None) -> int
     args = parser.parse_args(argv)
     try:
         build_all(
-            specs,
+            plans,
             root=args.root,
             mapping_dir=args.mapping_dir,
             soundbank_dir=args.soundbank_dir,

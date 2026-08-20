@@ -11,8 +11,9 @@ description: "Analyze and rebuild Monster Hunter: World/Iceborne Wwise NBNK Soun
 - Treat DIDX indices as 1-based. Inspect the Bank and report the matching Media ID before replacement.
 - Put all extracted media, converted WEM files, logs, and validation artifacts in one task-specific `/tmp` directory.
 - Write only the verified final NBNK to `output/`. Never overwrite an existing output without explicit authorization.
-- Treat `nbnk_media.py replace` as media-only: it must preserve HIRC byte-for-byte.
-- Put persistent project HIRC changes in the matching module under `builders/`, using guarded object-relative edits. Never patch absolute file offsets.
+- Treat mapped media replacement as media-only: it must preserve HIRC byte-for-byte.
+- Put persistent project media and HIRC changes in the matching `BankBuildPlan`
+  under `builders/`, using `tools.soundbank_editor` guarded APIs. Never patch absolute file offsets.
 - Treat structural validation as necessary but insufficient. Complete final trigger, volume, channel, and conflict checks in a recoverable game environment.
 
 ## Prepare the Workspace
@@ -34,11 +35,19 @@ test -f tools/wwiser/wwiser.py
 
 ## Inspect and Analyze
 
-Inspect chunk order, sizes, DIDX indices, Media IDs, offsets, and alignment:
+Inspect chunk order, sizes, DIDX indices, Media IDs, offsets, and alignment with
+the Python Library:
 
 ```sh
-conda run -n nanoha-gunlance-mod python \
-  tools/utils/nbnk_media.py inspect input.nbnk
+conda run -n nanoha-gunlance-mod python <<'PY'
+from pathlib import Path
+from tools import soundbank_editor
+
+bank = soundbank_editor.SoundBank.from_file(Path("input.nbnk"))
+print("version", bank.version, "bank_id", bank.bank_id)
+for index, entry in enumerate(bank.entries, 1):
+    print(index, entry.media_id, entry.offset, entry.size, entry.offset % 16 == 0)
+PY
 ```
 
 Use wwiser for a structural check:
@@ -66,17 +75,28 @@ sends.
 Extract one entry by DIDX index or Media ID:
 
 ```sh
-conda run -n nanoha-gunlance-mod python \
-  tools/utils/nbnk_media.py extract \
-  input.nbnk --index 22 -o "$temp_dir/22.wem"
+conda run -n nanoha-gunlance-mod python <<PY
+from pathlib import Path
+from tools import soundbank_editor
+
+bank = soundbank_editor.SoundBank.from_file(Path("input.nbnk"))
+Path("$temp_dir/22.wem").write_bytes(bank.extract_media(index=22))
+PY
 ```
 
-Use `--media-id ID` instead of `--index`, or extract every entry with:
+Use `extract_media(media_id=ID)` instead of `index=`, or extract every entry with:
 
 ```sh
-conda run -n nanoha-gunlance-mod python \
-  tools/utils/nbnk_media.py extract \
-  input.nbnk --all -o "$temp_dir/wem"
+conda run -n nanoha-gunlance-mod python <<PY
+from pathlib import Path
+from tools import soundbank_editor
+
+bank = soundbank_editor.SoundBank.from_file(Path("input.nbnk"))
+output = Path("$temp_dir/wem")
+output.mkdir(parents=True, exist_ok=True)
+for index, entry in enumerate(bank.entries, 1):
+    (output / f"{index}_{entry.media_id}.wem").write_bytes(entry.payload)
+PY
 ```
 
 Inspect or decode extracted media with the project CLI:
@@ -97,16 +117,17 @@ conda run -n nanoha-gunlance-mod python \
   replacement.wav "$temp_dir/replacement.wem"
 ```
 
-Inspect the converted WEM, then rebuild the Bank. Omit the output argument to write the final Bank to `output/<input filename>`:
+Inspect the converted WEM, then register the replacement in the matching mapping
+table and run its Python `BankBuildPlan`:
 
 ```sh
-conda run -n nanoha-gunlance-mod python \
-  tools/utils/nbnk_media.py replace \
-  original/soundbank/input.nbnk \
-  --replace 22="$temp_dir/replacement.wem"
+conda run -n nanoha-gunlance-mod python -m builders.wp07_gun_epvsp_shell --dry-run
+conda run -n nanoha-gunlance-mod python -m builders.wp07_gun_epvsp_shell
 ```
 
-Use `--replace id:468604124=...` to target a Media ID, and repeat `--replace` for distinct targets.
+The builder resolves every 1-based mapping index to its original Media ID,
+converts the mapped audio, and calls `SoundBankEditor.replace_media()` with that
+exact guard.
 
 The media-only rebuild must preserve Media ID order and every chunk other than
 DIDX/DATA byte-for-byte. It must also align media offsets to 16 bytes and pass
@@ -119,19 +140,22 @@ referenced by multiple Sound objects or spatial paths, so changing only the
 first match can cause level or channel imbalance.
 
 For a project Bank, implement the reviewed settings in
-`builders/<bank-name>.py`. Use `HircEditor` to locate an object by HIRC type and
-ID, then patch a body-relative field with its exact expected old value. The
-builder must fail if the object or old bytes differ. Keep paired playback paths
-symmetric unless the intended mix explicitly requires otherwise.
+`builders/<bank-name>.py`. Import `soundbank_editor`, define the Bank's
+`apply_edits(editor)` callback, and use `editor.hirc` to locate an object by HIRC
+type and ID. Patch a body-relative field with its exact expected old value. Use
+the v120 structural APIs only for reviewed Event/Action/Sound additions. The
+builder must fail if an object, ID, route, or old value differs. Keep paired
+playback paths symmetric unless the intended mix explicitly requires otherwise.
 
 Run the single builder with `--dry-run`, then build to `output/` and inspect the
-resulting HIRC diff. Do not use `nbnk_media.py replace` to express HIRC changes;
-its strict HIRC-preservation rule is an intentional safety boundary.
+resulting normalized wwiser HIRC diff. Do not express persistent HIRC changes in
+ad-hoc scripts; the same-name Python builder is the auditable edit plan.
 
 ## Validate the Final Bank
 
-Run the NBNK inspector and wwiser against the final file. Re-extract each
-replaced entry and inspect or decode it with pyvgmstream. For a HIRC edit,
+Reparse the final file with `SoundBank.from_file()` and run wwiser against it.
+Re-extract each replaced or appended entry and inspect or decode it with
+pyvgmstream. For a HIRC edit,
 compare original and rebuilt dumps after removing file-offset-only differences
 and require that all semantic changes match the declared builder settings.
 Report the output path, SHA-256, replaced DIDX indices, Media IDs, and HIRC

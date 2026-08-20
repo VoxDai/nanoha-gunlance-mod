@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-from .base import BankSpec, HircEditor, run_single_cli
+from tools import soundbank_editor
+
+from .base import BankBuildPlan, run_single_cli
 
 
-def apply_settings(editor: HircEditor) -> None:
+def apply_edits(editor: soundbank_editor.SoundBankEditor) -> None:
     """Keep the original HIRC; this Bank currently needs no node settings."""
 
 
-SPEC = BankSpec(name="hm_cm00_epvsp", apply_settings=apply_settings)
+PLAN = BankBuildPlan(name="hm_cm00_epvsp", apply_edits=apply_edits)
 
 
 if __name__ == "__main__":
-    raise SystemExit(run_single_cli(SPEC))
+    raise SystemExit(run_single_cli(PLAN))
