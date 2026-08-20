@@ -28,6 +28,12 @@ When rebuilding:
 preserving existing order. It requires a new explicit Media ID, rejects HIRC or
 media ID collisions, and applies the same 16-byte alignment during rebuilding.
 
+At builder level, `MappingMediaOverlay` marks one or more non-empty Audio rows as
+inputs for one appended payload rather than replacement targets. All marked rows
+must resolve to one source file, which is converted once. Their original DIDX
+records, Media IDs, order, and payloads remain unchanged; the Bank's
+`apply_edits()` callback must add and guard the route to the appended Media ID.
+
 An explicitly configured `BankBuildPlan` may change HIRC after mapped media edits.
 In that case it must identify objects by HIRC type and ID, assert every old
 field value, preserve all undeclared fields and chunks, and report the exact
@@ -49,9 +55,12 @@ paths. Trace every route before changing volume, pitch, or Aux settings.
 5. If the symptom is reverb, spatialization, or channel imbalance, inspect every
    Sound path for inherited Aux sends, positioning, parent pitch, and asymmetric
    volume settings.
-6. Confirm the installed Bank filename and path match the original game Bank.
-7. Remove conflicting mods that provide the same Bank.
-8. Restore the original Bank to verify the game environment, then compare with a known-working reference.
+6. For overlays, confirm the original mapping indices were excluded from the
+   replacement summary and the appended Media ID has exactly the intended
+   Event -> Action -> Sound route.
+7. Confirm the installed Bank filename and path match the original game Bank.
+8. Remove conflicting mods that provide the same Bank.
+9. Restore the original Bank to verify the game environment, then compare with a known-working reference.
 
 ## Validation Boundaries
 

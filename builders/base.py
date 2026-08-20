@@ -57,17 +57,57 @@ EditHook = Callable[[soundbank_editor.SoundBankEditor], None]
 
 
 @dataclass(frozen=True)
+class MappingMediaOverlay:
+    """Mapping rows consumed as one appended media payload, not replacements."""
+
+    indices: tuple[int, ...]
+    media_id: int
+
+    def __post_init__(self) -> None:
+        if not self.indices:
+            raise ValueError("Mapping media overlay must contain at least one DIDX index")
+        if any(
+            not isinstance(index, int) or isinstance(index, bool) or index < 1
+            for index in self.indices
+        ):
+            raise ValueError("Mapping media overlay indices must be positive integers")
+        if len(self.indices) != len(set(self.indices)):
+            raise ValueError("Mapping media overlay indices must be unique")
+        if (
+            not isinstance(self.media_id, int)
+            or isinstance(self.media_id, bool)
+            or not 0 <= self.media_id <= 0xFFFFFFFF
+        ):
+            raise ValueError("Mapping media overlay Media ID must be a u32")
+
+
+@dataclass(frozen=True)
 class BankBuildPlan:
     """Declarative identity and bank-specific edits for one builder."""
 
     name: str
     apply_edits: EditHook
+    media_overlays: tuple[MappingMediaOverlay, ...] = ()
 
     def __post_init__(self) -> None:
         if not BANK_NAME_RE.fullmatch(self.name):
             raise ValueError(f"Invalid Bank builder name: {self.name}")
         if not callable(self.apply_edits):
             raise TypeError("apply_edits must be callable")
+        if not isinstance(self.media_overlays, tuple) or any(
+            not isinstance(overlay, MappingMediaOverlay)
+            for overlay in self.media_overlays
+        ):
+            raise TypeError("media_overlays must be a tuple of MappingMediaOverlay")
+
+
+@dataclass(frozen=True)
+class PreparedMappingMediaOverlay:
+    """One validated overlay and its representative mapping row."""
+
+    config: MappingMediaOverlay
+    source_audio: Path
+    representative: Replacement
 
 
 @dataclass
@@ -79,6 +119,8 @@ class PreparedBank:
     mapping: MappingInfo
     original_bank: soundbank_editor.SoundBank
     preview_summary: soundbank_editor.EditSummary
+    replacements: tuple[Replacement, ...]
+    media_overlays: tuple[PreparedMappingMediaOverlay, ...]
     editor: soundbank_editor.SoundBankEditor | None = None
     staged: Path | None = None
 
@@ -352,6 +394,55 @@ def make_tool_paths(project_root: Path) -> ToolPaths:
     return paths
 
 
+def partition_mapping_edits(
+    build_plan: BankBuildPlan, mapping: MappingInfo
+) -> tuple[tuple[Replacement, ...], tuple[PreparedMappingMediaOverlay, ...]]:
+    """Separate ordinary replacements from plan-declared appended overlays."""
+
+    by_index = {replacement.index: replacement for replacement in mapping.replacements}
+    claimed: dict[int, int] = {}
+    prepared_overlays: list[PreparedMappingMediaOverlay] = []
+    for overlay_number, overlay in enumerate(build_plan.media_overlays, start=1):
+        for index in overlay.indices:
+            previous = claimed.get(index)
+            if previous is not None:
+                raise BuildError(
+                    f"{build_plan.name}: DIDX #{index} is claimed by mapping media "
+                    f"overlays {previous} and {overlay_number}"
+                )
+            claimed[index] = overlay_number
+        missing = [index for index in overlay.indices if index not in by_index]
+        if missing:
+            raise BuildError(
+                f"{build_plan.name}: mapping media overlay {overlay_number} references "
+                "rows without Audio replacements: "
+                + ", ".join(f"#{index}" for index in missing)
+            )
+        rows = [by_index[index] for index in overlay.indices]
+        sources = {row.source_audio.resolve() for row in rows}
+        if len(sources) != 1:
+            details = ", ".join(
+                f"#{row.index}={row.source_audio}" for row in rows
+            )
+            raise BuildError(
+                f"{build_plan.name}: mapping media overlay {overlay_number} rows must "
+                f"use one source audio file: {details}"
+            )
+        prepared_overlays.append(
+            PreparedMappingMediaOverlay(
+                config=overlay,
+                source_audio=next(iter(sources)),
+                representative=rows[0],
+            )
+        )
+    replacements = tuple(
+        replacement
+        for replacement in mapping.replacements
+        if replacement.index not in claimed
+    )
+    return replacements, tuple(prepared_overlays)
+
+
 def prepare_plan(
     build_plan: BankBuildPlan,
     project_root: Path,
@@ -381,8 +472,15 @@ def prepare_plan(
             )
         replacement.media_id = original_bank.entries[replacement.index - 1].media_id
 
+    replacements, media_overlays = partition_mapping_edits(build_plan, mapping)
+
     preview = soundbank_editor.SoundBankEditor(original_bank)
     try:
+        for overlay in media_overlays:
+            preview.append_media(
+                overlay.config.media_id,
+                original_bank.extract_media(index=overlay.representative.index),
+            )
         build_plan.apply_edits(preview)
         preview.validate()
     except soundbank_editor.SoundBankError as error:
@@ -402,6 +500,8 @@ def prepare_plan(
         mapping=mapping,
         original_bank=original_bank,
         preview_summary=preview.summary,
+        replacements=replacements,
+        media_overlays=media_overlays,
     )
 
 
@@ -462,7 +562,19 @@ def convert_replacements(
 ) -> dict[int, bytes]:
     converted_dir.mkdir(parents=True, exist_ok=True)
     payloads: dict[int, bytes] = {}
-    for replacement in plan.mapping.replacements:
+    converted_sources: dict[Path, tuple[bytes, Path]] = {}
+    conversion_rows = (
+        *plan.replacements,
+        *(overlay.representative for overlay in plan.media_overlays),
+    )
+    for replacement in conversion_rows:
+        source_audio = replacement.source_audio.resolve()
+        cached = converted_sources.get(source_audio)
+        if cached is not None:
+            payload, wem_path = cached
+            replacement.wem_path = wem_path
+            payloads[replacement.index - 1] = payload
+            continue
         wem_path = converted_dir / f"{plan.source.stem}_{replacement.index:03d}.wem"
         run_tool(
             [
@@ -480,6 +592,7 @@ def convert_replacements(
         except soundbank_editor.SoundBankError as error:
             raise BuildError(f"Converted WEM is invalid: {wem_path}: {error}") from error
         replacement.wem_path = wem_path
+        converted_sources[source_audio] = (payload, wem_path)
         payloads[replacement.index - 1] = payload
     return payloads
 
@@ -640,13 +753,18 @@ def build_plan(
     replacement_payloads = convert_replacements(plan, converted_dir, project_root, tools)
     editor = soundbank_editor.SoundBankEditor(plan.original_bank)
     try:
-        for replacement in plan.mapping.replacements:
+        for replacement in plan.replacements:
             if replacement.media_id is None:
                 raise BuildError(f"Missing Media ID for DIDX #{replacement.index}")
             editor.replace_media(
                 replacement_payloads[replacement.index - 1],
                 index=replacement.index,
                 expected_media_id=replacement.media_id,
+            )
+        for overlay in plan.media_overlays:
+            editor.append_media(
+                overlay.config.media_id,
+                replacement_payloads[overlay.representative.index - 1],
             )
         plan.plan.apply_edits(editor)
         editor.validate()
@@ -689,11 +807,17 @@ def print_preflight(plans: Sequence[PreparedBank]) -> None:
     for plan in plans:
         replacements = ", ".join(
             f"#{item.index} (Media ID {item.media_id})"
-            for item in plan.mapping.replacements
+            for item in plan.replacements
+        ) or "none"
+        overlays = ", ".join(
+            "/".join(f"#{index}" for index in overlay.config.indices)
+            + f" -> added Media ID {overlay.config.media_id}"
+            for overlay in plan.media_overlays
         ) or "none"
         print(
             f"  {plan.mapping.path.name}: {plan.mapping.data_rows} rows, "
             f"replacements={replacements}, "
+            f"overlays={overlays}, "
             f"HIRC changed bytes={plan.preview_summary.hirc_changed_bytes}, "
             f"HIRC added objects={len(plan.preview_summary.added_hirc_objects)}, "
             f"HIRC size delta={plan.preview_summary.hirc_size_delta:+d}"

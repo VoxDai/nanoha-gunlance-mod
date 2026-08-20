@@ -2,23 +2,60 @@ from __future__ import annotations
 
 import struct
 from pathlib import Path
+import tempfile
 import unittest
+from unittest import mock
 
 from builders.__main__ import PLANS
-from builders.base import parse_mapping, validate_registry
-from builders.wp07_gun_epvsp_shell import apply_edits as apply_wp07_edits
+from builders.base import (
+    BankBuildPlan,
+    BuildError,
+    MappingInfo,
+    MappingMediaOverlay,
+    Replacement,
+    ToolPaths,
+    convert_replacements,
+    parse_mapping,
+    partition_mapping_edits,
+    prepare_plan,
+    validate_registry,
+)
+from builders.wp07_gun_epvsp_shell import (
+    FULL_BURST_MAPPING_INDICES,
+    FULL_BURST_OVERLAY_MEDIA_ID,
+    FULL_BURST_OVERLAY_ROUTES,
+    PLAN as WP07_PLAN,
+    POSITIONING_VECTOR_OFFSET,
+    apply_edits as apply_wp07_edits,
+)
 from tools import soundbank_editor
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+MAPPING_ROOT = PROJECT_ROOT / "mapping"
+SOUNDBANK_ROOT = PROJECT_ROOT / "original" / "soundbank"
+
+
+def noop_edits(_editor: soundbank_editor.SoundBankEditor) -> None:
+    """Use a named no-op callback in synthetic build plans."""
+
+
+def synthetic_mapping(*sources: str) -> MappingInfo:
+    return MappingInfo(
+        path=Path("synthetic.md"),
+        bank_name="synthetic",
+        data_rows=len(sources),
+        replacements=[
+            Replacement(index, Path(source), index)
+            for index, source in enumerate(sources, 1)
+        ],
+        unresolved_rows=[],
+    )
+
 
 class MappingTests(unittest.TestCase):
     def test_registry_matches_every_mapping_and_soundbank(self) -> None:
-        validate_registry(
-            PLANS,
-            PROJECT_ROOT / "mapping",
-            PROJECT_ROOT / "original" / "soundbank",
-        )
+        validate_registry(PLANS, MAPPING_ROOT, SOUNDBANK_ROOT)
         self.assertEqual(
             {plan.name for plan in PLANS},
             {
@@ -34,7 +71,7 @@ class MappingTests(unittest.TestCase):
     def test_current_mapping_replacements_and_unresolved_rows(self) -> None:
         parsed = {
             path.stem: parse_mapping(path, PROJECT_ROOT)
-            for path in sorted((PROJECT_ROOT / "mapping").glob("*.md"))
+            for path in sorted(MAPPING_ROOT.glob("*.md"))
         }
         self.assertEqual(
             [item.index for item in parsed["wp07_gun_epvsp_shell"].replacements],
@@ -53,76 +90,236 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(len(parsed["cm_hitmark_epvsp"].unresolved_rows), 1)
         self.assertEqual(len(parsed["wp_gun_cmn"].unresolved_rows), 1)
 
+    def test_wp07_overlay_rows_are_removed_from_replacements(self) -> None:
+        prepared = prepare_plan(
+            WP07_PLAN,
+            PROJECT_ROOT,
+            MAPPING_ROOT,
+            SOUNDBANK_ROOT,
+        )
+        self.assertEqual(
+            tuple(item.index for item in prepared.replacements),
+            (4, 19, 23, 27, 29, 33, 37),
+        )
+        self.assertEqual(len(prepared.media_overlays), 1)
+        overlay = prepared.media_overlays[0]
+        self.assertEqual(overlay.config.indices, FULL_BURST_MAPPING_INDICES)
+        self.assertEqual(overlay.config.media_id, FULL_BURST_OVERLAY_MEDIA_ID)
+        self.assertEqual(
+            overlay.source_audio,
+            PROJECT_ROOT / "audio" / "wp07_gun_epvsp_shell" / "shoot.wav",
+        )
+        self.assertEqual(prepared.preview_summary.replaced_media, ())
+        self.assertEqual(
+            prepared.preview_summary.added_media,
+            ((43, FULL_BURST_OVERLAY_MEDIA_ID),),
+        )
+        self.assertEqual(prepared.preview_summary.hirc_changed_bytes, 10)
+        self.assertEqual(len(prepared.preview_summary.added_hirc_objects), 10)
+        self.assertEqual(len(prepared.preview_summary.resized_hirc_objects), 5)
+        self.assertEqual(prepared.preview_summary.hirc_size_delta, 520)
 
-class Wp07SettingsTests(unittest.TestCase):
+    def test_overlay_requires_mapped_rows_with_one_source(self) -> None:
+        missing = BankBuildPlan(
+            "synthetic",
+            noop_edits,
+            (MappingMediaOverlay((1, 3), 100),),
+        )
+        with self.assertRaisesRegex(BuildError, "rows without Audio replacements"):
+            partition_mapping_edits(missing, synthetic_mapping("same.wav", "same.wav"))
+
+        split = BankBuildPlan(
+            "synthetic",
+            noop_edits,
+            (MappingMediaOverlay((1, 2), 100),),
+        )
+        with self.assertRaisesRegex(BuildError, "one source audio file"):
+            partition_mapping_edits(split, synthetic_mapping("one.wav", "two.wav"))
+
+    def test_overlay_indices_cannot_be_claimed_twice(self) -> None:
+        plan = BankBuildPlan(
+            "synthetic",
+            noop_edits,
+            (
+                MappingMediaOverlay((1, 2), 100),
+                MappingMediaOverlay((2,), 101),
+            ),
+        )
+        with self.assertRaisesRegex(BuildError, "claimed by mapping media overlays"):
+            partition_mapping_edits(plan, synthetic_mapping("same.wav", "same.wav"))
+
+    def test_overlay_media_id_collision_fails_preflight(self) -> None:
+        bank = soundbank_editor.SoundBank.from_file(
+            SOUNDBANK_ROOT / "wp07_gun_epvsp_shell.nbnk"
+        )
+        plan = BankBuildPlan(
+            "wp07_gun_epvsp_shell",
+            noop_edits,
+            (
+                MappingMediaOverlay(
+                    FULL_BURST_MAPPING_INDICES,
+                    bank.entries[0].media_id,
+                ),
+            ),
+        )
+        with self.assertRaisesRegex(BuildError, "Media ID already exists"):
+            prepare_plan(plan, PROJECT_ROOT, MAPPING_ROOT, SOUNDBANK_ROOT)
+
+    def test_overlay_shared_source_is_converted_once(self) -> None:
+        prepared = prepare_plan(
+            WP07_PLAN,
+            PROJECT_ROOT,
+            MAPPING_ROOT,
+            SOUNDBANK_ROOT,
+        )
+        placeholder_wem = prepared.original_bank.extract_media(index=2)
+        commands: list[list[str]] = []
+
+        def fake_run_tool(
+            command: list[str], _label: str, _working_directory: Path
+        ) -> None:
+            commands.append(command)
+            Path(command[3]).write_bytes(placeholder_wem)
+
+        fake_tools = ToolPaths(
+            Path("converter.py"), Path("pyvgmstream.py"), Path("wwiser.py")
+        )
+        with tempfile.TemporaryDirectory(
+            prefix="mapping-overlay-test.", dir="/tmp"
+        ) as directory, mock.patch(
+            "builders.base.run_tool", side_effect=fake_run_tool
+        ):
+            payloads = convert_replacements(
+                prepared,
+                Path(directory),
+                PROJECT_ROOT,
+                fake_tools,
+            )
+
+        overlay_source = prepared.media_overlays[0].source_audio
+        overlay_commands = [
+            command
+            for command in commands
+            if Path(command[2]).resolve() == overlay_source
+        ]
+        self.assertEqual(len(overlay_commands), 1)
+        self.assertEqual(payloads[1], placeholder_wem)
+        self.assertFalse(
+            {index - 1 for index in FULL_BURST_MAPPING_INDICES[1:]} & payloads.keys()
+        )
+
+
+class Wp07OverlayTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        source = (
-            PROJECT_ROOT
-            / "original"
-            / "soundbank"
-            / "wp07_gun_epvsp_shell.nbnk"
+        source = SOUNDBANK_ROOT / "wp07_gun_epvsp_shell.nbnk"
+        cls.original = soundbank_editor.SoundBank.from_file(source)
+        cls.original_hirc = soundbank_editor.HircEditor(cls.original.hirc_payload)
+        cls.editor = soundbank_editor.SoundBankEditor(cls.original)
+        cls.editor.append_media(
+            FULL_BURST_OVERLAY_MEDIA_ID,
+            cls.original.extract_media(index=FULL_BURST_MAPPING_INDICES[0]),
         )
-        bank = soundbank_editor.SoundBank.from_file(source)
-        editor = soundbank_editor.SoundBankEditor(bank)
-        cls.original_hirc = bank.hirc_payload
-        apply_wp07_edits(editor)
-        cls.changed_byte_count = editor.hirc.changed_byte_count
-        cls.patched_hirc = editor.hirc.build()
-        cls.patched = soundbank_editor.HircEditor(cls.patched_hirc)
+        apply_wp07_edits(cls.editor)
+        cls.rebuilt = cls.editor.validate()
+        cls.rebuilt_hirc = soundbank_editor.HircEditor(cls.rebuilt.hirc_payload)
 
-    def test_exact_change_count_and_length(self) -> None:
-        self.assertEqual(self.changed_byte_count, 54)
-        self.assertEqual(len(self.patched_hirc), len(self.original_hirc))
-        self.assertEqual(
-            sum(a != b for a, b in zip(self.original_hirc, self.patched_hirc)), 54
+    def test_exact_structural_summary(self) -> None:
+        summary = self.editor.summary
+        expected_added = tuple(
+            item
+            for route in FULL_BURST_OVERLAY_ROUTES
+            for item in (
+                (soundbank_editor.HIRC_SOUND, route.sound_id),
+                (soundbank_editor.HIRC_ACTION, route.action_id),
+            )
         )
+        expected_resized = {
+            (soundbank_editor.HIRC_EVENT, route.event_id, 12, 16)
+            for route in FULL_BURST_OVERLAY_ROUTES
+        }
+        self.assertEqual(summary.replaced_media, ())
+        self.assertEqual(summary.added_media, ((43, FULL_BURST_OVERLAY_MEDIA_ID),))
+        self.assertEqual(summary.hirc_changed_bytes, 10)
+        self.assertEqual(summary.added_hirc_objects, expected_added)
+        self.assertEqual(set(summary.resized_hirc_objects), expected_resized)
+        self.assertEqual(summary.hirc_size_delta, 520)
 
-    def test_aux_overrides_and_bus_clear(self) -> None:
-        for sound_id, flag_offset, bus_offset in (
-            (46149961, 0x2B, 0x2C),
-            (219848096, 0x2B, 0x2C),
-            (641882349, 0x30, 0x31),
-            (68448090, 0x30, 0x31),
-            (196455745, 0x2B, 0x2C),
-            (994484287, 0x2B, 0x2C),
-        ):
-            body = self.patched.object_body(0x02, sound_id)
-            self.assertEqual(body[flag_offset], 0x0D)
-            self.assertEqual(struct.unpack_from("<I", body, bus_offset)[0], 0)
-        for sound_id in (862816411, 467996314):
-            self.assertEqual(self.patched.object_body(0x02, sound_id)[0x26], 0x05)
+    def test_overlay_mapping_media_remains_byte_exact(self) -> None:
+        for index in FULL_BURST_MAPPING_INDICES:
+            before = self.original.media_entry(index=index)
+            after = self.rebuilt.media_entry(index=index)
+            self.assertEqual(after.media_id, before.media_id, index)
+            self.assertEqual(after.payload, before.payload, index)
+        added = self.rebuilt.media_entry(index=43)
+        self.assertEqual(added.media_id, FULL_BURST_OVERLAY_MEDIA_ID)
+        self.assertEqual(added.offset % soundbank_editor.ALIGNMENT, 0)
 
-    def test_paired_pitch_and_volume_values(self) -> None:
-        for container_id, offset in (
-            (246916390, 0x17),
-            (505597934, 0x12),
-            (885313651, 0x12),
-        ):
-            body = self.patched.object_body(0x05, container_id)
-            self.assertEqual(struct.unpack_from("<f", body, offset)[0], 0.0)
+    def test_five_event_action_sound_media_routes(self) -> None:
+        positions = {
+            (item.object_type, item.object_id): position
+            for position, item in enumerate(self.rebuilt_hirc.objects())
+        }
+        for route in FULL_BURST_OVERLAY_ROUTES:
+            self.assertEqual(
+                self.rebuilt_hirc.event_actions(route.event_id),
+                (route.expected_action_id, route.action_id),
+            )
+            self.assertEqual(
+                positions[(soundbank_editor.HIRC_ACTION, route.action_id)] + 1,
+                positions[(soundbank_editor.HIRC_EVENT, route.event_id)],
+            )
+            action = self.rebuilt_hirc.object_body(
+                soundbank_editor.HIRC_ACTION, route.action_id
+            )
+            expected_action = self.rebuilt_hirc.create_play_action(
+                route.action_id, route.sound_id, self.rebuilt.bank_id
+            )
+            self.assertEqual(action, expected_action)
 
-        for sound_id, offset in (
-            (641882349, 0x22),
-            (467996314, 0x20),
-            (68448090, 0x22),
-            (862816411, 0x20),
-        ):
-            body = self.patched.object_body(0x02, sound_id)
-            self.assertEqual(struct.unpack_from("<f", body, offset)[0], -6.5)
+            donor = self.original_hirc.object_body(
+                soundbank_editor.HIRC_SOUND, route.donor_sound_id
+            )
+            expected_sound = bytearray(donor)
+            struct.pack_into("<I", expected_sound, 0, route.sound_id)
+            struct.pack_into("<I", expected_sound, 9, FULL_BURST_OVERLAY_MEDIA_ID)
+            expected_sound[POSITIONING_VECTOR_OFFSET] = 0xC1
+            actual_sound = self.rebuilt_hirc.object_body(
+                soundbank_editor.HIRC_SOUND, route.sound_id
+            )
+            self.assertEqual(actual_sound, bytes(expected_sound))
 
-        for sound_id in (196455745, 994484287):
-            body = self.patched.object_body(0x02, sound_id)
-            self.assertEqual(body[0x1F:0x21], bytes((0x00, 0x0E)))
-            self.assertEqual(struct.unpack_from("<f", body, 0x21)[0], -1.5)
-            self.assertEqual(struct.unpack_from("<f", body, 0x25)[0], 100.0)
+    def test_only_five_original_events_change(self) -> None:
+        diff = self.original.diff(self.rebuilt)
+        expected_events = {
+            (soundbank_editor.HIRC_EVENT, route.event_id)
+            for route in FULL_BURST_OVERLAY_ROUTES
+        }
+        expected_added = {
+            item
+            for route in FULL_BURST_OVERLAY_ROUTES
+            for item in (
+                (soundbank_editor.HIRC_SOUND, route.sound_id),
+                (soundbank_editor.HIRC_ACTION, route.action_id),
+            )
+        }
+        self.assertEqual(set(diff.changed_hirc_objects), expected_events)
+        self.assertEqual(set(diff.added_hirc_objects), expected_added)
+        self.assertEqual(diff.removed_hirc_objects, ())
+
+    def test_paired_events_remain_unchanged(self) -> None:
+        for event_id in (719268880, 678619471, 2432475814):
+            self.assertEqual(
+                self.rebuilt_hirc.object_body(soundbank_editor.HIRC_EVENT, event_id),
+                self.original_hirc.object_body(soundbank_editor.HIRC_EVENT, event_id),
+            )
 
     def test_other_builders_are_hirc_noops(self) -> None:
         for plan in PLANS:
             if plan.name == "wp07_gun_epvsp_shell":
                 continue
             bank = soundbank_editor.SoundBank.from_file(
-                PROJECT_ROOT / "original" / "soundbank" / f"{plan.name}.nbnk"
+                SOUNDBANK_ROOT / f"{plan.name}.nbnk"
             )
             editor = soundbank_editor.SoundBankEditor(bank)
             plan.apply_edits(editor)

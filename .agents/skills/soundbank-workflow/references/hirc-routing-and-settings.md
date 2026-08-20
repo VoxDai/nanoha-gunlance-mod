@@ -86,4 +86,9 @@ fields change later body offsets.
 `tools.soundbank_editor` is a Python Library, not a CLI. Use a per-Bank
 `BankBuildPlan` for persistent media and HIRC changes. The builder's mapping
 replacement phase remains media-only; bank-specific structural changes belong
-only in its Python `apply_edits()` callback.
+only in its Python `apply_edits()` callback. If mapping Audio rows feed an
+additional route while their original media must remain intact, declare them as
+a `MappingMediaOverlay` on that plan. The shared WEM is appended before the
+callback runs; the callback must guard its Media ID, clone the reviewed Sound,
+insert each Action before its Event, and preserve the Event's existing Action as
+the first list entry.

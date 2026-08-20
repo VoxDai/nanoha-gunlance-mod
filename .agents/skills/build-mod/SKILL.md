@@ -31,6 +31,7 @@ For one Bank, run `python -m builders.<bank-name>`. A single builder writes to
 - Each mapping table must contain `Wem# New(Old)` and `Audio` columns.
 - Use the link in Wem# New(Old) that points to original/audio_files/Bank/wav/index.wav to resolve the current 1-based DIDX index. Ignore the parenthesized Old index for replacement.
 - Treat an Audio cell containing only whitespace as unchanged media. A non-empty Audio cell must contain exactly one local Markdown link to an existing file inside the project.
+- A `BankBuildPlan` may declare `MappingMediaOverlay` rows. These rows still require valid non-empty Audio links, but they are excluded from replacement, must all resolve to one source file, and become one appended Media ID for the Bank-specific HIRC callback.
 - Ignore Source Audio for building; it is research metadata only.
 - Report rows without an original-audio link when Audio is empty and skip them. Fail before publishing when such a row has a non-empty Audio cell.
 - Reject missing Banks, missing audio files, malformed headers, duplicate DIDX targets, and out-of-range indices.
@@ -40,10 +41,12 @@ For one Bank, run `python -m builders.<bank-name>`. A single builder writes to
 1. Preflight the builder registry, mappings, source Banks, paths, DIDX indices,
    bank-specific HIRC guards, and required tools.
 2. Convert mapped audio to the verified 48 kHz, 16-bit, stereo Wwise PCM WEM
-   layout in one task-specific `/tmp` workspace.
+   layout in one task-specific `/tmp` workspace. Convert each overlay source
+   once even when several rows consume it.
 3. Create `tools.soundbank_editor.SoundBankEditor` from the original Bank,
-   apply mapped media replacements, then execute only the Python edits declared
-   by its `BankBuildPlan`. Banks with neither change remain byte-for-byte identical.
+   apply ordinary mapped media replacements, append plan-declared overlay media,
+   then execute only the Python edits declared by its `BankBuildPlan`. Banks
+   with neither change remain byte-for-byte identical.
 4. Reparse every staged Bank with `SoundBank.from_file()` and run
    `wwiser.py -d none`; for HIRC edits, also generate a normalized semantic diff.
 5. Re-extract every replaced or appended DIDX entry through the Library, then

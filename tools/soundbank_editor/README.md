@@ -77,6 +77,10 @@ Wwise-style ID is wanted.
 For persistent work, call these APIs from `apply_edits()` in the same-name Bank
 module under `builders/`. Builders own mapping parsing, WAV-to-WEM conversion,
 wwiser comparison, pyvgmstream decoding, and atomic output publication.
+When mapped Audio should be layered over unchanged original media, the plan may
+declare `MappingMediaOverlay(indices=(...), media_id=...)`. This builder-only
+configuration validates one shared source, converts it once, appends it, and
+then calls `apply_edits()`; it is not a JSON plan or Library CLI feature.
 
 ## Boundaries
 

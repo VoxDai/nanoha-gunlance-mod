@@ -11,7 +11,7 @@ description: "Analyze and rebuild Monster Hunter: World/Iceborne Wwise NBNK Soun
 - Treat DIDX indices as 1-based. Inspect the Bank and report the matching Media ID before replacement.
 - Put all extracted media, converted WEM files, logs, and validation artifacts in one task-specific `/tmp` directory.
 - Write only the verified final NBNK to `output/`. Never overwrite an existing output without explicit authorization.
-- Treat mapped media replacement as media-only: it must preserve HIRC byte-for-byte.
+- Treat ordinary mapped media replacement as media-only: it must preserve HIRC byte-for-byte. A reviewed `MappingMediaOverlay` is different: it consumes declared Audio rows without replacing their original payloads, appends shared media, and relies on the Bank callback for its HIRC route.
 - Put persistent project media and HIRC changes in the matching `BankBuildPlan`
   under `builders/`, using `tools.soundbank_editor` guarded APIs. Never patch absolute file offsets.
 - Treat structural validation as necessary but insufficient. Complete final trigger, volume, channel, and conflict checks in a recoverable game environment.
@@ -129,6 +129,14 @@ The builder resolves every 1-based mapping index to its original Media ID,
 converts the mapped audio, and calls `SoundBankEditor.replace_media()` with that
 exact guard.
 
+When several mapping rows describe one sound that must be layered over the
+original effects, declare `MappingMediaOverlay(indices=(...), media_id=...)` on
+the `BankBuildPlan`. Every declared row must exist and resolve to the same source
+file. The builder excludes those indices from ordinary replacement, converts
+the shared source once, appends it under the explicit Media ID, and then invokes
+`apply_edits()` to create the reviewed Event -> Action -> Sound route. A missing
+row, split source path, duplicate claimed index, or ID collision is fatal.
+
 The media-only rebuild must preserve Media ID order and every chunk other than
 DIDX/DATA byte-for-byte. It must also align media offsets to 16 bytes and pass
 read-back verification.
@@ -146,6 +154,9 @@ type and ID. Patch a body-relative field with its exact expected old value. Use
 the v120 structural APIs only for reviewed Event/Action/Sound additions. The
 builder must fail if an object, ID, route, or old value differs. Keep paired
 playback paths symmetric unless the intended mix explicitly requires otherwise.
+For an overlay, clone only a reviewed donor Sound, preserve all donor fields
+except the explicit new Sound and Source IDs, and guard any additional
+positioning override byte before changing it.
 
 Run the single builder with `--dry-run`, then build to `output/` and inspect the
 resulting normalized wwiser HIRC diff. Do not express persistent HIRC changes in
