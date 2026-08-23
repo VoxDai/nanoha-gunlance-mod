@@ -21,6 +21,17 @@ def make_hirc(*records: tuple[int, int, bytes]) -> bytes:
     return bytes(payload)
 
 
+def make_random_container_tail(*playlist: tuple[int, int]) -> bytes:
+    payload = bytearray(struct.pack("<I", len(playlist)))
+    payload += struct.pack(
+        f"<{len(playlist)}I", *(child_id for child_id, _ in playlist)
+    )
+    payload += struct.pack("<H", len(playlist))
+    for child_id, weight in playlist:
+        payload += struct.pack("<Ii", child_id, weight)
+    return bytes(payload)
+
+
 class SoundBankRoundTripTests(unittest.TestCase):
     def test_every_original_bank_round_trips_byte_exactly(self) -> None:
         for path in sorted(SOUNDBANK_ROOT.glob("*.nbnk")):
@@ -141,6 +152,162 @@ class HircEditorTests(unittest.TestCase):
             (soundbank_editor.HIRC_SOUND, sound_id), editor.hirc.rebuilt_objects
         )
         editor.validate()
+
+    def test_clone_random_sequence_container_rebuilds_reviewed_tail(self) -> None:
+        bank = soundbank_editor.SoundBank.from_file(
+            SOUNDBANK_ROOT / "wp07_gun_epvsp_shell.nbnk"
+        )
+        editor = soundbank_editor.SoundBankEditor(bank)
+        donor_container_id = 145_848_034
+        donor_sound_id = 535_190_438
+        second_sound_id = 220_939_954
+        new_container_id = 4_294_967_000
+        old_playlist = ((donor_sound_id, 50_000),)
+        new_playlist = (
+            (donor_sound_id, 50_000),
+            (second_sound_id, 25_000),
+        )
+
+        donor = editor.hirc.object_body(
+            soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+            donor_container_id,
+        )
+        old_tail = make_random_container_tail(*old_playlist)
+        self.assertTrue(donor.endswith(old_tail))
+        prefix = bytearray(donor[: -len(old_tail)])
+        struct.pack_into("<I", prefix, 0, new_container_id)
+        self.assertEqual(struct.unpack_from("<H", prefix, len(prefix) - 6)[0], 1)
+        struct.pack_into("<H", prefix, len(prefix) - 6, 0)
+
+        editor.hirc.clone_random_sequence_container(
+            donor_container_id,
+            new_container_id,
+            new_playlist,
+            expected_playlist=old_playlist,
+            expected_avoid_repeat_count=1,
+            avoid_repeat_count=0,
+        )
+
+        actual = editor.hirc.object_body(
+            soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+            new_container_id,
+        )
+        self.assertEqual(actual, bytes(prefix) + make_random_container_tail(*new_playlist))
+        rebuilt = editor.validate()
+        self.assertEqual(
+            soundbank_editor.HircEditor(rebuilt.hirc_payload).object_body(
+                soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+                new_container_id,
+            ),
+            actual,
+        )
+        self.assertEqual(
+            editor.summary.added_hirc_objects,
+            ((soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, new_container_id),),
+        )
+        self.assertEqual(editor.summary.hirc_size_delta, 105)
+
+    def test_clone_random_sequence_container_guards_inputs(self) -> None:
+        bank = soundbank_editor.SoundBank.from_file(
+            SOUNDBANK_ROOT / "wp07_gun_epvsp_shell.nbnk"
+        )
+        editor = soundbank_editor.SoundBankEditor(bank)
+        donor_container_id = 145_848_034
+        donor_sound_id = 535_190_438
+        expected_playlist = ((donor_sound_id, 50_000),)
+        arguments = {
+            "donor_container_id": donor_container_id,
+            "new_container_id": 4_294_967_000,
+            "playlist": expected_playlist,
+            "expected_playlist": expected_playlist,
+            "expected_avoid_repeat_count": 1,
+        }
+
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "expected playlist"):
+            editor.hirc.clone_random_sequence_container(
+                **(arguments | {"expected_playlist": ((donor_sound_id, 40_000),)})
+            )
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "avoid-repeat count"):
+            editor.hirc.clone_random_sequence_container(
+                **(arguments | {"expected_avoid_repeat_count": 0})
+            )
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "must be unique"):
+            editor.hirc.clone_random_sequence_container(
+                **(
+                    arguments
+                    | {
+                        "playlist": (
+                            (donor_sound_id, 50_000),
+                            (donor_sound_id, 50_000),
+                        )
+                    }
+                )
+            )
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "does not exist"):
+            editor.hirc.clone_random_sequence_container(
+                **(arguments | {"playlist": ((4_294_966_999, 50_000),)})
+            )
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "positive signed"):
+            editor.hirc.clone_random_sequence_container(
+                **(arguments | {"playlist": ((donor_sound_id, 0),)})
+            )
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "ID already exists"):
+            editor.hirc.clone_random_sequence_container(
+                **(arguments | {"new_container_id": donor_container_id})
+            )
+
+    def test_clone_random_sequence_container_rejects_bad_donor_and_version(self) -> None:
+        bank = soundbank_editor.SoundBank.from_file(
+            SOUNDBANK_ROOT / "wp07_gun_epvsp_shell.nbnk"
+        )
+        expected_playlist = ((535_190_438, 50_000),)
+        unsupported = soundbank_editor.HircEditor(bank.hirc_payload, version=121)
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "requires Wwise v120"):
+            unsupported.clone_random_sequence_container(
+                145_848_034,
+                4_294_967_000,
+                expected_playlist,
+                expected_playlist=expected_playlist,
+                expected_avoid_repeat_count=1,
+            )
+
+        editor = soundbank_editor.SoundBankEditor(bank)
+        donor = editor.hirc.object_body(
+            soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, 145_848_034
+        )
+        tail = make_random_container_tail(*expected_playlist)
+        sequence_donor_id = 4_294_966_998
+        sequence = bytearray(donor)
+        struct.pack_into("<I", sequence, 0, sequence_donor_id)
+        sequence[len(donor) - len(tail) - 2] = 1
+        editor.hirc.insert_object(
+            soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+            sequence_donor_id,
+            bytes(sequence[4:]),
+        )
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "not in Random mode"):
+            editor.hirc.clone_random_sequence_container(
+                sequence_donor_id,
+                4_294_967_000,
+                expected_playlist,
+                expected_playlist=expected_playlist,
+                expected_avoid_repeat_count=1,
+            )
+
+        malformed = soundbank_editor.HircEditor(
+            make_hirc(
+                (soundbank_editor.HIRC_SOUND, 10, b"sound"),
+                (soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, 20, b"bad"),
+            )
+        )
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "unambiguous"):
+            malformed.clone_random_sequence_container(
+                20,
+                21,
+                ((10, 50_000),),
+                expected_playlist=((10, 50_000),),
+                expected_avoid_repeat_count=1,
+            )
 
 
 class SoundBankEditTests(unittest.TestCase):
@@ -271,6 +438,34 @@ class SoundBankEditTests(unittest.TestCase):
                 4283649192,
                 expected_actions=(325_918_653, 744_297_877),
             )
+
+    def test_validate_rejects_new_container_with_missing_child(self) -> None:
+        bank = soundbank_editor.SoundBank.from_file(
+            SOUNDBANK_ROOT / "wp07_gun_epvsp_shell.nbnk"
+        )
+        editor = soundbank_editor.SoundBankEditor(bank)
+        donor_container_id = 145_848_034
+        donor_sound_id = 535_190_438
+        new_container_id = 4_294_967_000
+        missing_child_id = 4_294_966_999
+        donor = editor.hirc.object_body(
+            soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+            donor_container_id,
+        )
+        old_tail = make_random_container_tail((donor_sound_id, 50_000))
+        cloned = bytearray(donor[: -len(old_tail)])
+        struct.pack_into("<I", cloned, 0, new_container_id)
+        cloned += make_random_container_tail((missing_child_id, 50_000))
+        editor.hirc.insert_object(
+            soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+            new_container_id,
+            bytes(cloned[4:]),
+        )
+
+        with self.assertRaisesRegex(
+            soundbank_editor.SoundBankError, "references missing child"
+        ):
+            editor.validate()
 
     def test_atomic_write_refuses_input_and_reads_back(self) -> None:
         editor = soundbank_editor.SoundBankEditor(self.bank)

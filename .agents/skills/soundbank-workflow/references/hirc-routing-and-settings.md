@@ -71,13 +71,14 @@ fields change later body offsets.
 4. Adjust every paired or layered path symmetrically unless asymmetry is the
    intended result. A pitch-shifted duplicate or one-sided volume edit can sound
    like surround processing or a channel imbalance.
-5. Use `insert_object()`, `append_event_action()`, `add_play_event_action()`, or
-   `add_custom_sound_action()` for reviewed Wwise v120 structural changes. These
-   APIs rebuild object and chunk sizes and reject ID collisions. In the original
-   v120 Banks every Event Action is serialized before the Event that references
-   it; use the high-level APIs, which insert a new Action immediately before its
-   owning Event, and treat forward Action references as invalid. Unknown object
-   types remain raw bodies and must not be structurally authored.
+5. Use `insert_object()`, `append_event_action()`, `add_play_event_action()`,
+   `add_custom_sound_action()`, or `clone_random_sequence_container()` for
+   reviewed Wwise v120 structural changes. These APIs rebuild object and chunk
+   sizes and reject ID collisions. In the original v120 Banks every Event Action
+   is serialized before the Event that references it; use the high-level APIs,
+   which insert a new Action immediately before its owning Event, and treat
+   forward Action references as invalid. Unknown object types remain raw bodies
+   and must not be structurally authored.
 6. Run the builder `--dry-run`, build to a temporary output, parse it with
    wwiser, and compare semantic dumps. Only declared fields may differ.
 7. Re-extract and decode all replaced media, then perform in-game trigger,
@@ -92,3 +93,12 @@ a `MappingMediaOverlay` on that plan. The shared WEM is appended before the
 callback runs; the callback must guard its Media ID, clone the reviewed Sound,
 insert each Action before its Event, and preserve the Event's existing Action as
 the first list entry.
+
+For a random route, create and parent every child first, then use
+`clone_random_sequence_container()` with the donor's exact expected playlist
+and avoid-repeat count. The API preserves the donor's node and unmodeled fields,
+rebuilds only `Children` and `CAkPlayList`, and requires existing unique child
+IDs with positive weights. Guard any child `DirectParentID` and positioning
+changes separately. Use equal weights plus `avoid_repeat_count=0` for independent
+uniform selection; with two children, an avoid-repeat value of `1` becomes
+alternation after the initial choice.

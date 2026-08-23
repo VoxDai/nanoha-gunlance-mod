@@ -74,6 +74,36 @@ the end of the Action objects, matching the ordering used by the original Banks.
 Use distinct explicit IDs; `wwise_fnv1(name)` is available when a deterministic
 Wwise-style ID is wanted.
 
+## Clone a random Container
+
+Create every child object first, then clone a reviewed v120 Random/Sequence
+Container with a guarded replacement playlist:
+
+```python
+editor.hirc.clone_random_sequence_container(
+    donor_container_id=145848034,
+    new_container_id=1771233315,
+    playlist=((3336168856, 50000), (173193142, 50000)),
+    expected_playlist=((535190438, 50000),),
+    expected_avoid_repeat_count=1,
+    avoid_repeat_count=0,
+)
+```
+
+The operation locates the donor's terminal `Children` and `CAkPlayList`
+structures, requires an exact expected playlist and avoid-repeat value, and
+rebuilds only that tail. The donor's node, output, positioning, Aux, loop, and
+other unmodeled fields remain byte-exact. Child IDs must already exist and be
+unique; weights must be positive signed 32-bit values. The donor must be in
+Random mode. Setting `avoid_repeat_count=0` allows independent selections;
+omitting it preserves the donor value.
+
+When cloned Sounds become children of the new Container, separately patch each
+reviewed `DirectParentID` field with `patch_u32()`. Any positioning override
+must likewise use its inspected object-relative offset and expected old byte.
+`SoundBankEditor.validate()` reparses added Containers and rejects missing child
+references or malformed child/playlist topology.
+
 For persistent work, call these APIs from `apply_edits()` in the same-name Bank
 module under `builders/`. Builders own mapping parsing, WAV-to-WEM conversion,
 wwiser comparison, pyvgmstream decoding, and atomic output publication.

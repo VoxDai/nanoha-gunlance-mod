@@ -80,6 +80,17 @@ class SoundBankDiff:
     removed_hirc_objects: tuple[tuple[int, int], ...]
 
 
+@dataclass(frozen=True)
+class _RandomSequenceContainerTail:
+    """Parsed terminal child and playlist fields from one v120 Container."""
+
+    children_offset: int
+    children: tuple[int, ...]
+    playlist: tuple[tuple[int, int], ...]
+    avoid_repeat_count: int
+    mode: int
+
+
 def _check_u32(value: int, label: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= 0xFFFFFFFF:
         raise SoundBankError(f"{label} must be an unsigned 32-bit integer: {value!r}")
@@ -96,6 +107,94 @@ def _check_u16(value: int, label: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= 0xFFFF:
         raise SoundBankError(f"{label} must be an unsigned 16-bit integer: {value!r}")
     return value
+
+
+def _normalize_random_playlist(
+    value: Sequence[tuple[int, int]], label: str
+) -> tuple[tuple[int, int], ...]:
+    if isinstance(value, (str, bytes, bytearray)):
+        raise SoundBankError(f"{label} must be a sequence of (child ID, weight) pairs")
+    try:
+        items = tuple(value)
+    except TypeError as error:
+        raise SoundBankError(
+            f"{label} must be a sequence of (child ID, weight) pairs"
+        ) from error
+    if not items:
+        raise SoundBankError(f"{label} must contain at least one child")
+    if len(items) > 0xFFFF:
+        raise SoundBankError(f"{label} cannot contain more than 65535 children")
+
+    normalized: list[tuple[int, int]] = []
+    for index, item in enumerate(items, 1):
+        if not isinstance(item, (tuple, list)) or len(item) != 2:
+            raise SoundBankError(
+                f"{label} item #{index} must be a (child ID, weight) pair"
+            )
+        child_id = _check_u32(item[0], f"{label} item #{index} child ID")
+        weight = item[1]
+        if (
+            not isinstance(weight, int)
+            or isinstance(weight, bool)
+            or not 1 <= weight <= 0x7FFFFFFF
+        ):
+            raise SoundBankError(
+                f"{label} item #{index} weight must be a positive signed 32-bit "
+                f"integer: {weight!r}"
+            )
+        normalized.append((child_id, weight))
+
+    child_ids = [child_id for child_id, _ in normalized]
+    if len(child_ids) != len(set(child_ids)):
+        raise SoundBankError(f"{label} child IDs must be unique")
+    return tuple(normalized)
+
+
+def _parse_random_sequence_container_tail(
+    body: bytes | bytearray, label: str
+) -> _RandomSequenceContainerTail:
+    """Locate the terminal Children/CAkPlayList layout used by Wwise v120."""
+
+    candidates: list[_RandomSequenceContainerTail] = []
+    for count in range(1, max(1, (len(body) - 6) // 12 + 1)):
+        playlist_offset = len(body) - 2 - 8 * count
+        children_offset = playlist_offset - 4 - 4 * count
+        if children_offset < 10:
+            continue
+        if struct.unpack_from("<H", body, playlist_offset)[0] != count:
+            continue
+        if struct.unpack_from("<I", body, children_offset)[0] != count:
+            continue
+
+        children = struct.unpack_from(
+            f"<{count}I", body, children_offset + 4
+        )
+        playlist = tuple(
+            struct.unpack_from("<Ii", body, playlist_offset + 2 + 8 * index)
+            for index in range(count)
+        )
+        if len(set(children)) != count:
+            continue
+        if sorted(children) != sorted(child_id for child_id, _ in playlist):
+            continue
+        candidates.append(
+            _RandomSequenceContainerTail(
+                children_offset=children_offset,
+                children=children,
+                playlist=playlist,
+                avoid_repeat_count=struct.unpack_from(
+                    "<H", body, children_offset - 6
+                )[0],
+                mode=body[children_offset - 2],
+            )
+        )
+
+    if len(candidates) != 1:
+        raise SoundBankError(
+            f"{label}: expected one unambiguous v120 Children/playlist tail, "
+            f"found {len(candidates)}"
+        )
+    return candidates[0]
 
 
 def wwise_fnv1(name: str) -> int:
@@ -588,6 +687,80 @@ class HircEditor:
             label=label,
         )
 
+    def clone_random_sequence_container(
+        self,
+        donor_container_id: int,
+        new_container_id: int,
+        playlist: Sequence[tuple[int, int]],
+        *,
+        expected_playlist: Sequence[tuple[int, int]],
+        expected_avoid_repeat_count: int,
+        avoid_repeat_count: int | None = None,
+        label: str = "clone Random/Sequence Container",
+    ) -> HircObject:
+        """Clone a reviewed v120 Random Container with a rebuilt playlist."""
+
+        self._require_v120(label)
+        donor = self.object_body(
+            HIRC_RANDOM_SEQUENCE_CONTAINER, donor_container_id
+        )
+        layout = _parse_random_sequence_container_tail(donor, label)
+        if layout.mode != 0:
+            raise SoundBankError(
+                f"{label}: donor Container {donor_container_id} is not in Random mode"
+            )
+
+        guarded_playlist = _normalize_random_playlist(
+            expected_playlist, f"{label} expected playlist"
+        )
+        if layout.playlist != guarded_playlist:
+            raise SoundBankError(
+                f"{label}: donor Container {donor_container_id} expected playlist "
+                f"{guarded_playlist} but found {layout.playlist}"
+            )
+        expected_avoid_repeat_count = _check_u16(
+            expected_avoid_repeat_count, "expected avoid-repeat count"
+        )
+        if layout.avoid_repeat_count != expected_avoid_repeat_count:
+            raise SoundBankError(
+                f"{label}: donor Container {donor_container_id} expected "
+                f"avoid-repeat count {expected_avoid_repeat_count} but found "
+                f"{layout.avoid_repeat_count}"
+            )
+
+        new_playlist = _normalize_random_playlist(playlist, f"{label} playlist")
+        for child_id, _ in new_playlist:
+            if child_id not in self._by_id:
+                raise SoundBankError(f"{label}: child object does not exist: {child_id}")
+
+        if avoid_repeat_count is None:
+            new_avoid_repeat_count = layout.avoid_repeat_count
+        else:
+            new_avoid_repeat_count = _check_u16(
+                avoid_repeat_count, "avoid-repeat count"
+            )
+
+        cloned = bytearray(donor[: layout.children_offset])
+        struct.pack_into(
+            "<I", cloned, 0, _check_u32(new_container_id, "new Container ID")
+        )
+        struct.pack_into(
+            "<H", cloned, layout.children_offset - 6, new_avoid_repeat_count
+        )
+        child_ids = tuple(child_id for child_id, _ in new_playlist)
+        cloned += struct.pack("<I", len(child_ids))
+        cloned += struct.pack(f"<{len(child_ids)}I", *child_ids)
+        cloned += struct.pack("<H", len(new_playlist))
+        for child_id, weight in new_playlist:
+            cloned += struct.pack("<Ii", child_id, weight)
+
+        return self.insert_object(
+            HIRC_RANDOM_SEQUENCE_CONTAINER,
+            new_container_id,
+            bytes(cloned[4:]),
+            label=label,
+        )
+
     @property
     def resized_objects(self) -> tuple[tuple[int, int, int, int], ...]:
         resized: list[tuple[int, int, int, int]] = []
@@ -1060,14 +1233,28 @@ class SoundBankEditor:
                         )
             media_ids = {entry.media_id for entry in rebuilt.entries}
             for object_type, object_id in self.hirc.added_objects:
-                if object_type != HIRC_SOUND:
-                    continue
                 body = rebuilt_hirc.object_body(object_type, object_id)
-                source_id = struct.unpack_from("<I", body, 9)[0]
-                if source_id not in media_ids:
-                    raise SoundBankError(
-                        f"new Sound {object_id} references missing Media ID {source_id}"
+                if object_type == HIRC_SOUND:
+                    source_id = struct.unpack_from("<I", body, 9)[0]
+                    if source_id not in media_ids:
+                        raise SoundBankError(
+                            f"new Sound {object_id} references missing Media ID "
+                            f"{source_id}"
+                        )
+                elif object_type == HIRC_RANDOM_SEQUENCE_CONTAINER:
+                    layout = _parse_random_sequence_container_tail(
+                        body, f"new Container {object_id}"
                     )
+                    missing_children = [
+                        child_id
+                        for child_id in layout.children
+                        if child_id not in object_ids
+                    ]
+                    if missing_children:
+                        raise SoundBankError(
+                            f"new Container {object_id} references missing child "
+                            f"objects: {missing_children}"
+                        )
         diff = self.original.diff(rebuilt)
         declared_hirc = set(self.hirc.added_objects)
         declared_hirc.update((item[0], item[1]) for item in self.hirc.resized_objects)
