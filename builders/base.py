@@ -876,7 +876,7 @@ def build_one(
     *,
     root: Path | None = None,
     mapping_dir: str | Path = "mapping",
-    soundbank_dir: str | Path = "original/soundbank",
+    soundbank_dir: str | Path = "original/nbnk",
     output_dir: str | Path = "output",
     dry_run: bool = False,
     force: bool = False,
@@ -923,7 +923,7 @@ def build_all(
     *,
     root: Path | None = None,
     mapping_dir: str | Path = "mapping",
-    soundbank_dir: str | Path = "original/soundbank",
+    soundbank_dir: str | Path = "original/nbnk",
     release_dir: str | Path = "release",
     dry_run: bool = False,
 ) -> list[BuildResult]:
@@ -983,7 +983,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--soundbank-dir",
-        default="original/soundbank",
+        default="original/nbnk",
         help="Original SoundBank directory relative to root",
     )
     parser.add_argument(

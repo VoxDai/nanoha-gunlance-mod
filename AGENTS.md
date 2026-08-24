@@ -25,7 +25,9 @@
 - `docs/`：存放招式、语音和其他研究资料。
   - `docs/mapping/`：存放原版音频、事件和动作的逆向映射；过渡期仍保留现有 `Audio` 列供未解耦 builder 使用。
 - `original/`：存放从《怪物猎人：世界》提取的铳枪相关游戏原版数据；样本文件应保持不变。
-    - `original/soundbank/`：存放原版 `.nbnk` SoundBank 文件。
+    - `original/nbnk/`：存放原版 `.nbnk` SoundBank 文件。
+    - `original/lmt/`：存放原版 `.lmt` Motion 文件。
+    - `original/wwev/`：存放原版 `.wwev` 事件请求表。
     - `original/audio_files/<SoundBank>/{wav,wem}/`：存放按 SoundBank 分类提取的原版音频文件及其 WAV 转换文件。
 - `tools/`：存放用于分析、提取、转换音频和重建 SoundBank 的工具脚本。
   - `tools/soundbank_editor/`：纯 Python 音频路由 Library，提供 NBNK/DIDX/DATA/HIRC、LMT v95/TIML 和 WWEV v19

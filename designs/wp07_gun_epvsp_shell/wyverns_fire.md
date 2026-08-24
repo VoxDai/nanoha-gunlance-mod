@@ -27,7 +27,7 @@ target_artifacts:
 
 ## 实现契约
 
-- 原始 Bank: `original/soundbank/wp07_gun_epvsp_shell.nbnk`
+- 原始 Bank: `original/nbnk/wp07_gun_epvsp_shell.nbnk`
 - Bank ID: `3273965928`
 
 | 名称                        | Event ID   | 原 Action ID | Container ID | donor Sound / Media ID | DIDX / 原 Media ID | 新 Action ID | 新 Sound ID |

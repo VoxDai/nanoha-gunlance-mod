@@ -62,7 +62,7 @@ fields change later body offsets.
 
 ## Implement a Project Setting
 
-1. Start from `original/soundbank/<bank>.nbnk` and trace all affected routes in
+1. Start from `original/nbnk/<bank>.nbnk` and trace all affected routes in
    a wwiser text dump.
 2. Add the setting to `apply_edits()` in `builders/<bank>.py`; keep the route,
    audible intent, units, and reason in comments.

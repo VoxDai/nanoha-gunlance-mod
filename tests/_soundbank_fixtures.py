@@ -5,7 +5,7 @@ import struct
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SOUNDBANK_ROOT = PROJECT_ROOT / "original" / "soundbank"
+SOUNDBANK_ROOT = PROJECT_ROOT / "original" / "nbnk"
 
 
 def make_hirc(*records: tuple[int, int, bytes]) -> bytes:

@@ -24,7 +24,7 @@ target_artifacts:
 
 ## 实现契约
 
-- 原始 Bank: `original/soundbank/wp_cmn_epvsp.nbnk`
+- 原始 Bank: `original/nbnk/wp_cmn_epvsp.nbnk`
 - Bank ID: `1149256632`
 
 | 名称     | Event ID | 原 Action ID | Container ID | donor Sound / Media ID | DIDX / 原 Media ID | 新 Action ID | 新 Sound ID |

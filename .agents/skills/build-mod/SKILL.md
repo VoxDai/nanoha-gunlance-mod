@@ -18,7 +18,7 @@ Run only registry, table, path, tool, index, and HIRC setting checks:
       -m builders --dry-run --mapping-dir docs/mapping
 
 The batch entry point requires one registered builder for every matching file in
-`docs/mapping/` and `original/soundbank/`. It stages and validates all Banks before
+`docs/mapping/` and `original/nbnk/`. It stages and validates all Banks before
 atomically replacing same-named files under `release/`. Use `--root`,
 `--mapping-dir`, `--soundbank-dir`, or `--release-dir` to override paths.
 

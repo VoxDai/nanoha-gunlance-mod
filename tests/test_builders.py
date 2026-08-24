@@ -33,7 +33,7 @@ from tools import soundbank_editor
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MAPPING_ROOT = PROJECT_ROOT / "docs" / "mapping"
-SOUNDBANK_ROOT = PROJECT_ROOT / "original" / "soundbank"
+SOUNDBANK_ROOT = PROJECT_ROOT / "original" / "nbnk"
 
 
 def noop_edits(_editor: soundbank_editor.SoundBankEditor) -> None:

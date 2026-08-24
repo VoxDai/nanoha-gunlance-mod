@@ -14,7 +14,7 @@ from pathlib import Path
 from tools import soundbank_editor
 
 bank = soundbank_editor.SoundBank.from_file(
-    Path("original/soundbank/wp_gun_cmn.nbnk")
+    Path("original/nbnk/wp_gun_cmn.nbnk")
 )
 print(bank.version, bank.bank_id, len(bank.entries))
 
