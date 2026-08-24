@@ -19,9 +19,11 @@
     - `assets/testing_mod_files/`：存放用于测试的 Mod 文件。
 - `builders/`：每个 SoundBank 的同名 Python 脚本是一份 `BankBuildPlan`，负责读取映射、调用编辑器修改原始 Bank
   并保存；公共转换、验证和发布逻辑由 `builders/base.py` 复用。需要保留原版媒体并叠加声音时，用 `MappingMediaOverlay` 消费指定
-  Audio 行、追加一份共享媒体，并在该 Bank 的 `apply_edits()` 中声明 HIRC 路由。
+  Audio 行、追加一份共享媒体，并在该 Bank 的 `apply_edits()` 中声明 HIRC 路由。builder 尚未与文档解耦，过渡期运行时需显式传入
+  `--mapping-dir docs/mapping`。
+- `designs/`：存放 Mod 的音效设计，按用户可感知的动作记录触发范围、声音层、技术实现契约和验收要求；design 不作为构建期配置读取。
 - `docs/`：存放招式、语音和其他研究资料。
-- `mapping/`：存放逆向分析记录、文件格式说明及游戏事件与音频文件的映射表。
+  - `docs/mapping/`：存放原版音频、事件和动作的逆向映射；过渡期仍保留现有 `Audio` 列供未解耦 builder 使用。
 - `original/`：存放从《怪物猎人：世界》提取的铳枪相关游戏原版数据；样本文件应保持不变。
     - `original/soundbank/`：存放原版 `.nbnk` SoundBank 文件。
     - `original/audio_files/<SoundBank>/{wav,wem}/`：存放按 SoundBank 分类提取的原版音频文件及其 WAV 转换文件。

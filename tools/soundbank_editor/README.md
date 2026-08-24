@@ -107,7 +107,8 @@ must likewise use its inspected object-relative offset and expected old byte.
 references or malformed child/playlist topology.
 
 For persistent work, call these APIs from `apply_edits()` in the same-name Bank
-module under `builders/`. Builders own mapping parsing, WAV-to-WEM conversion,
+module under `builders/`. During the current transition, builders parse tables
+under `docs/mapping/` when invoked with `--mapping-dir docs/mapping`; they also own WAV-to-WEM conversion,
 wwiser comparison, pyvgmstream decoding, and atomic output publication.
 When mapped Audio should be layered over unchanged original media, the plan may
 declare `MappingMediaOverlay(indices=(...), media_id=...)`. This builder-only

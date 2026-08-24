@@ -10,20 +10,23 @@ description: "Build and validate every Monster Hunter: World .nbnk mod Bank thro
 Run from the project root:
 
     conda run -n nanoha-gunlance-mod python \
-      -m builders
+      -m builders --mapping-dir docs/mapping
 
 Run only registry, table, path, tool, index, and HIRC setting checks:
 
     conda run -n nanoha-gunlance-mod python \
-      -m builders --dry-run
+      -m builders --dry-run --mapping-dir docs/mapping
 
 The batch entry point requires one registered builder for every matching file in
-`mapping/` and `original/soundbank/`. It stages and validates all Banks before
+`docs/mapping/` and `original/soundbank/`. It stages and validates all Banks before
 atomically replacing same-named files under `release/`. Use `--root`,
 `--mapping-dir`, `--soundbank-dir`, or `--release-dir` to override paths.
 
-For one Bank, run `python -m builders.<bank-name>`. A single builder writes to
-`output/` by default and requires `--force` before replacing an existing output.
+For one Bank, run
+`python -m builders.<bank-name> --mapping-dir docs/mapping`. A single builder
+writes to `output/` by default and requires `--force` before replacing an
+existing output. The explicit mapping path is required until builders are
+decoupled from the documentation tables.
 
 ## Input contract
 
@@ -60,6 +63,6 @@ not replace in-game trigger, volume, channel, spatialization, and conflict tests
 
 ## Protection boundaries
 
-- Never modify `mapping/`, `original/`, or `audio/` while building.
+- Never modify `docs/mapping/`, `original/`, or `audio/` while building.
 - Do not write intermediate WEM, decoded WAV, or logs into release/.
 - Do not publish partial results when parsing, conversion, rebuilding, or validation fails.

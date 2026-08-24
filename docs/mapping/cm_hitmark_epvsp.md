@@ -1,0 +1,161 @@
+# cm_hitmark_epvsp.nbnk
+
+主要包含武器命中、属性伤害、异常状态及爆炸等战斗命中音效。
+
+| Wem# New(Old)                                                        | Status  | Description                                                             | Notes                                |
+|----------------------------------------------------------------------|---------|-------------------------------------------------------------------------|--------------------------------------|
+| [**1**(1)](../../original/audio_files/cm_hitmark_epvsp/wav/001.wav)     | Pending | ❄️ 冰属性音效 1/3                                                       |                                      |
+| [**2**](../../original/audio_files/cm_hitmark_epvsp/wav/002.wav)        |         | 飞翔爪攻击                                                              | New Iceborne sound                   |
+| [**3**](../../original/audio_files/cm_hitmark_epvsp/wav/003.wav)        |         |                                                                         | New Iceborne sound                   |
+| [**4**(2)](../../original/audio_files/cm_hitmark_epvsp/wav/004.wav)     |         | 冰呪龙轻弩射击                                                          |                                      |
+| [**5**(3)](../../original/audio_files/cm_hitmark_epvsp/wav/005.wav)     |         | 减气弹射击                                                              |                                      |
+| [**6**(34)](../../original/audio_files/cm_hitmark_epvsp/wav/006.wav)    | Pending | 铁制片手剑 / 斩击斧剑模式 / 盾斧剑模式 / 操虫棍 斩击命中 [1/3]          | Hitsound updated for Iceborne        |
+| [**7**](../../original/audio_files/cm_hitmark_epvsp/wav/007.wav)        |         |                                                                         | New Iceborne sound                   |
+| [**8**(4)](../../original/audio_files/cm_hitmark_epvsp/wav/008.wav)     | Pending | 🐉 龙属性音效 1/3                                                       |                                      |
+| [**9**(6)](../../original/audio_files/cm_hitmark_epvsp/wav/009.wav)     |         |                                                                         |                                      |
+| [**10**(8)](../../original/audio_files/cm_hitmark_epvsp/wav/010.wav)    | Pending | 钝击命中回响                                                            |                                      |
+| [**11**(9)](../../original/audio_files/cm_hitmark_epvsp/wav/011.wav)    |         |                                                                         |                                      |
+| [**12**(10)](../../original/audio_files/cm_hitmark_epvsp/wav/012.wav)   | Pending | 🐉 龙属性音效 2/3                                                       |                                      |
+| [**13**(11)](../../original/audio_files/cm_hitmark_epvsp/wav/013.wav)   | Pending | 🌩️ 雷属性音效 1/3                                                       |                                      |
+| [**14**(12)](../../original/audio_files/cm_hitmark_epvsp/wav/014.wav)   |         | 操虫棍标记目标                                                          |                                      |
+| [**15**(13)](../../original/audio_files/cm_hitmark_epvsp/wav/015.wav)   | Pending | ⚡ 麻痹命中效果 1/1                                                     |                                      |
+| [**16**](../../original/audio_files/cm_hitmark_epvsp/wav/016.wav)       |         |                                                                         | New Iceborne sound                   |
+| [**17**](../../original/audio_files/cm_hitmark_epvsp/wav/017.wav)       |         |                                                                         | New Iceborne sound                   |
+| [**18**(15)](../../original/audio_files/cm_hitmark_epvsp/wav/018.wav)   | Pending | 锐器攻击弹刀声 [1/2]                                                    |                                      |
+| [**19**(16)](../../original/audio_files/cm_hitmark_epvsp/wav/019.wav)   |         |                                                                         |                                      |
+| [**20**(17)](../../original/audio_files/cm_hitmark_epvsp/wav/020.wav)   | Pending | 弓（弩）命中回响                                                        |                                      |
+| [**21**(18)](../../original/audio_files/cm_hitmark_epvsp/wav/021.wav)   |         |                                                                         |                                      |
+| [**22**(106)](../../original/audio_files/cm_hitmark_epvsp/wav/022.wav)  | Pending | 铁制太刀 斩击命中 [1/3]                                                 | Hitsound updated for Iceborne        |
+| [**23**(19)](../../original/audio_files/cm_hitmark_epvsp/wav/023.wav)   |         |                                                                         |                                      |
+| [**24**(20)](../../original/audio_files/cm_hitmark_epvsp/wav/024.wav)   |         |                                                                         |                                      |
+| [**25**](../../original/audio_files/cm_hitmark_epvsp/wav/025.wav)       |         |                                                                         | New Iceborne sound                   |
+| [**26**(21)](../../original/audio_files/cm_hitmark_epvsp/wav/026.wav)   |         |                                                                         |                                      |
+| [**27**](../../original/audio_files/cm_hitmark_epvsp/wav/027.wav)       | Pending | 骨制斩击斧剑模式 / 盾斧剑模式 / 操虫棍 斩击命中 [1/3]                   | New Iceborne sound                   |
+| [**28**](../../original/audio_files/cm_hitmark_epvsp/wav/028.wav)       | Pending | 骨制太刀 斩击命中 [1/3]                                                 | New Iceborne sound                   |
+| [**29**(119)](../../original/audio_files/cm_hitmark_epvsp/wav/029.wav)  | Pending | 铁制大锤 / 狩猎笛 钝击命中 [1/3]                                        | Hitsound updated for Iceborne        |
+| [**30**](../../original/audio_files/cm_hitmark_epvsp/wav/030.wav)       |         |                                                                         | New Iceborne sound                   |
+| [**31**](../../original/audio_files/cm_hitmark_epvsp/wav/031.wav)       |         |                                                                         | New Iceborne sound                   |
+| [**32**(23)](../../original/audio_files/cm_hitmark_epvsp/wav/032.wav)   | Pending | 片手剑盾击命中 [1/3]                                                    |                                      |
+| [**33**(24)](../../original/audio_files/cm_hitmark_epvsp/wav/033.wav)   |         |                                                                         |                                      |
+| [**34**(25)](../../original/audio_files/cm_hitmark_epvsp/wav/034.wav)   | Pending | 骑乘小刀命中 [1/3]                                                      |                                      |
+| [**35**(26)](../../original/audio_files/cm_hitmark_epvsp/wav/035.wav)   | Pending | 💣 爆破爆炸 1/2                                                         |                                      |
+| [**36**(27)](../../original/audio_files/cm_hitmark_epvsp/wav/036.wav)   | Pending | ❄️ 冰属性音效 2/3                                                       |                                      |
+| [**37**(28)](../../original/audio_files/cm_hitmark_epvsp/wav/037.wav)   | Pending | 箭矢命中 [1/3]                                                          |                                      |
+| [**38**(92)](../../original/audio_files/cm_hitmark_epvsp/wav/038.wav)   | Pending | 铁制长枪 / 铳枪刺击命中 [1/3]                                           | Hitsound updated for Iceborne        |
+| [**39**(29)](../../original/audio_files/cm_hitmark_epvsp/wav/039.wav)   |         |                                                                         |                                      |
+| [**40**(30)](../../original/audio_files/cm_hitmark_epvsp/wav/040.wav)   | Pending | 💧 水属性音效 1/3                                                       |                                      |
+| [**41**(31)](../../original/audio_files/cm_hitmark_epvsp/wav/041.wav)   | Pending | 大剑侧拍/长枪盾牌攻击命中怪物 [1/3]                                     |                                      |
+| [**42**(32)](../../original/audio_files/cm_hitmark_epvsp/wav/042.wav)   | Pending | 🔥 火属性音效 1/3                                                       |                                      |
+| [**43**(33)](../../original/audio_files/cm_hitmark_epvsp/wav/043.wav)   | Pending | 轻斩击命中 [1/3]                                                        |                                      |
+| [**44**(35)](../../original/audio_files/cm_hitmark_epvsp/wav/044.wav)   | Pending | 会心命中效果                                                            |                                      |
+| [**45**(36)](../../original/audio_files/cm_hitmark_epvsp/wav/045.wav)   |         |                                                                         |                                      |
+| [**46**(37)](../../original/audio_files/cm_hitmark_epvsp/wav/046.wav)   |         | 操虫棍标记目标                                                          |                                      |
+| [**47**](../../original/audio_files/cm_hitmark_epvsp/wav/047.wav)       | Pending | 骨制大剑 / 铳枪挥击 / 斩击斧斧模式 / 盾斧斧模式 斩击命中 [2/3]          | New Iceborne sound                   |
+| [**48**(38)](../../original/audio_files/cm_hitmark_epvsp/wav/048.wav)   | Pending | 🔥 火属性音效 2/3                                                       |                                      |
+| [**49**(39)](../../original/audio_files/cm_hitmark_epvsp/wav/049.wav)   | Pending | 钝击命中怪物弱点 [1/2]                                                  |                                      |
+| [**50**](../../original/audio_files/cm_hitmark_epvsp/wav/050.wav)       | Pending | 骨制太刀 斩击命中 [2/3]                                                 | New Iceborne sound                   |
+| [**51**(5)](../../original/audio_files/cm_hitmark_epvsp/wav/051.wav)    | Pending | 铁制太刀 斩击命中 [2/3]                                                 | Hitsound updated for Iceborne        |
+| [**52**(40)](../../original/audio_files/cm_hitmark_epvsp/wav/052.wav)   |         |                                                                         |                                      |
+| [**53**(41)](../../original/audio_files/cm_hitmark_epvsp/wav/053.wav)   |         |                                                                         |                                      |
+| [**54**(42)](../../original/audio_files/cm_hitmark_epvsp/wav/054.wav)   | Pending | 片手剑盾击命中 [2/3]                                                    |                                      |
+| [**55**(43)](../../original/audio_files/cm_hitmark_epvsp/wav/055.wav)   |         |                                                                         |                                      |
+| [**56**(44)](../../original/audio_files/cm_hitmark_epvsp/wav/056.wav)   |         |                                                                         |                                      |
+| [**57**](../../original/audio_files/cm_hitmark_epvsp/wav/057.wav)       | Pending | 铁制双剑 斩击命中 [1/3]                                                 | New Iceborne sound                   |
+| [**58**(45)](../../original/audio_files/cm_hitmark_epvsp/wav/058.wav)   |         | 🧪 毒属性命中效果 1/3                                                   |                                      |
+| [**59**(46)](../../original/audio_files/cm_hitmark_epvsp/wav/059.wav)   |         |                                                                         |                                      |
+| [**60**(47)](../../original/audio_files/cm_hitmark_epvsp/wav/060.wav)   |         |                                                                         |                                      |
+| [**61**(48)](../../original/audio_files/cm_hitmark_epvsp/wav/061.wav)   | Pending | 🔥 火属性音效 3/3                                                       |                                      |
+| [**62**(49)](../../original/audio_files/cm_hitmark_epvsp/wav/062.wav)   | Pending | 箭矢命中 [2/3]                                                          |                                      |
+| [**63**(50)](../../original/audio_files/cm_hitmark_epvsp/wav/063.wav)   | Pending | 💣 爆破爆炸 2/2                                                         |                                      |
+| [**64**](../../original/audio_files/cm_hitmark_epvsp/wav/064.wav)       |         |                                                                         | New Iceborne sound                   |
+| [**65**(51)](../../original/audio_files/cm_hitmark_epvsp/wav/065.wav)   | Pending | 🧪 毒属性命中效果 2/3                                                   |                                      |
+| [**66**](../../original/audio_files/cm_hitmark_epvsp/wav/066.wav)       | Pending | 骨制斩击斧剑模式 / 盾斧剑模式 / 操虫棍 斩击命中 [2/3]                   | New Iceborne sound                   |
+| [**67**(52)](../../original/audio_files/cm_hitmark_epvsp/wav/067.wav)   | Pending | 盾斧盾突命中 [1/3]                                                      | Used for Gunlance poke in base game. |
+| [**68**(53)](../../original/audio_files/cm_hitmark_epvsp/wav/068.wav)   | Pending | 🌩️ 雷属性音效 2/3                                                       |                                      |
+| [**69**(54)](../../original/audio_files/cm_hitmark_epvsp/wav/069.wav)   |         |                                                                         |                                      |
+| [**70**(55)](../../original/audio_files/cm_hitmark_epvsp/wav/070.wav)   | Pending | 😴 睡眠效果                                                             |                                      |
+| [**71**(61)](../../original/audio_files/cm_hitmark_epvsp/wav/071.wav)   | Pending | 铁制大剑 / 铳枪挥击 / 斩击斧斧模式 / 盾斧斧模式 斩击命中 [1/3]          | Hitsound updated for Iceborne        |
+| [**72**(56)](../../original/audio_files/cm_hitmark_epvsp/wav/072.wav)   |         |                                                                         |                                      |
+| [**73**(65)](../../original/audio_files/cm_hitmark_epvsp/wav/073.wav)   | Pending | 铁制大剑 / 铳枪挥击 / 斩击斧斧模式 / 盾斧斧模式 斩击命中 [2/3]          | Hitsound updated for Iceborne        |
+| [**74**(57)](../../original/audio_files/cm_hitmark_epvsp/wav/074.wav)   | Pending | 骑乘小刀命中 [2/3]                                                      |                                      |
+| [**75**(58)](../../original/audio_files/cm_hitmark_epvsp/wav/075.wav)   |         |                                                                         |                                      |
+| [**76**](../../original/audio_files/cm_hitmark_epvsp/wav/076.wav)       | Pending | 骨制片手剑 / 双剑 斩击命中 [1/3]                                        | New Iceborne sound                   |
+| [**77**](../../original/audio_files/cm_hitmark_epvsp/wav/077.wav)       | Pending | 骨制太刀 斩击命中 [3/3]                                                 | New Iceborne sound                   |
+| [**78**(7)](../../original/audio_files/cm_hitmark_epvsp/wav/078.wav)    | Pending | 铁制片手剑 / 斩击斧剑模式 / 盾斧剑模式 / 操虫棍 斩击命中 [2/3] / 斩裂弹 | Hitsound updated for Iceborne        |
+| [**79**(59)](../../original/audio_files/cm_hitmark_epvsp/wav/079.wav)   | Pending | 💥 爆破效果 1/2                                                         |                                      |
+| [**80**(60)](../../original/audio_files/cm_hitmark_epvsp/wav/080.wav)   | Pending | 片手剑盾击命中 [3/3]                                                    |                                      |
+| [**81**](../../original/audio_files/cm_hitmark_epvsp/wav/081.wav)       | Pending | 骨制大锤 / 狩猎笛 [2/3]                                                 | New Iceborne sound                   |
+| [**82**(62)](../../original/audio_files/cm_hitmark_epvsp/wav/082.wav)   | Pending | 弹丸命中 [1/3]                                                          |                                      |
+| [**83**(14)](../../original/audio_files/cm_hitmark_epvsp/wav/083.wav)   | Pending | 铁制大锤 / 狩猎笛 钝击命中 [2/3]                                        | Hitsound updated for Iceborne        |
+| [**84**(63)](../../original/audio_files/cm_hitmark_epvsp/wav/084.wav)   | Pending | 锐器攻击弹刀声 [2/2]                                                    |                                      |
+| [**85**(64)](../../original/audio_files/cm_hitmark_epvsp/wav/085.wav)   |         |                                                                         |                                      |
+| [**86**(66)](../../original/audio_files/cm_hitmark_epvsp/wav/086.wav)   | Pending | 轻斩击命中 [2/3]                                                        |                                      |
+| [**87**(67)](../../original/audio_files/cm_hitmark_epvsp/wav/087.wav)   |         |                                                                         |                                      |
+| [**88**](../../original/audio_files/cm_hitmark_epvsp/wav/088.wav)       | Pending | 骨制长枪 / 铳枪刺击命中 [2/3]                                           | New Iceborne sound                   |
+| [**89**(68)](../../original/audio_files/cm_hitmark_epvsp/wav/089.wav)   | Pending | 弹丸命中 [2/3]                                                          |                                      |
+| [**90**(105)](../../original/audio_files/cm_hitmark_epvsp/wav/090.wav)  | Pending | 铁制大剑 / 铳枪挥击 / 斩击斧斧模式 / 盾斧斧模式 斩击命中 [3/3]          | Hitsound updated for Iceborne        |
+| [**91**(22)](../../original/audio_files/cm_hitmark_epvsp/wav/091.wav)   | Pending | 铁制片手剑 / 斩击斧剑模式 / 盾斧剑模式 / 操虫棍 斩击命中 [3/3]          | Hitsound updated for Iceborne        |
+| [**92**(69)](../../original/audio_files/cm_hitmark_epvsp/wav/092.wav)   |         |                                                                         |                                      |
+| [**93**](../../original/audio_files/cm_hitmark_epvsp/wav/093.wav)       |         |                                                                         | New Iceborne sound                   |
+| [**94**](../../original/audio_files/cm_hitmark_epvsp/wav/094.wav)       | Pending | 铁制双剑 斩击命中 [2/3]                                                 | New Iceborne sound                   |
+| [**95**(70)](../../original/audio_files/cm_hitmark_epvsp/wav/095.wav)   | Pending | 钝器弹刀声 [1/2]                                                        |                                      |
+| [**96**](../../original/audio_files/cm_hitmark_epvsp/wav/096.wav)       | Pending | 骨制长枪 / 铳枪刺击命中 [3/3]                                           | New Iceborne sound                   |
+| [**97**(71)](../../original/audio_files/cm_hitmark_epvsp/wav/097.wav)   | Pending | 盾斧盾突命中 [2/3]                                                      | Used for Gunlance poke in base game. |
+| [**98**(72)](../../original/audio_files/cm_hitmark_epvsp/wav/098.wav)   |         |                                                                         |                                      |
+| [**99**(74)](../../original/audio_files/cm_hitmark_epvsp/wav/099.wav)   | Pending | 斩击命中怪物弱点 [1/2]                                                  |                                      |
+| [**100**(75)](../../original/audio_files/cm_hitmark_epvsp/wav/100.wav)  |         | 💥 爆破火花                                                             |                                      |
+| [**101**(76)](../../original/audio_files/cm_hitmark_epvsp/wav/101.wav)  | Pending | 造成昏厥伤害                                                            |                                      |
+| [**102**](../../original/audio_files/cm_hitmark_epvsp/wav/102.wav)      | Pending | 骨制大剑 / 铳枪挥击 / 斩击斧斧模式 / 盾斧斧模式 斩击命中 [3/3]          | New Iceborne sound                   |
+| [**103**(77)](../../original/audio_files/cm_hitmark_epvsp/wav/103.wav)  | Pending | 钝器弹刀声 [2/2]                                                        |                                      |
+| [**104**(78)](../../original/audio_files/cm_hitmark_epvsp/wav/104.wav)  |         | 💥 爆破火花                                                             |                                      |
+| [**105**(79)](../../original/audio_files/cm_hitmark_epvsp/wav/105.wav)  |         |                                                                         |                                      |
+| [**106**(80)](../../original/audio_files/cm_hitmark_epvsp/wav/106.wav)  | Pending | 💧 水属性音效 2/3                                                       |                                      |
+| [**107**(81)](../../original/audio_files/cm_hitmark_epvsp/wav/107.wav)  |         |                                                                         |                                      |
+| [**108**(82)](../../original/audio_files/cm_hitmark_epvsp/wav/108.wav)  | Pending | 💧 水属性音效 3/3                                                       |                                      |
+| [**109**](../../original/audio_files/cm_hitmark_epvsp/wav/109.wav)      | Pending | 骨制斩击斧剑模式 / 盾斧剑模式 / 操虫棍 斩击命中 [3/3]                   | New Iceborne sound                   |
+| [**110**](../../original/audio_files/cm_hitmark_epvsp/wav/110.wav)      | Pending | 骨制片手剑 / 双剑 斩击命中 [2/3]                                        | New Iceborne sound                   |
+| [**111**(84)](../../original/audio_files/cm_hitmark_epvsp/wav/111.wav)  | Pending | 🧪 毒属性命中效果 3/3                                                   |                                      |
+| [**112**(85)](../../original/audio_files/cm_hitmark_epvsp/wav/112.wav)  |         |                                                                         |                                      |
+| [**113**](../../original/audio_files/cm_hitmark_epvsp/wav/113.wav)      |         |                                                                         | New Iceborne sound                   |
+| [**114**(86)](../../original/audio_files/cm_hitmark_epvsp/wav/114.wav)  |         |                                                                         |                                      |
+| [**115**(87)](../../original/audio_files/cm_hitmark_epvsp/wav/115.wav)  |         |                                                                         |                                      |
+| [**116**(88)](../../original/audio_files/cm_hitmark_epvsp/wav/116.wav)  | Pending | 骑乘小刀命中 [3/3]                                                      |                                      |
+| [**117**](../../original/audio_files/cm_hitmark_epvsp/wav/117.wav)      |         |                                                                         | New Iceborne sound                   |
+| [**118**(89)](../../original/audio_files/cm_hitmark_epvsp/wav/118.wav)  |         |                                                                         |                                      |
+| [**119**(91)](../../original/audio_files/cm_hitmark_epvsp/wav/119.wav)  | Pending | 轻斩击命中 [3/3]                                                        |                                      |
+| [**120**(94)](../../original/audio_files/cm_hitmark_epvsp/wav/120.wav)  |         |                                                                         |                                      |
+| [**121**(96)](../../original/audio_files/cm_hitmark_epvsp/wav/121.wav)  |         |                                                                         |                                      |
+| [**122**(97)](../../original/audio_files/cm_hitmark_epvsp/wav/122.wav)  | Pending | 钝击命中怪物弱点 [2/2]                                                  |                                      |
+| [**123**(98)](../../original/audio_files/cm_hitmark_epvsp/wav/123.wav)  | Pending | 盾斧盾突命中 [3/3]                                                      | Used for Gunlance poke in base game. |
+| [**124**(99)](../../original/audio_files/cm_hitmark_epvsp/wav/124.wav)  |         |                                                                         |                                      |
+| [**125**(100)](../../original/audio_files/cm_hitmark_epvsp/wav/125.wav) | Pending | 💥 爆破效果 2/2                                                         |                                      |
+| [**126**(83)](../../original/audio_files/cm_hitmark_epvsp/wav/126.wav)  | Pending | 铁制大锤 / 狩猎笛 钝击命中 [3/3]                                        | Hitsound updated for Iceborne        |
+| [**127**(101)](../../original/audio_files/cm_hitmark_epvsp/wav/127.wav) |         |                                                                         |                                      |
+| [**128**(102)](../../original/audio_files/cm_hitmark_epvsp/wav/128.wav) |         |                                                                         |                                      |
+| [**129**(103)](../../original/audio_files/cm_hitmark_epvsp/wav/129.wav) | Pending | 🐉 龙属性音效 3/3                                                       |                                      |
+| [**130**](../../original/audio_files/cm_hitmark_epvsp/wav/130.wav)      |         |                                                                         | New Iceborne sound                   |
+| [**131**(104)](../../original/audio_files/cm_hitmark_epvsp/wav/131.wav) |         | 弓箭雨攻击                                                              |                                      |
+| [**132**](../../original/audio_files/cm_hitmark_epvsp/wav/132.wav)      | Pending | 铁制双剑 斩击命中 [3/3]                                                 | New Iceborne sound                   |
+| [**133**(73)](../../original/audio_files/cm_hitmark_epvsp/wav/133.wav)  | Pending | 铁制太刀 斩击命中 [3/3]                                                 | Hitsound updated for Iceborne        |
+| [**134**(107)](../../original/audio_files/cm_hitmark_epvsp/wav/134.wav) | Pending | ❄️ 冰属性音效 3/3                                                       |                                      |
+| [**135**(93)](../../original/audio_files/cm_hitmark_epvsp/wav/135.wav)  | Pending | 铁制长枪 / 铳枪刺击命中 [2/3]                                           | Hitsound updated for Iceborne        |
+| [**136**(108)](../../original/audio_files/cm_hitmark_epvsp/wav/136.wav) |         |                                                                         |                                      |
+| [**137**(109)](../../original/audio_files/cm_hitmark_epvsp/wav/137.wav) |         |                                                                         |                                      |
+| [**138**(110)](../../original/audio_files/cm_hitmark_epvsp/wav/138.wav) | Pending | 大剑侧拍/长枪盾牌攻击命中怪物 [2/3]                                     |                                      |
+| [**139**(111)](../../original/audio_files/cm_hitmark_epvsp/wav/139.wav) | Pending | 大剑侧拍/长枪盾牌攻击命中怪物 [3/3]                                     |                                      |
+| [**140**(112)](../../original/audio_files/cm_hitmark_epvsp/wav/140.wav) |         |                                                                         |                                      |
+| [**141**(113)](../../original/audio_files/cm_hitmark_epvsp/wav/141.wav) |         |                                                                         |                                      |
+| [**142**(114)](../../original/audio_files/cm_hitmark_epvsp/wav/142.wav) | Pending | 铳枪爆炸命中 [1/2]                                                      |                                      |
+| [**143**(90)](../../original/audio_files/cm_hitmark_epvsp/wav/143.wav)  | Pending | 铁制长枪 / 铳枪刺击命中 [3/3]                                           | Hitsound updated for Iceborne        |
+| [**144**(115)](../../original/audio_files/cm_hitmark_epvsp/wav/144.wav) | Pending | 箭矢命中 [3/3]                                                          |                                      |
+| [**145**(116)](../../original/audio_files/cm_hitmark_epvsp/wav/145.wav) | Pending | 铳枪爆炸命中 [2/2]                                                      |                                      |
+| [**146**(117)](../../original/audio_files/cm_hitmark_epvsp/wav/146.wav) | Pending | 弹丸命中 [3/3]                                                          |                                      |
+| [**147**(118)](../../original/audio_files/cm_hitmark_epvsp/wav/147.wav) | Pending | 轻微钝击命中回响                                                        |                                      |
+| [**148**(120)](../../original/audio_files/cm_hitmark_epvsp/wav/148.wav) |         |                                                                         |                                      |
+| [**149**(121)](../../original/audio_files/cm_hitmark_epvsp/wav/149.wav) |         |                                                                         |                                      |
+| [**150**(122)](../../original/audio_files/cm_hitmark_epvsp/wav/150.wav) |         |                                                                         |                                      |
+| [**151**](../../original/audio_files/cm_hitmark_epvsp/wav/151.wav)      | Pending | 骨制大锤 / 狩猎笛 [3/3]                                                 | New Iceborne sound                   |
+| [**152**(123)](../../original/audio_files/cm_hitmark_epvsp/wav/152.wav) | Pending | 斩击命中怪物弱点 [2/2]                                                  |                                      |
+| [**153**](../../original/audio_files/cm_hitmark_epvsp/wav/153.wav)      | Pending | 骨制片手剑 / 双剑 斩击命中 [3/3]                                        | New Iceborne sound                   |
+| [**154**(124)](../../original/audio_files/cm_hitmark_epvsp/wav/154.wav) | Pending | 🌩️ 雷属性音效 3/3                                                       |                                      |
+| ?(95)                                                                | Pending | 斩击命中回响                                                            |                                      |

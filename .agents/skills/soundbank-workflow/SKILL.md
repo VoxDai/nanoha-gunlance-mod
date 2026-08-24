@@ -139,17 +139,21 @@ conda run -n nanoha-gunlance-mod python \
   replacement.wav "$temp_dir/replacement.wem"
 ```
 
-Inspect the converted WEM, then register the replacement in the matching mapping
-table and run its Python `BankBuildPlan`:
+Inspect the converted WEM, then register the replacement in the matching table
+under `docs/mapping/` and run its Python `BankBuildPlan`:
 
 ```sh
-conda run -n nanoha-gunlance-mod python -m builders.wp07_gun_epvsp_shell --dry-run
-conda run -n nanoha-gunlance-mod python -m builders.wp07_gun_epvsp_shell
+conda run -n nanoha-gunlance-mod python -m builders.wp07_gun_epvsp_shell \
+  --mapping-dir docs/mapping --dry-run
+conda run -n nanoha-gunlance-mod python -m builders.wp07_gun_epvsp_shell \
+  --mapping-dir docs/mapping
 ```
 
 The builder resolves every 1-based mapping index to its original Media ID,
 converts the mapped audio, and calls `SoundBankEditor.replace_media()` with that
-exact guard.
+exact guard. The explicit mapping path is transitional; the mapping documents
+are research records and will stop being runtime inputs after the builder
+orchestration is decoupled.
 
 When several mapping rows describe one sound that must be layered over the
 original effects, declare `MappingMediaOverlay(indices=(...), media_id=...)` on
