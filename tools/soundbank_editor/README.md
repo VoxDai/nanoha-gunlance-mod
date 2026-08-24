@@ -106,14 +106,21 @@ must likewise use its inspected object-relative offset and expected old byte.
 `SoundBankEditor.validate()` reparses added Containers and rejects missing child
 references or malformed child/playlist topology.
 
-For persistent work, call these APIs from `apply_edits()` in the same-name Bank
-module under `builders/`. During the current transition, builders parse tables
-under `docs/mapping/` when invoked with `--mapping-dir docs/mapping`; they also own WAV-to-WEM conversion,
-wwiser comparison, pyvgmstream decoding, and atomic output publication.
-When mapped Audio should be layered over unchanged original media, the plan may
-declare `MappingMediaOverlay(indices=(...), media_id=...)`. This builder-only
-configuration validates one shared source, converts it once, appends it, and
-then calls `apply_edits()`; it is not a JSON plan or Library CLI feature.
+For persistent project work, call these APIs from the guarded `apply_edits()`
+callback of an explicit plan under `builders/`. `SoundBankBuildPlan` declares
+each `MediaReplacement` or `MediaAddition` directly, including its 1-based DIDX
+index, Media ID, project WAV path, original Bank identity and exact expected
+`SoundBankEditSummary`. The builder converts WAVs, runs wwiser and pyvgmstream
+validation, rejects callback media edits not declared in the plan, and publishes
+only after read-back succeeds. `docs/mapping/` is
+research documentation and is never parsed at build time.
+
+LMT and WWEV routes use the same pattern through `LmtBuildPlan` and
+`WwevBuildPlan`, with fixed source hashes, exact editor summaries and fixed
+output hashes. `ModBuildPlan` groups every target and runs cross-file validators
+before replacing the complete `release/nativePC/` tree. These project plan
+types are orchestration around the Library; the Library itself remains free of
+CLI and project-specific route data.
 
 ## Trace LMT requests through WWEV
 
@@ -199,5 +206,8 @@ overwrites and existing outputs unless `overwrite=True` is explicit. Catch
 - Unknown HIRC types are preserved, not semantically decoded.
 - Unknown WWEV record bytes are retained and included in donor guards.
 - Arbitrary HIRC object deletion is intentionally unsupported.
+- Project builders fix original NBNK/LMT/WWEV SHA-256 values, but intentionally
+  do not fix WAV hashes so a reviewed mix can be adjusted at the same declared
+  path and rebuilt without changing routing code.
 - A successful parse is not proof of game-runtime acceptance; complete trigger,
   mix, spatial, loop/Stop, and mod-conflict testing in game.

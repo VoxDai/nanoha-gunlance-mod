@@ -1,6 +1,6 @@
 ---
 name: soundbank-workflow
-description: "Analyze and rebuild Monster Hunter: World/Iceborne Wwise NBNK SoundBanks. Use for DIDX/WEM media work, HIRC Event-to-Sound routing, guarded node or mix settings, structural validation, and verified single-Bank output."
+description: "Analyze and rebuild Monster Hunter: World/Iceborne NBNK audio and LMT/WWEV event routes. Use for DIDX/WEM media work, HIRC routing, guarded node settings, cross-format requests, and verified single-artifact output."
 ---
 
 # SoundBank Workflow
@@ -11,9 +11,12 @@ description: "Analyze and rebuild Monster Hunter: World/Iceborne Wwise NBNK Soun
 - Treat DIDX indices as 1-based. Inspect the Bank and report the matching Media ID before replacement.
 - Put all extracted media, converted WEM files, logs, and validation artifacts in one task-specific `/tmp` directory.
 - Write only the verified final NBNK to `output/`. Never overwrite an existing output without explicit authorization.
-- Treat ordinary mapped media replacement as media-only: it must preserve HIRC byte-for-byte. A reviewed `MappingMediaOverlay` is different: it consumes declared Audio rows without replacing their original payloads, appends shared media, and relies on the Bank callback for its HIRC route.
-- Put persistent project media and HIRC changes in the matching `BankBuildPlan`
-  under `builders/`, using `tools.soundbank_editor` guarded APIs. Never patch absolute file offsets.
+- Treat a declared `MediaReplacement` as media-only unless its plan also has a
+  reviewed HIRC callback. Use `MediaAddition` when original payloads remain and
+  a new route needs appended media.
+- Put persistent project changes in the matching `SoundBankBuildPlan`,
+  `LmtBuildPlan`, or `WwevBuildPlan` under `builders/`, using
+  `tools.soundbank_editor` guarded APIs. Never patch absolute file offsets.
 - Treat structural validation as necessary but insufficient. Complete final trigger, volume, channel, and conflict checks in a recoverable game environment.
 
 ## Prepare the Workspace
@@ -85,8 +88,9 @@ Use `LmtEditor.replace_request()` only with a reviewed Motion, EventGroup, slot,
 assignment frame, old ReqNo, and exact trigger-frame set. Use
 `WwevEditor.append_cloned_record()` only with the donor Event, mode, and full
 variable-record SHA-256 guards. Both editors reject in-place writes and perform
-read-back validation. They are Library APIs, not a persistent project route or
-CLI; a future three-file route still needs an explicitly reviewed build plan.
+read-back validation. They are Library APIs, not persistent project routes or
+CLI commands; record reviewed changes in explicit artifact plans and validate
+multi-file routes through a `ModBuildPlan` bundle validator.
 
 Read [hirc-routing-and-settings.md](references/hirc-routing-and-settings.md)
 before changing Event routes, Sound/Container properties, positioning, or Aux
@@ -139,29 +143,22 @@ conda run -n nanoha-gunlance-mod python \
   replacement.wav "$temp_dir/replacement.wem"
 ```
 
-Inspect the converted WEM, then register the replacement in the matching table
-under `docs/mapping/` and run its Python `BankBuildPlan`:
+Inspect the converted WEM, then declare its project WAV path, exact 1-based DIDX
+index and Media ID in the matching `SoundBankBuildPlan` and run that artifact:
 
 ```sh
 conda run -n nanoha-gunlance-mod python -m builders.wp07_gun_epvsp_shell \
-  --mapping-dir docs/mapping --dry-run
-conda run -n nanoha-gunlance-mod python -m builders.wp07_gun_epvsp_shell \
-  --mapping-dir docs/mapping
+  --dry-run
+conda run -n nanoha-gunlance-mod python -m builders.wp07_gun_epvsp_shell
 ```
 
-The builder resolves every 1-based mapping index to its original Media ID,
-converts the mapped audio, and calls `SoundBankEditor.replace_media()` with that
-exact guard. The explicit mapping path is transitional; the mapping documents
-are research records and will stop being runtime inputs after the builder
-orchestration is decoupled.
-
-When several mapping rows describe one sound that must be layered over the
-original effects, declare `MappingMediaOverlay(indices=(...), media_id=...)` on
-the `BankBuildPlan`. Every declared row must exist and resolve to the same source
-file. The builder excludes those indices from ordinary replacement, converts
-the shared source once, appends it under the explicit Media ID, and then invokes
-`apply_edits()` to create the reviewed Event -> Action -> Sound route. A missing
-row, split source path, duplicate claimed index, or ID collision is fatal.
+`MediaReplacement(index, expected_media_id, source_audio)` causes the builder to
+convert the declared WAV and call `replace_media()` with both DIDX and Media ID
+guards. `MediaAddition(expected_index, media_id, source_audio)` appends media in
+the declared order before `apply_edits()` creates the reviewed Event -> Action
+-> Sound route. Missing files, index drift, Media ID collisions, summary drift,
+or a source Bank hash mismatch are fatal. `docs/mapping/` remains useful for
+research but is never an executable input.
 
 The media-only rebuild must preserve Media ID order and every chunk other than
 DIDX/DATA byte-for-byte. It must also align media offsets to 16 bytes and pass
@@ -173,8 +170,8 @@ First trace the complete route in a wwiser text dump. The same Media ID may be
 referenced by multiple Sound objects or spatial paths, so changing only the
 first match can cause level or channel imbalance.
 
-For a project Bank, implement the reviewed settings in
-`builders/<bank-name>.py`. Import `soundbank_editor`, define the Bank's
+For a project Bank, implement the reviewed settings in its artifact module under
+`builders/`. Import `soundbank_editor`, define the Bank's
 `apply_edits(editor)` callback, and use `editor.hirc` to locate an object by HIRC
 type and ID. Patch a body-relative field with its exact expected old value. Use
 the v120 structural APIs only for reviewed Event/Action/Sound additions. The
@@ -184,9 +181,10 @@ For an overlay, clone only a reviewed donor Sound, preserve all donor fields
 except the explicit new Sound and Source IDs, and guard any additional
 positioning override byte before changing it.
 
-Run the single builder with `--dry-run`, then build to `output/` and inspect the
-resulting normalized wwiser HIRC diff. Do not express persistent HIRC changes in
-ad-hoc scripts; the same-name Python builder is the auditable edit plan.
+Run the single builder with `--dry-run`, then build to
+`output/nativePC/<declared-target>` and inspect the resulting normalized wwiser
+HIRC diff. Do not express persistent HIRC changes in ad-hoc scripts; the Python
+artifact plan is the auditable implementation contract.
 
 ## Validate the Final Bank
 

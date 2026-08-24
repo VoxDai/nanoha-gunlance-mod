@@ -7,7 +7,7 @@
 
 1. 逆向分析现有 Mod 或游戏源文件，整理“游戏事件—音频文件”映射关系。
 2. 收集并筛选《魔法少女奈叶》动画或游戏中的语音素材，完成裁剪、降噪、音量调整及格式转换。
-3. 根据事件映射替换对应音频，或通过额外 Action 在原版音效上叠加音频，生成 `.nbnk` 文件。
+3. 根据 design 中的实现契约替换或叠加音频，必要时同时修改 `.nbnk`、`.lmt` 和 `.wwev` 路由文件。
 4. 在可恢复的测试环境中安装并验证 Mod，确认触发事件、语音内容和播放效果符合预期。
 
 ## 目录结构
@@ -17,13 +17,13 @@
     - `assets/mod_samples/`：存放用于逆向分析的参考 Mod 样本；样本文件应保持不变。
     - `assets/source_audio/`：存放《魔法少女奈叶》相关游戏及动画语音素材；`assets/source_audio/testing/` 存放测试音频。
     - `assets/testing_mod_files/`：存放用于测试的 Mod 文件。
-- `builders/`：每个 SoundBank 的同名 Python 脚本是一份 `BankBuildPlan`，负责读取映射、调用编辑器修改原始 Bank
-  并保存；公共转换、验证和发布逻辑由 `builders/base.py` 复用。需要保留原版媒体并叠加声音时，用 `MappingMediaOverlay` 消费指定
-  Audio 行、追加一份共享媒体，并在该 Bank 的 `apply_edits()` 中声明 HIRC 路由。builder 尚未与文档解耦，过渡期运行时需显式传入
-  `--mapping-dir docs/mapping`。
-- `designs/`：存放 Mod 的音效设计，按用户可感知的动作记录触发范围、声音层、技术实现契约和验收要求；design 不作为构建期配置读取。
+- `builders/`：使用 `SoundBankBuildPlan`、`LmtBuildPlan`、`WwevBuildPlan` 显式包含完整构建计划，包括 design ID、源和目标路径、
+  原始二进制哈希、媒体 index/Media ID、guarded 编辑回调及精确摘要。`builders/base.py` 负责临时构建、深度验证和事务发布；
+  `python -m builders` 一次生成完整 `release/nativePC/`，单 artifact 模块用于调试。
+- `designs/`：存放 Mod 的音效设计，按用户可感知的动作记录触发范围、声音层、技术实现契约和验收要求。Design 是 builder 的设计依据，
+  但不是构建期解析的配置文件；实现后的完整契约必须固化在对应 Python plan 中。
 - `docs/`：存放招式、语音和其他研究资料。
-  - `docs/mapping/`：存放原版音频、事件和动作的逆向映射；过渡期仍保留现有 `Audio` 列供未解耦 builder 使用。
+  - `docs/mapping/`：存放原版音频、事件和动作的逆向映射，仅作为研究文档，不参与构建。
 - `original/`：存放从《怪物猎人：世界》提取的铳枪相关游戏原版数据；样本文件应保持不变。
     - `original/nbnk/`：存放原版 `.nbnk` SoundBank 文件。
     - `original/lmt/`：存放原版 `.lmt` Motion 文件。
@@ -57,7 +57,9 @@ conda run -n nanoha-gunlance-mod python <<'PY' ... PY
   `conda run -n nanoha-gunlance-mod python tools/utils/pyvgmstream.py inspect <文件.wem>`，或添加 `-h` 查看完整参数。
 - `tools.soundbank_editor`：使用 `SoundBank`/`SoundBankEditor` 处理 Bank 和 1-based DIDX 媒体；使用 `LmtFile`/`LmtEditor`
   查询或 guarded 替换 Motion TIML 请求；使用 `WwevFile`/`WwevEditor` 解析请求表并克隆完整记录。该 Library 不提供 CLI，
-  SoundBank 持久修改应写入同名 builder；映射 overlay 属于 builder 编排能力，不属于 Library 的 JSON 或 CLI 接口。
+  持久修改应写入对应的显式 artifact builder；跨格式路由由 `ModBuildPlan` 的 bundle validator 验证。
+- `builders`：运行 `conda run -n nanoha-gunlance-mod python -m builders --dry-run` 完成不发布的全量构建验证；正式构建使用
+  `python -m builders`，已有 release 时必须显式添加 `--force` 才会通过带回滚备份的整树替换发布。
 - `tools/utils/wav_to_wem.py`：将输入音频转换为项目验证过的 48 kHz、16-bit、stereo Wwise PCM WEM 布局。
 - `tools/wwiser/`：通过 Git Submodule 管理的 [wwiser](https://github.com/bnnm/wwiser)，用于解析 Wwise `.bnk`/`.nbnk` 的区块和
   HIRC 音频事件关系、导出结构信息及生成 TXTP。克隆主仓库后运行 `git submodule update --init --recursive` 获取工具。使用

@@ -84,15 +84,16 @@ fields change later body offsets.
 7. Re-extract and decode all replaced media, then perform in-game trigger,
    loudness, channel, camera-position, and conflict tests.
 
-`tools.soundbank_editor` is a Python Library, not a CLI. Use a per-Bank
-`BankBuildPlan` for persistent media and HIRC changes. The builder's mapping
-replacement phase remains media-only; bank-specific structural changes belong
-only in its Python `apply_edits()` callback. If mapping Audio rows feed an
-additional route while their original media must remain intact, declare them as
-a `MappingMediaOverlay` on that plan. The shared WEM is appended before the
-callback runs; the callback must guard its Media ID, clone the reviewed Sound,
-insert each Action before its Event, and preserve the Event's existing Action as
-the first list entry.
+`tools.soundbank_editor` is a Python Library, not a CLI. Use a
+`SoundBankBuildPlan` for persistent media and HIRC changes. Declare ordinary
+replacement with `MediaReplacement`; it remains media-only unless the plan also
+contains reviewed structural edits. Declare layered audio with `MediaAddition`
+so existing DIDX payloads stay byte-exact. Added media is serialized in declared
+index order before `apply_edits()` runs; the callback must guard its Media ID,
+clone the reviewed Sound, insert each Action before its Event, and preserve the
+Event's existing Action as the first list entry. If the Event is reached through
+LMT/WWEV, use explicit companion plans and a bundle validator that proves the
+complete Motion -> ReqNo -> Event -> Action -> Sound -> Media chain.
 
 For a random route, create and parent every child first, then use
 `clone_random_sequence_container()` with the donor's exact expected playlist

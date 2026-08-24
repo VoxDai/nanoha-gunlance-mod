@@ -1,4 +1,4 @@
 interface:
   display_name: "SoundBank Workflow"
-  short_description: "Analyze media, HIRC routes, and NBNK settings"
-  default_prompt: "Use $soundbank-workflow to inspect NBNK media, trace HIRC routes, apply guarded Bank settings, and validate the result."
+  short_description: "Analyze NBNK media and LMT/WWEV event routes"
+  default_prompt: "Use $soundbank-workflow to inspect NBNK media, trace HIRC and LMT/WWEV routes, apply guarded artifact edits, and validate the result."
