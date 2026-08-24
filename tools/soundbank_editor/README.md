@@ -1,9 +1,11 @@
 # soundbank_editor
 
-`tools.soundbank_editor` is the project-local Python Library for lossless NBNK
-parsing, embedded WEM extraction, DIDX/DATA rebuilding, and guarded HIRC edits.
-It has no command-line or JSON-plan interface. Project changes belong in the
-matching Python module under `builders/`.
+`tools.soundbank_editor` is the project-local Python Library for lossless NBNK,
+LMT v95/TIML, and WWEV v19 parsing. It provides embedded WEM extraction,
+DIDX/DATA rebuilding, guarded HIRC edits, Motion-scoped request substitution,
+and guarded WWEV record cloning. It has no command-line or JSON-plan interface.
+Import its public API with `from tools import soundbank_editor`; the internal
+modules are split by binary format.
 
 ## Parse and extract
 
@@ -112,10 +114,89 @@ declare `MappingMediaOverlay(indices=(...), media_id=...)`. This builder-only
 configuration validates one shared source, converts it once, appends it, and
 then calls `apply_edits()`; it is not a JSON plan or Library CLI feature.
 
+## Trace LMT requests through WWEV
+
+```python
+from pathlib import Path
+from tools import soundbank_editor
+
+lmt = soundbank_editor.LmtFile.from_file(Path("input.lmt"))
+wwev = soundbank_editor.WwevFile.from_file(Path("input.wwev"))
+
+for route in lmt.triggered_requests(wwev):
+    print(
+        route.motion_id,
+        route.trigger_frame,
+        route.event_group,
+        route.slot,
+        route.request_no,
+        route.event_id,
+    )
+```
+
+`LmtFile` preserves the complete input and exposes populated Motion headers and
+embedded TIML types, transforms, and keyframes. Request reports map the low
+eight `mTrigger` bits to ReqNo slots A through H. Repeated WWEV records are
+expanded rather than silently collapsed, and shared TIML offsets list every
+affected Motion.
+
+## Guarded LMT request substitution
+
+```python
+editor = soundbank_editor.LmtEditor(lmt)
+edit = editor.replace_request(
+    motion_id=2,
+    event_group="EventGroup06",
+    slot="B",
+    request_keyframe_frame=0.0,
+    expected_request=100,
+    replacement_request=101,
+    expected_trigger_frames=(9.0,),
+)
+rebuilt_lmt = editor.validate()
+```
+
+The editor requires one unshared Motion TIML, one typed request transform, one
+matching assignment keyframe, and the exact trigger-frame set. It changes only
+the keyframe's four-byte value and rejects overlapping edits. ReqNo values use
+the positive signed-16 range shared with WWEV.
+
+## Guarded WWEV record cloning
+
+```python
+donor = wwev.record(100)
+editor = soundbank_editor.WwevEditor(wwev)
+editor.append_cloned_record(
+    donor_request=100,
+    expected_donor_event_id=123456,
+    expected_donor_mode=2,
+    expected_donor_sha256="0123456789abcdef" * 4,
+    new_request=101,
+    new_event_id=654321,
+)
+rebuilt_wwev = editor.validate()
+```
+
+Record SHA-256 covers the entire variable-length donor, including mode,
+command hash, the 116-byte unknown region, WWPC, and its terminator. The editor
+preserves dependencies and every original record byte-for-byte, updates only
+the record count, and appends verified clones. Inspect and record the donor hash
+before writing a persistent edit plan; do not derive a guard from an unreviewed
+input at edit time.
+
+`SoundBankEditor`, `LmtEditor`, and `WwevEditor` all provide `build()`,
+`validate()`, summaries, and `write_atomic()`. Atomic writes reject input-path
+overwrites and existing outputs unless `overwrite=True` is explicit. Catch
+`EditorError` for every format or the format-specific `SoundBankError`,
+`LmtError`, and `WwevError` subclasses.
+
 ## Boundaries
 
 - Structural authoring supports MHW Wwise v120. Other versions are read-only.
+- LMT/TIML parsing and editing supports MHW LMT v95 only.
+- WWEV parsing and append-only editing supports MHW WWEV v19 only.
 - Unknown HIRC types are preserved, not semantically decoded.
+- Unknown WWEV record bytes are retained and included in donor guards.
 - Arbitrary HIRC object deletion is intentionally unsupported.
 - A successful parse is not proof of game-runtime acceptance; complete trigger,
   mix, spatial, loop/Stop, and mod-conflict testing in game.

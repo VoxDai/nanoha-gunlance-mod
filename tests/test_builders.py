@@ -88,7 +88,7 @@ class MappingTests(unittest.TestCase):
         ):
             self.assertEqual(parsed[name].replacements, [])
         self.assertEqual(len(parsed["cm_hitmark_epvsp"].unresolved_rows), 1)
-        self.assertEqual(len(parsed["wp_gun_cmn"].unresolved_rows), 1)
+        self.assertEqual(len(parsed["wp_gun_cmn"].unresolved_rows), 0)
 
     def test_wp07_overlay_rows_are_removed_from_replacements(self) -> None:
         prepared = prepare_plan(

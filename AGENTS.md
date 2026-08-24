@@ -26,8 +26,8 @@
     - `original/soundbank/`：存放原版 `.nbnk` SoundBank 文件。
     - `original/audio_files/<SoundBank>/{wav,wem}/`：存放按 SoundBank 分类提取的原版音频文件及其 WAV 转换文件。
 - `tools/`：存放用于分析、提取、转换音频和重建 SoundBank 的工具脚本。
-  - `tools/soundbank_editor/`：纯 Python SoundBank Library，提供 NBNK/DIDX/DATA/HIRC 的解析、媒体提取、guarded 编辑、v120
-    结构重建和读回验证；通过 `from tools import soundbank_editor` 使用。
+  - `tools/soundbank_editor/`：纯 Python 音频路由 Library，提供 NBNK/DIDX/DATA/HIRC、LMT v95/TIML 和 WWEV v19
+    的无损解析、guarded 编辑、结构重建和读回验证；通过 `from tools import soundbank_editor` 使用。
     - `tools/utils/`：存放项目公共音频工具，包括 pyvgmstream 封装和 Wwise PCM WEM 转换脚本。
     - `tools/wwiser/`：解析 Wwise SoundBank 结构、HIRC 关系并生成分析结果。
 
@@ -51,9 +51,9 @@ conda run -n nanoha-gunlance-mod python <<'PY' ... PY
 - `pyvgmstream`：用于识别 Wwise `.wem` 元数据、将 WEM 解码为 WAV 以及批量转换。项目统一通过
   `tools/utils/pyvgmstream.py` 调用，例如：
   `conda run -n nanoha-gunlance-mod python tools/utils/pyvgmstream.py inspect <文件.wem>`，或添加 `-h` 查看完整参数。
-- `tools.soundbank_editor`：使用 `SoundBank.from_file()` 解析 Bank，通过 1-based DIDX index 或 Media ID 提取媒体；使用
-  `SoundBankEditor` 替换/追加媒体并执行 guarded HIRC 编辑。该 Library 不提供 CLI，持久修改应写入同名 builder；映射 overlay
-  属于 builder 编排能力，不属于 Library 的 JSON 或 CLI 接口。
+- `tools.soundbank_editor`：使用 `SoundBank`/`SoundBankEditor` 处理 Bank 和 1-based DIDX 媒体；使用 `LmtFile`/`LmtEditor`
+  查询或 guarded 替换 Motion TIML 请求；使用 `WwevFile`/`WwevEditor` 解析请求表并克隆完整记录。该 Library 不提供 CLI，
+  SoundBank 持久修改应写入同名 builder；映射 overlay 属于 builder 编排能力，不属于 Library 的 JSON 或 CLI 接口。
 - `tools/utils/wav_to_wem.py`：将输入音频转换为项目验证过的 48 kHz、16-bit、stereo Wwise PCM WEM 布局。
 - `tools/wwiser/`：通过 Git Submodule 管理的 [wwiser](https://github.com/bnnm/wwiser)，用于解析 Wwise `.bnk`/`.nbnk` 的区块和
   HIRC 音频事件关系、导出结构信息及生成 TXTP。克隆主仓库后运行 `git submodule update --init --recursive` 获取工具。使用

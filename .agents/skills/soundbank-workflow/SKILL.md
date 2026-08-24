@@ -66,6 +66,28 @@ rg -n -C 8 'sourceID|ulID|DirectParentID|ulChildID|idExt' \
   "$temp_dir/input-hirc.txt"
 ```
 
+For an animation-driven route, inspect the Motion TIML request and resolve it
+through the matching WWEV without changing either source file:
+
+```sh
+conda run -n nanoha-gunlance-mod python <<'PY'
+from pathlib import Path
+from tools import soundbank_editor
+
+lmt = soundbank_editor.LmtFile.from_file(Path("input.lmt"))
+wwev = soundbank_editor.WwevFile.from_file(Path("input.wwev"))
+for route in lmt.triggered_requests(wwev):
+    print(route)
+PY
+```
+
+Use `LmtEditor.replace_request()` only with a reviewed Motion, EventGroup, slot,
+assignment frame, old ReqNo, and exact trigger-frame set. Use
+`WwevEditor.append_cloned_record()` only with the donor Event, mode, and full
+variable-record SHA-256 guards. Both editors reject in-place writes and perform
+read-back validation. They are Library APIs, not a persistent project route or
+CLI; a future three-file route still needs an explicitly reviewed build plan.
+
 Read [hirc-routing-and-settings.md](references/hirc-routing-and-settings.md)
 before changing Event routes, Sound/Container properties, positioning, or Aux
 sends.
