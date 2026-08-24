@@ -1,34 +1,52 @@
 ---
 name: soundbank-workflow
-description: "Analyze and rebuild Monster Hunter: World/Iceborne NBNK audio and LMT/WWEV event routes. Use for DIDX/WEM media work, HIRC routing, guarded node settings, cross-format requests, and verified single-artifact output."
+description: "Inspect, query, and perform guarded standalone edits on Monster Hunter: World NBNK, LMT v95/TIML, and WWEV v19 files. Use for binary-format analysis, WEM extraction, HIRC and request routing, safe prototypes, and verified single-artifact output; do not author project designs or builders or publish releases."
 ---
 
 # SoundBank Workflow
 
+Use `tools.soundbank_editor` as the format-level Library for NBNK audio and
+LMT/WWEV event routes. This skill explains binary inspection and guarded
+single-artifact work. It does not decide audible behavior, implement persistent
+project plans, or publish a Mod release.
+
+## Capabilities and Limits
+
+| Format | Read and query | Guarded changes |
+|---|---|---|
+| NBNK / Wwise v120 | Bank/chunk identity, 1-based DIDX, Media IDs, WEM extraction, HIRC routes and objects | replace or append media; patch, insert, append, or clone supported HIRC structures |
+| LMT v95 / TIML | Motions, embedded TIML, EventGroup00–10, ReqNo A–H, low-eight-bit triggers, shared TIML | replace one guarded request assignment |
+| WWEV v19 | header, dependencies, complete records, ReqNo/mode/Event routes, WWPC | append a full guarded donor clone with new ReqNo/Event |
+
+The Library does not provide high-level deletion of original media, HIRC
+objects, TIML data, or WWEV records. Do not simulate unsupported deletion with
+raw byte patches. Unsupported versions and unknown structures are preserved or
+rejected rather than guessed.
+
 ## Safety Rules
 
-- Use an original Bank from `original/` as the rebuild input. Never modify `original/` or `mod_samples/`.
-- Treat DIDX indices as 1-based. Inspect the Bank and report the matching Media ID before replacement.
-- Put all extracted media, converted WEM files, logs, and validation artifacts in one task-specific `/tmp` directory.
-- Write only the verified final NBNK to `output/`. Never overwrite an existing output without explicit authorization.
-- Treat a declared `MediaReplacement` as media-only unless its plan also has a
-  reviewed HIRC callback. Use `MediaAddition` when original payloads remain and
-  a new route needs appended media.
-- Put persistent project changes in the matching `SoundBankBuildPlan`,
-  `LmtBuildPlan`, or `WwevBuildPlan` under `builders/`, using
-  `tools.soundbank_editor` guarded APIs. Never patch absolute file offsets.
-- Treat structural validation as necessary but insufficient. Complete final trigger, volume, channel, and conflict checks in a recoverable game environment.
+- Read project inputs from the documented `original/` directories. Never
+  modify them, `assets/chunk/`, or reference Mod samples.
+- Treat DIDX indices as 1-based and always pair an index with its inspected
+  Media ID.
+- Put extracted WEMs, converted media, prototypes, wwiser dumps, logs, and
+  validation files in one task-specific `/tmp` directory.
+- Never patch an absolute file offset. HIRC fields use object-relative offsets;
+  LMT and WWEV changes use their high-level guarded APIs.
+- Prefer in-memory build and validation. Write a single artifact only when the
+  user requests it, to a new output path that cannot overwrite its input.
+- A successful structural validation is not game acceptance. Trigger, timing,
+  loudness, channel, positioning, interruption, and Mod conflicts require
+  recoverable in-game testing.
 
-## Prepare the Workspace
-
-Create a temporary workspace and register cleanup before producing intermediates:
+## Prepare a Temporary Workspace
 
 ```sh
 temp_dir="$(mktemp -d /tmp/soundbank-workflow.XXXXXX)"
 trap 'rm -rf -- "$temp_dir"' EXIT INT TERM
 ```
 
-Check the required tools:
+Check project tools when the task needs WEM or HIRC validation:
 
 ```sh
 conda run -n nanoha-gunlance-mod ffmpeg -version
@@ -36,164 +54,168 @@ conda run -n nanoha-gunlance-mod python -c "import pyvgmstream; print('pyvgmstre
 test -f tools/wwiser/wwiser.py
 ```
 
-## Inspect and Analyze
+## Read and Query
 
-Inspect chunk order, sizes, DIDX indices, Media IDs, offsets, and alignment with
-the Python Library:
+Inspect one Bank and its embedded media:
 
-```sh
-conda run -n nanoha-gunlance-mod python <<'PY'
+```python
 from pathlib import Path
 from tools import soundbank_editor
 
-bank = soundbank_editor.SoundBank.from_file(Path("input.nbnk"))
-print("version", bank.version, "bank_id", bank.bank_id)
+bank = soundbank_editor.SoundBank.from_file(
+    Path("original/nbnk/wp_gun_cmn.nbnk")
+)
+print(bank.version, bank.bank_id, len(bank.entries))
 for index, entry in enumerate(bank.entries, 1):
-    print(index, entry.media_id, entry.offset, entry.size, entry.offset % 16 == 0)
-PY
+    print(index, entry.media_id, entry.offset, entry.size, entry.offset % 16)
 ```
 
-Use wwiser for a structural check:
+Resolve an animation request through WWEV:
 
-```sh
-conda run -n nanoha-gunlance-mod python tools/wwiser/wwiser.py -d none input.nbnk
+```python
+lmt = soundbank_editor.LmtFile.from_file(Path("original/lmt/w07_00.lmt"))
+wwev = soundbank_editor.WwevFile.from_file(
+    Path("original/wwev/hm_wp07_snd_ev.wwev")
+)
+for route in lmt.triggered_requests(wwev):
+    print(route)
 ```
 
-When tracing HIRC routes or node settings, write a text dump inside the temporary
-workspace and search it by Media ID or HIRC object ID:
+`triggered_requests()` preserves repeated WWEV expansions, shared-TIML Motion
+lists, trigger frames and masks, slot, mode, and Event ID. Inspect the complete
+route before selecting an edit guard.
+
+For HIRC topology, first parse with wwiser and write the dump under the
+temporary directory:
 
 ```sh
 conda run -n nanoha-gunlance-mod python tools/wwiser/wwiser.py \
-  -d txt -dn "$temp_dir/input-hirc" input.nbnk
+  -d txt -dn "$temp_dir/bank-hirc" original/nbnk/wp_gun_cmn.nbnk
 rg -n -C 8 'sourceID|ulID|DirectParentID|ulChildID|idExt' \
-  "$temp_dir/input-hirc.txt"
+  "$temp_dir/bank-hirc.txt"
 ```
 
-For an animation-driven route, inspect the Motion TIML request and resolve it
-through the matching WWEV without changing either source file:
+Read
+[hirc-routing-and-settings.md](references/hirc-routing-and-settings.md) before
+changing an Event route, Sound or Container topology, positioning, volume,
+pitch, or Aux settings.
 
-```sh
-conda run -n nanoha-gunlance-mod python <<'PY'
-from pathlib import Path
-from tools import soundbank_editor
-
-lmt = soundbank_editor.LmtFile.from_file(Path("input.lmt"))
-wwev = soundbank_editor.WwevFile.from_file(Path("input.wwev"))
-for route in lmt.triggered_requests(wwev):
-    print(route)
-PY
-```
-
-Use `LmtEditor.replace_request()` only with a reviewed Motion, EventGroup, slot,
-assignment frame, old ReqNo, and exact trigger-frame set. Use
-`WwevEditor.append_cloned_record()` only with the donor Event, mode, and full
-variable-record SHA-256 guards. Both editors reject in-place writes and perform
-read-back validation. They are Library APIs, not persistent project routes or
-CLI commands; record reviewed changes in explicit artifact plans and validate
-multi-file routes through a `ModBuildPlan` bundle validator.
-
-Read [hirc-routing-and-settings.md](references/hirc-routing-and-settings.md)
-before changing Event routes, Sound/Container properties, positioning, or Aux
-sends.
-
-## Extract and Decode Media
-
-Extract one entry by DIDX index or Media ID:
+## Extract and Inspect WEM
 
 ```sh
 conda run -n nanoha-gunlance-mod python <<PY
 from pathlib import Path
 from tools import soundbank_editor
 
-bank = soundbank_editor.SoundBank.from_file(Path("input.nbnk"))
+bank = soundbank_editor.SoundBank.from_file(
+    Path("original/nbnk/wp_gun_cmn.nbnk")
+)
+entry = bank.media_entry(index=22)
 Path("$temp_dir/22.wem").write_bytes(bank.extract_media(index=22))
+print(entry.media_id)
 PY
 ```
 
-Use `extract_media(media_id=ID)` instead of `index=`, or extract every entry with:
-
 ```sh
-conda run -n nanoha-gunlance-mod python <<PY
-from pathlib import Path
-from tools import soundbank_editor
-
-bank = soundbank_editor.SoundBank.from_file(Path("input.nbnk"))
-output = Path("$temp_dir/wem")
-output.mkdir(parents=True, exist_ok=True)
-for index, entry in enumerate(bank.entries, 1):
-    (output / f"{index}_{entry.media_id}.wem").write_bytes(entry.payload)
-PY
-```
-
-Inspect or decode extracted media with the project CLI:
-
-```sh
-conda run -n nanoha-gunlance-mod python tools/utils/pyvgmstream.py inspect "$temp_dir/22.wem"
+conda run -n nanoha-gunlance-mod python tools/utils/pyvgmstream.py inspect \
+  "$temp_dir/22.wem"
 conda run -n nanoha-gunlance-mod python tools/utils/pyvgmstream.py decode \
   "$temp_dir/22.wem" "$temp_dir/22.wav"
 ```
 
-## Convert and Replace
-
-Convert replacement audio to the verified 48 kHz, 16-bit, stereo Wwise PCM layout:
+Convert a reviewed WAV to the verified 48 kHz, 16-bit, stereo Wwise PCM WEM
+layout before using it as a replacement:
 
 ```sh
-conda run -n nanoha-gunlance-mod python \
-  tools/utils/wav_to_wem.py \
+conda run -n nanoha-gunlance-mod python tools/utils/wav_to_wem.py \
   replacement.wav "$temp_dir/replacement.wem"
 ```
 
-Inspect the converted WEM, then declare its project WAV path, exact 1-based DIDX
-index and Media ID in the matching `SoundBankBuildPlan` and run that artifact:
+## Guarded Standalone Edits
 
-```sh
-conda run -n nanoha-gunlance-mod python -m builders.wp07_gun_epvsp_shell \
-  --dry-run
-conda run -n nanoha-gunlance-mod python -m builders.wp07_gun_epvsp_shell
+For NBNK, guard media identity and every HIRC old value:
+
+```python
+editor = soundbank_editor.SoundBankEditor(bank)
+editor.replace_media(
+    replacement_wem,  # Path inside the task-specific temporary directory
+    index=22,
+    expected_media_id=entry.media_id,
+)
+editor.hirc.patch_float(
+    soundbank_editor.HIRC_SOUND,
+    123456,
+    0x20,
+    -5.0,
+    -6.5,
+    label="reviewed Sound volume",
+)
+rebuilt_bank = editor.validate()
 ```
 
-`MediaReplacement(index, expected_media_id, source_audio)` causes the builder to
-convert the declared WAV and call `replace_media()` with both DIDX and Media ID
-guards. `MediaAddition(expected_index, media_id, source_audio)` appends media in
-the declared order before `apply_edits()` creates the reviewed Event -> Action
--> Sound route. Missing files, index drift, Media ID collisions, summary drift,
-or a source Bank hash mismatch are fatal. `docs/mapping/` remains useful for
-research but is never an executable input.
+Use `append_media()`, `clone_sound()`, `insert_object()`,
+`append_event_action()`, and
+`clone_random_sequence_container()` only after inspecting the donor and every
+reference. New IDs must be explicit and collision checked.
 
-The media-only rebuild must preserve Media ID order and every chunk other than
-DIDX/DATA byte-for-byte. It must also align media offsets to 16 bytes and pass
-read-back verification.
+For LMT, supply the complete Motion-level guard:
 
-## Change HIRC Settings
+```python
+lmt_editor = soundbank_editor.LmtEditor(lmt)
+lmt_editor.replace_request(
+    motion_id=2,
+    event_group="EventGroup06",
+    slot="B",
+    request_keyframe_frame=0.0,
+    expected_request=6470,
+    replacement_request=6592,
+    expected_trigger_frames=(9.0,),
+)
+rebuilt_lmt = lmt_editor.validate()
+```
 
-First trace the complete route in a wwiser text dump. The same Media ID may be
-referenced by multiple Sound objects or spatial paths, so changing only the
-first match can cause level or channel imbalance.
+For WWEV, hash and guard the entire variable-length donor record:
 
-For a project Bank, implement the reviewed settings in its artifact module under
-`builders/`. Import `soundbank_editor`, define the Bank's
-`apply_edits(editor)` callback, and use `editor.hirc` to locate an object by HIRC
-type and ID. Patch a body-relative field with its exact expected old value. Use
-the v120 structural APIs only for reviewed Event/Action/Sound additions. The
-builder must fail if an object, ID, route, or old value differs. Keep paired
-playback paths symmetric unless the intended mix explicitly requires otherwise.
-For an overlay, clone only a reviewed donor Sound, preserve all donor fields
-except the explicit new Sound and Source IDs, and guard any additional
-positioning override byte before changing it.
+```python
+wwev_editor = soundbank_editor.WwevEditor(wwev)
+wwev_editor.append_cloned_record(
+    donor_request=6470,
+    expected_donor_event_id=3567942167,
+    expected_donor_mode=2,
+    expected_donor_sha256="1c6fd120501ce70925b00d8ab0166a38b132934e220a1095506424024a33e53f",
+    new_request=6592,
+    new_event_id=3176129810,
+)
+rebuilt_wwev = wwev_editor.validate()
+```
 
-Run the single builder with `--dry-run`, then build to
-`output/nativePC/<declared-target>` and inspect the resulting normalized wwiser
-HIRC diff. Do not express persistent HIRC changes in ad-hoc scripts; the Python
-artifact plan is the auditable implementation contract.
+The donor hash covers mode, command data, the unknown region, WWPC, and record
+terminators. Do not derive a guard from an unreviewed or already modified input.
 
-## Validate the Final Bank
+## Validate and Write
 
-Reparse the final file with `SoundBank.from_file()` and run wwiser against it.
-Re-extract each replaced or appended entry and inspect or decode it with
-pyvgmstream. For a HIRC edit,
-compare original and rebuilt dumps after removing file-offset-only differences
-and require that all semantic changes match the declared builder settings.
-Report the output path, SHA-256, replaced DIDX indices, Media IDs, and HIRC
-changed-byte count.
+Before writing, compare the editor summary with the reviewed intent, call
+`validate()`, and reparse `build()`. For NBNK also run wwiser, re-extract
+every changed WEM, and inspect/decode it with pyvgmstream. For an LMT/WWEV pair,
+resolve the rebuilt request route again and require only the intended rows.
 
-Read [format-and-troubleshooting.md](references/format-and-troubleshooting.md) when a Bank is rejected, an index is ambiguous, a WEM is unrecognized, or the game is silent.
+`SoundBankEditor`, `LmtEditor`, and `WwevEditor` provide
+`write_atomic()`. They reject input-path overwrites and existing outputs
+unless overwrite is explicitly authorized. Keep diagnostics in `/tmp`; report
+the final path, SHA-256, summary, and preservation checks.
+
+Read
+[format-and-troubleshooting.md](references/format-and-troubleshooting.md) when
+parsing fails, WEM is silent, an index or route is ambiguous, or the game does
+not trigger the expected sound.
+
+## Project Handoff
+
+- Use `audio-design` to turn verified behavior, audio, artifacts, and guards
+  into a design contract.
+- Use `design-implement` to encode a specified design in persistent artifact
+  builders, integration validators, and tests.
+- Use `build-mod` to execute the registered complete Mod plan and publish
+  `release/nativePC/`.
+
+Do not edit those project layers as an implicit side effect of binary analysis.

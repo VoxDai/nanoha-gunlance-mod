@@ -1,4 +1,4 @@
 interface:
   display_name: "Audio Design"
-  short_description: "Create verified sound-effect design contracts"
-  default_prompt: "Use $audio-design to create or update an implementation-ready sound-effect design document from my playback requirements."
+  short_description: "Create verified design contracts before builders"
+  default_prompt: "Use $audio-design to create or update the specified implementation-ready sound-effect design from my playback requirements."

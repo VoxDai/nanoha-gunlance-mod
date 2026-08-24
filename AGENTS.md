@@ -1,77 +1,80 @@
 # Nanoha Gunlance Mod
 
-本项目用于制作《怪物猎人：世界》语音 Mod，将游戏中铳枪相关音效替换为《魔法少女奈叶》中奈叶的战斗语音。开发内容包括游戏音频事件分析、语音素材整理与处理，以及
-`.nbnk` Mod 文件的生成和验证。
+本项目用于制作《怪物猎人：世界》语音 Mod，将游戏中铳枪相关音效替换或叠加为《魔法少女奈叶》中奈叶及 Raising Heart
+的战斗语音。开发内容包括游戏音频事件分析、素材整理与处理、音效设计、构建器实现，以及完整 Mod 的验证和发布。
 
 ## 基本步骤
 
-1. 逆向分析现有 Mod 或游戏源文件，整理“游戏事件—音频文件”映射关系。
-2. 收集并筛选《魔法少女奈叶》动画或游戏中的语音素材，完成裁剪、降噪、音量调整及格式转换。
-3. 根据 design 中的实现契约替换或叠加音频，必要时同时修改 `.nbnk`、`.lmt` 和 `.wwev` 路由文件。
-4. 在可恢复的测试环境中安装并验证 Mod，确认触发事件、语音内容和播放效果符合预期。
+1. 使用 `soundbank-workflow` 只读分析原版 NBNK、LMT、WWEV，整理事件、动作、媒体和路由证据。
+2. 收集并处理最终语音素材；需要从本地媒体截取时可使用 `extract-audio`。
+3. 使用 `audio-design` 将预期播放行为、最终音频、原始 artifact、guard 和验收要求固化到 `designs/`。
+4. 使用 `design-implement` 将指定 design 实现为显式 artifact builders、bundle validators 和测试。
+5. 使用 `build-mod` 执行完整 dry-run，并在全部验证通过后事务发布 `release/nativePC/`。
+6. 在可恢复的游戏环境中验证触发范围、播放时机、音量、空间感、中断行为和 Mod 冲突。
 
 ## 目录结构
 
-- `assets/`：存放项目资源及测试文件。
-  - `assets/chunk/`：存放从《怪物猎人：世界》提取的游戏完整原版数据；样本文件应保持不变。
-    - `assets/mod_samples/`：存放用于逆向分析的参考 Mod 样本；样本文件应保持不变。
-    - `assets/source_audio/`：存放《魔法少女奈叶》相关游戏及动画语音素材；`assets/source_audio/testing/` 存放测试音频。
-    - `assets/testing_mod_files/`：存放用于测试的 Mod 文件。
-- `builders/`：使用 `SoundBankBuildPlan`、`LmtBuildPlan`、`WwevBuildPlan` 显式包含完整构建计划，包括 design ID、源和目标路径、
-  原始二进制哈希、媒体 index/Media ID、guarded 编辑回调及精确摘要。`builders/base.py` 负责临时构建、深度验证和事务发布；
-  `python -m builders` 一次生成完整 `release/nativePC/`，单 artifact 模块用于调试。
-- `designs/`：存放 Mod 的音效设计，按用户可感知的动作记录触发范围、声音层、技术实现契约和验收要求。Design 是 builder 的设计依据，
-  但不是构建期解析的配置文件；实现后的完整契约必须固化在对应 Python plan 中。
-- `docs/`：存放招式、语音和其他研究资料。
-  - `docs/mapping/`：存放原版音频、事件和动作的逆向映射，仅作为研究文档，不参与构建。
-- `original/`：存放从《怪物猎人：世界》提取的铳枪相关游戏原版数据；样本文件应保持不变。
-    - `original/nbnk/`：存放原版 `.nbnk` SoundBank 文件。
-    - `original/lmt/`：存放原版 `.lmt` Motion 文件。
-    - `original/wwev/`：存放原版 `.wwev` 事件请求表。
-    - `original/audio_files/<SoundBank>/{wav,wem}/`：存放按 SoundBank 分类提取的原版音频文件及其 WAV 转换文件。
-- `tools/`：存放用于分析、提取、转换音频和重建 SoundBank 的工具脚本。
-  - `tools/soundbank_editor/`：纯 Python 音频路由 Library，提供 NBNK/DIDX/DATA/HIRC、LMT v95/TIML 和 WWEV v19
-    的无损解析、guarded 编辑、结构重建和读回验证；通过 `from tools import soundbank_editor` 使用。
-    - `tools/utils/`：存放项目公共音频工具，包括 pyvgmstream 封装和 Wwise PCM WEM 转换脚本。
-    - `tools/wwiser/`：解析 Wwise SoundBank 结构、HIRC 关系并生成分析结果。
+- `assets/`：原始素材、游戏提取数据及只读测试参考。
+    - `assets/chunk/`：从《怪物猎人：世界》提取的完整原版数据；保持不变。
+    - `assets/mod_samples/`：逆向分析用参考 Mod；保持不变。
+    - `assets/source_audio/`：奈叶相关游戏及动画的源语音；`testing/` 仅存放探针和测试音频。
+    - `assets/testing_mod_files/`：可恢复验证使用的历史或临时测试包，不属于正式 release。
+- `audio/`：design 使用的最终项目 WAV，按目标 artifact 和动作整理。
+- `builders/`：唯一可执行构建契约。
+    - `SoundBankBuildPlan`、`LmtBuildPlan`、`WwevBuildPlan` 显式声明 design ID、源和 nativePC 目标、原始哈希、 媒体
+      index/Media ID、guarded 回调及精确摘要。
+    - `ModBuildPlan` 显式注册完整 release 成员和跨文件 validators；不从目录内容或文档推断。
+    - `builders/base.py` 负责临时构建、深度验证和带回滚的整树事务发布。
+- `designs/`：按用户可感知动作记录触发范围、声音层、技术实现契约和验收要求；不是 builder 配置文件。
+- `docs/`：研究和参考资料。
+    - `docs/mapping/`：原版音频、事件和动作映射，仅供研究。
+    - `docs/reference/`：招式、语音等参考资料。
+- `original/`：已确认并固定给 design/builder 使用的原版输入；禁止原地修改。
+    - `original/nbnk/`：原版 NBNK SoundBanks。
+    - `original/lmt/`：原版 LMT Motion 文件。
+    - `original/wwev/`：原版 WWEV 请求表。
+    - `original/audio_files/<SoundBank>/{wav,wem}/`：按 SoundBank 分类的原版媒体提取结果。
+- `output/`：用户明确请求的单 artifact 调试输出；不构成正式 Mod。
+- `release/`：`build-mod` 事务发布的完整 Mod 树；不得手工拼装或发布子集。
+- `tools/`：格式 Library、音频转换和第三方分析工具。
 
 ## 本地开发环境
 
-本项目专用 conda 环境 `nanoha-gunlance-mod`，Python 版本为 3.12，完整依赖声明见 `environment.yml`。 环境包含 `ffmpeg`、
-`pyvgmstream`，以及用于 PDF、文档、表格和网页解析的常用包。
+项目专用 conda 环境为 `nanoha-gunlance-mod`，Python 3.12，完整依赖见 `environment.yml`。环境包含
+`ffmpeg`、`pyvgmstream` 及项目测试和分析依赖。
 
 ```sh
 # 运行单个命令
 conda run -n nanoha-gunlance-mod mycommand
 
-# 运行多行命令
-conda run -n nanoha-gunlance-mod python <<'PY' ... PY
+# 运行多行 Python
+conda run -n nanoha-gunlance-mod python <<'PY'
+...
+PY
 ```
+
+项目使用 Git LFS 管理 `.nbnk`、`.wav`、`.wem`、`.lmt` 和 `.wwev` 等二进制文件。在 `.git` 仅可读的沙箱中，
+检查普通文本文件时可使用 `git -c filter.lfs.process= -c filter.lfs.required=false diff --check -- <paths>` 跳过
+LFS filter；完整检查应申请写入权限。
 
 ## 项目工具
 
-- `ffmpeg`：用于音视频格式转换、裁剪、提取等处理。使用 `conda run -n nanoha-gunlance-mod ffmpeg -i <输入文件> <输出文件>`
-  执行，并通过指定参数完成相应处理。
-- `pyvgmstream`：用于识别 Wwise `.wem` 元数据、将 WEM 解码为 WAV 以及批量转换。项目统一通过
-  `tools/utils/pyvgmstream.py` 调用，例如：
-  `conda run -n nanoha-gunlance-mod python tools/utils/pyvgmstream.py inspect <文件.wem>`，或添加 `-h` 查看完整参数。
-- `tools.soundbank_editor`：使用 `SoundBank`/`SoundBankEditor` 处理 Bank 和 1-based DIDX 媒体；使用 `LmtFile`/`LmtEditor`
-  查询或 guarded 替换 Motion TIML 请求；使用 `WwevFile`/`WwevEditor` 解析请求表并克隆完整记录。该 Library 不提供 CLI，
-  持久修改应写入对应的显式 artifact builder；跨格式路由由 `ModBuildPlan` 的 bundle validator 验证。
-- `builders`：运行 `conda run -n nanoha-gunlance-mod python -m builders --dry-run` 完成不发布的全量构建验证；正式构建使用
-  `python -m builders`，已有 release 时必须显式添加 `--force` 才会通过带回滚备份的整树替换发布。
-- `tools/utils/wav_to_wem.py`：将输入音频转换为项目验证过的 48 kHz、16-bit、stereo Wwise PCM WEM 布局。
-- `tools/wwiser/`：通过 Git Submodule 管理的 [wwiser](https://github.com/bnnm/wwiser)，用于解析 Wwise `.bnk`/`.nbnk` 的区块和
-  HIRC 音频事件关系、导出结构信息及生成 TXTP。克隆主仓库后运行 `git submodule update --init --recursive` 获取工具。使用
-  `conda run -n nanoha-gunlance-mod python tools/wwiser/wwiser.py <文件.nbnk>` 解析文件，或添加 `-h` 查看完整参数。
+- `tools.soundbank_editor`：通过 `from tools import soundbank_editor` 使用，提供 NBNK/DIDX/DATA/HIRC、LMT v95/TIML、WWEV v19
+  的无损解析、guarded 编辑、结构重建和读回验证。
+- `ffmpeg`：用于音视频格式转换、裁剪和提取。通过
+  `conda run -n nanoha-gunlance-mod ffmpeg ...` 执行。
+- `pyvgmstream`：统一通过 `tools/utils/pyvgmstream.py` 封装调用，用于检查 WEM 和解码 WAV；添加 `-h` 查看参数。
+- `tools/utils/wav_to_wem.py`：将最终音频转换为项目验证过的 48 kHz、16-bit、stereo Wwise PCM WEM。
+- `tools/wwiser/`：Git Submodule 管理的
+  [wwiser](https://github.com/bnnm/wwiser)，用于解析 NBNK、HIRC 路由、导出结构和 TXTP。 使用
+  `conda run -n nanoha-gunlance-mod python tools/wwiser/wwiser.py <文件.nbnk>`。
 
 ## 参考资料
 
 - [MHW:IB Labelled Audio](https://docs.google.com/spreadsheets/d/10A_YEfm7KV0ATw7uD-3_o_ZOGSlGXtzWWMGXKs_neYM/edit)
-  ：社区维护的《怪物猎人：世界／冰原》音频标注表，包含 `.nbnk`/`.npck` 用途、内部 WEM 编号、Bank Index、角色语音预设和部分人工试听说明。内容并不完整，带
+  ：社区维护的《怪物猎人：世界／冰原》音频标注表，包含 NBNK/NPCK 用途、WEM 编号、Bank Index、角色语音预设和部分试听说明； 内容不完整，带
   `?` 的标注及旧版本编号需要自行验证。
-- [Modding MH:W — wwiseutil Wiki](https://github.com/hpxro7/wwiseutil/wiki/Modding-MH%3AW)：介绍《怪物猎人：世界》的
-  `.nbnk`/`.npck`、`.wem` 音频结构及提取、替换流程，并链接上述社区标注表。`wwiseutil` 已较旧，资料可作为参考；实际结构解析优先使用项目中的
-  `wwiser`。
+- [Modding MH:W — wwiseutil Wiki](https://github.com/hpxro7/wwiseutil/wiki/Modding-MH%3AW)
+  ：介绍 MHW 的 NBNK/NPCK/WEM 结构和替换流程。资料可作参考，实际解析优先使用项目中的 wwiser。
 - [Player Weapon Action IDs](https://github.com/AniBullet/MonsterHunterWorldModding/wiki/Player-Weapon-Action-IDs)
-  ：整理《怪物猎人：世界》各类玩家武器的 Action ID、动作名称及对应类名，可用于武器动作事件分析和 FSM 编辑。
+  ：玩家武器 Action ID 和动作名称参考，可辅助动作事件分析和 FSM 编辑。
