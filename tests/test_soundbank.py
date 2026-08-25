@@ -196,6 +196,47 @@ class SoundBankEditTests(unittest.TestCase):
         ):
             editor.validate()
 
+    def test_validate_rejects_new_switch_with_missing_child(self) -> None:
+        editor = soundbank_editor.SoundBankEditor(self.bank)
+        donor_container_id = 368_774_789
+        new_container_id = 4_294_967_000
+        original_child_id = 127_521_149
+        missing_child_id = 4_294_966_999
+        topology = editor.hirc.switch_container_topology(donor_container_id)
+        editor.hirc.clone_switch_container(
+            donor_container_id,
+            new_container_id,
+            {
+                child_id: original_child_id
+                if child_id == original_child_id
+                else None
+                for child_id in topology.children
+            },
+            expected_topology=topology,
+            expected_body_sha256=(
+                "a6df54f2d29b79482420ff8a17420b0952cbb64589e03dde"
+                "1358c02ab99043bb"
+            ),
+        )
+        body = editor.hirc.object_body(
+            soundbank_editor.HIRC_SWITCH_CONTAINER, new_container_id
+        )
+        old_id = struct.pack("<I", original_child_id)
+        new_id = struct.pack("<I", missing_child_id)
+        self.assertEqual(body.count(old_id), 13)
+        editor.hirc.replace_object_body(
+            soundbank_editor.HIRC_SWITCH_CONTAINER,
+            new_container_id,
+            body,
+            body.replace(old_id, new_id),
+            label="inject missing Switch child",
+        )
+
+        with self.assertRaisesRegex(
+            soundbank_editor.SoundBankError, "references missing child"
+        ):
+            editor.validate()
+
     def test_atomic_write_refuses_input_and_reads_back(self) -> None:
         editor = soundbank_editor.SoundBankEditor(self.bank)
         with self.assertRaisesRegex(soundbank_editor.SoundBankError, "overwriting"):
@@ -213,6 +254,15 @@ class PublicApiCompatibilityTests(unittest.TestCase):
             compatibility_editor.SoundBankEditor, soundbank_editor.SoundBankEditor
         )
         self.assertIs(compatibility_editor.HircEditor, soundbank_editor.HircEditor)
+        self.assertIs(
+            compatibility_editor.SwitchContainerTopology,
+            soundbank_editor.SwitchContainerTopology,
+        )
+        self.assertIs(
+            compatibility_editor.SwitchNodeParams,
+            soundbank_editor.SwitchNodeParams,
+        )
+        self.assertEqual(soundbank_editor.HIRC_SWITCH_CONTAINER, 0x06)
         self.assertIs(
             soundbank_editor.EditSummary, soundbank_editor.SoundBankEditSummary
         )

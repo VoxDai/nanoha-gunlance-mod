@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import struct
 import unittest
 
@@ -9,6 +10,42 @@ from ._soundbank_fixtures import (
     SOUNDBANK_ROOT,
     make_hirc,
     make_random_container_tail,
+)
+
+
+DONOR_SWITCH_TOPOLOGY = soundbank_editor.SwitchContainerTopology(
+    group_type=0,
+    group_id=3_251_135_135,
+    default_switch=3_396_333_570,
+    continuous_validation=0,
+    children=(101_900_622, 125_400_496, 127_521_149, 133_098_601, 438_972_177),
+    switch_packages=(
+        (3_396_333_570, (127_521_149,)),
+        (1_341_411_413, (438_972_177,)),
+        (3_366_211_890, (125_400_496,)),
+        (1_382_012_724, (127_521_149,)),
+        (345_916_037, (127_521_149,)),
+        (1_839_555_973, (127_521_149,)),
+        (3_165_334_324, (127_521_149,)),
+        (3_893_559_432, (133_098_601,)),
+        (3_529_994_682, (127_521_149,)),
+        (3_846_765_152, (127_521_149,)),
+        (3_818_705_907, (101_900_622,)),
+        (1_876_434_011, (127_521_149,)),
+        (835_669_289, (127_521_149,)),
+        (3_295_588_651, (127_521_149,)),
+        (208_142_906, (127_521_149,)),
+    ),
+    node_params=(
+        soundbank_editor.SwitchNodeParams(125_400_496, 0, 1, 0, 0),
+        soundbank_editor.SwitchNodeParams(438_972_177, 0, 1, 0, 0),
+        soundbank_editor.SwitchNodeParams(133_098_601, 0, 1, 0, 0),
+        soundbank_editor.SwitchNodeParams(101_900_622, 0, 1, 0, 0),
+        soundbank_editor.SwitchNodeParams(127_521_149, 0, 1, 0, 0),
+    ),
+)
+DONOR_SWITCH_BODY_SHA256 = (
+    "a6df54f2d29b79482420ff8a17420b0952cbb64589e03dde1358c02ab99043bb"
 )
 
 
@@ -262,8 +299,176 @@ class HircEditorTests(unittest.TestCase):
                 expected_avoid_repeat_count=1,
             )
 
+    def test_switch_container_topology_and_filtered_clone(self) -> None:
+        bank = soundbank_editor.SoundBank.from_file(
+            SOUNDBANK_ROOT / "hm_cm00_epvsp.nbnk"
+        )
+        editor = soundbank_editor.SoundBankEditor(bank)
+        donor_container_id = 368_774_789
+        new_container_id = 4_294_967_000
+        replacement_child_id = 925_721_864
+        child_map = {
+            child_id: replacement_child_id if child_id == 127_521_149 else None
+            for child_id in DONOR_SWITCH_TOPOLOGY.children
+        }
 
+        self.assertEqual(
+            editor.hirc.switch_container_topology(donor_container_id),
+            DONOR_SWITCH_TOPOLOGY,
+        )
+        donor = editor.hirc.object_body(
+            soundbank_editor.HIRC_SWITCH_CONTAINER, donor_container_id
+        )
+        editor.hirc.clone_switch_container(
+            donor_container_id,
+            new_container_id,
+            child_map,
+            expected_topology=DONOR_SWITCH_TOPOLOGY,
+            expected_body_sha256=DONOR_SWITCH_BODY_SHA256,
+        )
 
+        cloned = editor.hirc.object_body(
+            soundbank_editor.HIRC_SWITCH_CONTAINER, new_container_id
+        )
+        tail_marker = struct.pack(
+            "<BIIB",
+            DONOR_SWITCH_TOPOLOGY.group_type,
+            DONOR_SWITCH_TOPOLOGY.group_id,
+            DONOR_SWITCH_TOPOLOGY.default_switch,
+            DONOR_SWITCH_TOPOLOGY.continuous_validation,
+        )
+        tail_offset = donor.index(tail_marker)
+        self.assertEqual(cloned[4:tail_offset], donor[4:tail_offset])
+        retained_switch_ids = tuple(
+            switch_id
+            for switch_id, node_ids in DONOR_SWITCH_TOPOLOGY.switch_packages
+            if 127_521_149 in node_ids
+        )
+        expected = soundbank_editor.SwitchContainerTopology(
+            group_type=0,
+            group_id=3_251_135_135,
+            default_switch=3_396_333_570,
+            continuous_validation=0,
+            children=(replacement_child_id,),
+            switch_packages=tuple(
+                (switch_id, (replacement_child_id,))
+                for switch_id in retained_switch_ids
+            ),
+            node_params=(
+                soundbank_editor.SwitchNodeParams(
+                    replacement_child_id, 0, 1, 0, 0
+                ),
+            ),
+        )
+        self.assertEqual(
+            editor.hirc.switch_container_topology(new_container_id), expected
+        )
+        rebuilt = editor.validate()
+        self.assertEqual(
+            soundbank_editor.HircEditor(
+                rebuilt.hirc_payload, version=rebuilt.version
+            ).switch_container_topology(new_container_id),
+            expected,
+        )
+
+    def test_clone_switch_container_guards_inputs(self) -> None:
+        bank = soundbank_editor.SoundBank.from_file(
+            SOUNDBANK_ROOT / "hm_cm00_epvsp.nbnk"
+        )
+        donor_container_id = 368_774_789
+        child_map = {
+            child_id: 925_721_864 if child_id == 127_521_149 else None
+            for child_id in DONOR_SWITCH_TOPOLOGY.children
+        }
+        arguments = {
+            "donor_container_id": donor_container_id,
+            "new_container_id": 4_294_967_000,
+            "child_map": child_map,
+            "expected_topology": DONOR_SWITCH_TOPOLOGY,
+            "expected_body_sha256": DONOR_SWITCH_BODY_SHA256,
+        }
+
+        editor = soundbank_editor.SoundBankEditor(bank)
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "body SHA-256"):
+            editor.hirc.clone_switch_container(
+                **(arguments | {"expected_body_sha256": "00" * 32})
+            )
+
+        changed_topology = soundbank_editor.SwitchContainerTopology(
+            **(
+                DONOR_SWITCH_TOPOLOGY.__dict__
+                | {"continuous_validation": 1}
+            )
+        )
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "topology changed"):
+            editor.hirc.clone_switch_container(
+                **(arguments | {"expected_topology": changed_topology})
+            )
+
+        incomplete_map = dict(child_map)
+        incomplete_map.pop(101_900_622)
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "cover every donor"):
+            editor.hirc.clone_switch_container(
+                **(arguments | {"child_map": incomplete_map})
+            )
+
+        missing_child_map = dict(child_map)
+        missing_child_map[127_521_149] = 4_294_966_999
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "does not exist"):
+            editor.hirc.clone_switch_container(
+                **(arguments | {"child_map": missing_child_map})
+            )
+
+        duplicate_map = {child_id: None for child_id in child_map}
+        duplicate_map[127_521_149] = 925_721_864
+        duplicate_map[125_400_496] = 925_721_864
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "must be unique"):
+            editor.hirc.clone_switch_container(
+                **(arguments | {"child_map": duplicate_map})
+            )
+
+        removed_default_map = {child_id: None for child_id in child_map}
+        removed_default_map[125_400_496] = 925_721_864
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "default switch"):
+            editor.hirc.clone_switch_container(
+                **(arguments | {"child_map": removed_default_map})
+            )
+
+    def test_clone_switch_container_rejects_version_and_malformed_body(self) -> None:
+        bank = soundbank_editor.SoundBank.from_file(
+            SOUNDBANK_ROOT / "hm_cm00_epvsp.nbnk"
+        )
+        unsupported = soundbank_editor.HircEditor(
+            bank.hirc_payload, version=121
+        )
+        child_map = {
+            child_id: 925_721_864 if child_id == 127_521_149 else None
+            for child_id in DONOR_SWITCH_TOPOLOGY.children
+        }
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "requires Wwise v120"):
+            unsupported.clone_switch_container(
+                368_774_789,
+                4_294_967_000,
+                child_map,
+                expected_topology=DONOR_SWITCH_TOPOLOGY,
+                expected_body_sha256=DONOR_SWITCH_BODY_SHA256,
+            )
+
+        malformed_body = struct.pack("<I", 20) + b"bad"
+        malformed = soundbank_editor.HircEditor(
+            make_hirc(
+                (soundbank_editor.HIRC_SOUND, 10, b"sound"),
+                (soundbank_editor.HIRC_SWITCH_CONTAINER, 20, b"bad"),
+            )
+        )
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "unambiguous"):
+            malformed.clone_switch_container(
+                20,
+                21,
+                {child_id: None for child_id in DONOR_SWITCH_TOPOLOGY.children},
+                expected_topology=DONOR_SWITCH_TOPOLOGY,
+                expected_body_sha256=hashlib.sha256(malformed_body).hexdigest(),
+            )
 
 if __name__ == "__main__":
     unittest.main()

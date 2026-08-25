@@ -11,9 +11,12 @@ from .hirc import (
     HIRC_EVENT,
     HIRC_RANDOM_SEQUENCE_CONTAINER,
     HIRC_SOUND,
+    HIRC_SWITCH_CONTAINER,
     SUPPORTED_EDIT_VERSION,
     HircEditor,
     HircObject,
+    SwitchContainerTopology,
+    SwitchNodeParams,
 )
 from .soundbank import (
     ALIGNMENT,
@@ -37,6 +40,7 @@ __all__ = (
     "HIRC_EVENT",
     "HIRC_RANDOM_SEQUENCE_CONTAINER",
     "HIRC_SOUND",
+    "HIRC_SWITCH_CONTAINER",
     "SUPPORTED_EDIT_VERSION",
     "Chunk",
     "EditSummary",
@@ -48,6 +52,8 @@ __all__ = (
     "SoundBankEditor",
     "SoundBankEditSummary",
     "SoundBankError",
+    "SwitchContainerTopology",
+    "SwitchNodeParams",
     "validate_wem",
     "wwise_fnv1",
 )

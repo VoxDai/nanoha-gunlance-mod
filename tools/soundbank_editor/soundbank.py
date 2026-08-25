@@ -17,9 +17,11 @@ from .hirc import (
     HIRC_EVENT,
     HIRC_RANDOM_SEQUENCE_CONTAINER,
     HIRC_SOUND,
+    HIRC_SWITCH_CONTAINER,
     SUPPORTED_EDIT_VERSION,
     HircEditor,
     _parse_random_sequence_container_tail,
+    _parse_switch_container_tail,
 )
 
 
@@ -593,6 +595,20 @@ class SoundBankEditor:
                         raise SoundBankError(
                             f"new Container {object_id} references missing child "
                             f"objects: {missing_children}"
+                        )
+                elif object_type == HIRC_SWITCH_CONTAINER:
+                    layout = _parse_switch_container_tail(
+                        body, f"new Switch Container {object_id}"
+                    )
+                    missing_children = [
+                        child_id
+                        for child_id in layout.topology.children
+                        if child_id not in object_ids
+                    ]
+                    if missing_children:
+                        raise SoundBankError(
+                            f"new Switch Container {object_id} references missing "
+                            f"child objects: {missing_children}"
                         )
         diff = self.original.diff(rebuilt)
         declared_hirc = set(self.hirc.added_objects)

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+import hashlib
 import struct
 
 from ._binary import check_unsigned
@@ -15,6 +16,7 @@ HIRC_SOUND = 0x02
 HIRC_ACTION = 0x03
 HIRC_EVENT = 0x04
 HIRC_RANDOM_SEQUENCE_CONTAINER = 0x05
+HIRC_SWITCH_CONTAINER = 0x06
 ACTION_PLAY = 0x0403
 ACTION_PLAY_EVENT = 0x2103
 
@@ -40,6 +42,38 @@ class _RandomSequenceContainerTail:
     mode: int
 
 
+@dataclass(frozen=True)
+class SwitchNodeParams:
+    """One v120 Switch Container child behavior record."""
+
+    node_id: int
+    behavior_flags: int
+    transition_flags: int
+    fade_out_ms: int
+    fade_in_ms: int
+
+
+@dataclass(frozen=True)
+class SwitchContainerTopology:
+    """Guardable terminal routing topology for one v120 Switch Container."""
+
+    group_type: int
+    group_id: int
+    default_switch: int
+    continuous_validation: int
+    children: tuple[int, ...]
+    switch_packages: tuple[tuple[int, tuple[int, ...]], ...]
+    node_params: tuple[SwitchNodeParams, ...]
+
+
+@dataclass(frozen=True)
+class _SwitchContainerTail:
+    """Parsed v120 Switch Container tail and its object-relative offset."""
+
+    offset: int
+    topology: SwitchContainerTopology
+
+
 def _check_u32(value: int, label: str) -> int:
     return check_unsigned(value, 32, label, SoundBankError)
 
@@ -50,6 +84,16 @@ def _check_u8(value: int, label: str) -> int:
 
 def _check_u16(value: int, label: str) -> int:
     return check_unsigned(value, 16, label, SoundBankError)
+
+
+def _check_i32(value: int, label: str) -> int:
+    if (
+        not isinstance(value, int)
+        or isinstance(value, bool)
+        or not -(1 << 31) <= value < (1 << 31)
+    ):
+        raise SoundBankError(f"{label} must be a signed 32-bit integer: {value!r}")
+    return value
 
 
 def _normalize_random_playlist(
@@ -136,6 +180,240 @@ def _parse_random_sequence_container_tail(
             f"found {len(candidates)}"
         )
     return candidates[0]
+
+
+def _normalize_switch_container_topology(
+    value: SwitchContainerTopology,
+    label: str,
+) -> SwitchContainerTopology:
+    if not isinstance(value, SwitchContainerTopology):
+        raise SoundBankError(f"{label} must be a SwitchContainerTopology")
+
+    group_type = _check_u8(value.group_type, f"{label} group type")
+    if group_type not in (0, 1):
+        raise SoundBankError(f"{label} group type must be Switch or State")
+    group_id = _check_u32(value.group_id, f"{label} group ID")
+    default_switch = _check_u32(value.default_switch, f"{label} default switch")
+    continuous_validation = _check_u8(
+        value.continuous_validation, f"{label} continuous-validation flag"
+    )
+    if continuous_validation not in (0, 1):
+        raise SoundBankError(
+            f"{label} continuous-validation flag must be zero or one"
+        )
+
+    children = tuple(
+        _check_u32(child_id, f"{label} child #{index} ID")
+        for index, child_id in enumerate(value.children, 1)
+    )
+    if not children:
+        raise SoundBankError(f"{label} must contain at least one child")
+    if len(children) != len(set(children)):
+        raise SoundBankError(f"{label} child IDs must be unique")
+
+    packages: list[tuple[int, tuple[int, ...]]] = []
+    for index, package in enumerate(value.switch_packages, 1):
+        if not isinstance(package, (tuple, list)) or len(package) != 2:
+            raise SoundBankError(
+                f"{label} package #{index} must be a (switch ID, node IDs) pair"
+            )
+        switch_id = _check_u32(package[0], f"{label} package #{index} switch ID")
+        node_ids = tuple(
+            _check_u32(node_id, f"{label} package #{index} node #{node_index} ID")
+            for node_index, node_id in enumerate(package[1], 1)
+        )
+        if not node_ids:
+            raise SoundBankError(f"{label} package #{index} may not be empty")
+        if len(node_ids) != len(set(node_ids)):
+            raise SoundBankError(f"{label} package #{index} node IDs must be unique")
+        packages.append((switch_id, node_ids))
+    if not packages:
+        raise SoundBankError(f"{label} must contain at least one switch package")
+    switch_ids = tuple(switch_id for switch_id, _ in packages)
+    if len(switch_ids) != len(set(switch_ids)):
+        raise SoundBankError(f"{label} switch IDs must be unique")
+    if default_switch not in switch_ids:
+        raise SoundBankError(
+            f"{label} default switch {default_switch} has no switch package"
+        )
+
+    child_ids = set(children)
+    package_node_ids = {
+        node_id for _, node_ids in packages for node_id in node_ids
+    }
+    unknown_package_nodes = package_node_ids - child_ids
+    if unknown_package_nodes:
+        raise SoundBankError(
+            f"{label} packages reference non-child nodes: "
+            f"{sorted(unknown_package_nodes)}"
+        )
+    if package_node_ids != child_ids:
+        raise SoundBankError(
+            f"{label} children without a switch package: "
+            f"{sorted(child_ids - package_node_ids)}"
+        )
+
+    node_params: list[SwitchNodeParams] = []
+    for index, params in enumerate(value.node_params, 1):
+        if not isinstance(params, SwitchNodeParams):
+            raise SoundBankError(
+                f"{label} node params #{index} must be a SwitchNodeParams"
+            )
+        node_params.append(
+            SwitchNodeParams(
+                node_id=_check_u32(
+                    params.node_id, f"{label} node params #{index} node ID"
+                ),
+                behavior_flags=_check_u8(
+                    params.behavior_flags,
+                    f"{label} node params #{index} behavior flags",
+                ),
+                transition_flags=_check_u8(
+                    params.transition_flags,
+                    f"{label} node params #{index} transition flags",
+                ),
+                fade_out_ms=_check_i32(
+                    params.fade_out_ms, f"{label} node params #{index} fade-out"
+                ),
+                fade_in_ms=_check_i32(
+                    params.fade_in_ms, f"{label} node params #{index} fade-in"
+                ),
+            )
+        )
+    param_node_ids = tuple(params.node_id for params in node_params)
+    if len(param_node_ids) != len(set(param_node_ids)):
+        raise SoundBankError(f"{label} node-param IDs must be unique")
+    if set(param_node_ids) != child_ids:
+        raise SoundBankError(
+            f"{label} node params must cover every child exactly once"
+        )
+
+    return SwitchContainerTopology(
+        group_type=group_type,
+        group_id=group_id,
+        default_switch=default_switch,
+        continuous_validation=continuous_validation,
+        children=children,
+        switch_packages=tuple(packages),
+        node_params=tuple(node_params),
+    )
+
+
+def _parse_switch_container_tail(
+    body: bytes | bytearray,
+    label: str,
+) -> _SwitchContainerTail:
+    """Locate the terminal v120 Switch routing structures unambiguously."""
+
+    candidates: list[_SwitchContainerTail] = []
+    for offset in range(4, max(4, len(body) - 13)):
+        if body[offset] not in (0, 1):
+            continue
+        position = offset
+        try:
+            group_type = body[position]
+            position += 1
+            group_id, default_switch = struct.unpack_from("<II", body, position)
+            position += 8
+            continuous_validation = body[position]
+            position += 1
+
+            child_count = struct.unpack_from("<I", body, position)[0]
+            position += 4
+            if not child_count or position + 4 * child_count > len(body):
+                continue
+            children = struct.unpack_from(f"<{child_count}I", body, position)
+            position += 4 * child_count
+
+            package_count = struct.unpack_from("<I", body, position)[0]
+            position += 4
+            if not package_count or package_count > (len(body) - position) // 8:
+                continue
+            packages: list[tuple[int, tuple[int, ...]]] = []
+            for _ in range(package_count):
+                if position + 8 > len(body):
+                    raise struct.error
+                switch_id, node_count = struct.unpack_from("<II", body, position)
+                position += 8
+                if not node_count or position + 4 * node_count > len(body):
+                    raise struct.error
+                node_ids = struct.unpack_from(f"<{node_count}I", body, position)
+                position += 4 * node_count
+                packages.append((switch_id, node_ids))
+
+            if position + 4 > len(body):
+                continue
+            params_count = struct.unpack_from("<I", body, position)[0]
+            position += 4
+            if not params_count or position + 14 * params_count != len(body):
+                continue
+            node_params: list[SwitchNodeParams] = []
+            for _ in range(params_count):
+                node_id, behavior_flags, transition_flags, fade_out, fade_in = (
+                    struct.unpack_from("<IBBii", body, position)
+                )
+                position += 14
+                node_params.append(
+                    SwitchNodeParams(
+                        node_id=node_id,
+                        behavior_flags=behavior_flags,
+                        transition_flags=transition_flags,
+                        fade_out_ms=fade_out,
+                        fade_in_ms=fade_in,
+                    )
+                )
+
+            topology = _normalize_switch_container_topology(
+                SwitchContainerTopology(
+                    group_type=group_type,
+                    group_id=group_id,
+                    default_switch=default_switch,
+                    continuous_validation=continuous_validation,
+                    children=children,
+                    switch_packages=tuple(packages),
+                    node_params=tuple(node_params),
+                ),
+                label,
+            )
+        except (IndexError, struct.error, SoundBankError):
+            continue
+        candidates.append(_SwitchContainerTail(offset=offset, topology=topology))
+
+    if len(candidates) != 1:
+        raise SoundBankError(
+            f"{label}: expected one unambiguous v120 Switch Container tail, "
+            f"found {len(candidates)}"
+        )
+    return candidates[0]
+
+
+def _build_switch_container_tail(topology: SwitchContainerTopology) -> bytes:
+    payload = bytearray(
+        struct.pack(
+            "<BIIB",
+            topology.group_type,
+            topology.group_id,
+            topology.default_switch,
+            topology.continuous_validation,
+        )
+    )
+    payload += struct.pack("<I", len(topology.children))
+    payload += struct.pack(f"<{len(topology.children)}I", *topology.children)
+    payload += struct.pack("<I", len(topology.switch_packages))
+    for switch_id, node_ids in topology.switch_packages:
+        payload += struct.pack("<II", switch_id, len(node_ids))
+        payload += struct.pack(f"<{len(node_ids)}I", *node_ids)
+    payload += struct.pack("<I", len(topology.node_params))
+    for params in topology.node_params:
+        payload += struct.pack(
+            "<IBBii",
+            params.node_id,
+            params.behavior_flags,
+            params.transition_flags,
+            params.fade_out_ms,
+            params.fade_in_ms,
+        )
+    return bytes(payload)
 
 
 class HircEditor:
@@ -678,6 +956,139 @@ class HircEditor:
 
         return self.insert_object(
             HIRC_RANDOM_SEQUENCE_CONTAINER,
+            new_container_id,
+            bytes(cloned[4:]),
+            label=label,
+        )
+
+    def switch_container_topology(
+        self,
+        container_id: int,
+    ) -> SwitchContainerTopology:
+        """Return the parsed terminal topology of one v120 Switch Container."""
+
+        self._require_v120("parse Switch Container topology")
+        body = self.object_body(HIRC_SWITCH_CONTAINER, container_id)
+        return _parse_switch_container_tail(
+            body, f"Switch Container {container_id}"
+        ).topology
+
+    def clone_switch_container(
+        self,
+        donor_container_id: int,
+        new_container_id: int,
+        child_map: Mapping[int, int | None],
+        *,
+        expected_topology: SwitchContainerTopology,
+        expected_body_sha256: str,
+        label: str = "clone Switch Container",
+    ) -> HircObject:
+        """Clone a reviewed v120 Switch Container and filter/remap its children."""
+
+        self._require_v120(label)
+        donor = self.object_body(HIRC_SWITCH_CONTAINER, donor_container_id)
+        if (
+            not isinstance(expected_body_sha256, str)
+            or len(expected_body_sha256) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in expected_body_sha256
+            )
+        ):
+            raise SoundBankError(
+                f"{label}: expected body SHA-256 must be 64 lowercase hex characters"
+            )
+        actual_sha256 = hashlib.sha256(donor).hexdigest()
+        if actual_sha256 != expected_body_sha256:
+            raise SoundBankError(
+                f"{label}: donor Container {donor_container_id} expected body "
+                f"SHA-256 {expected_body_sha256} but found {actual_sha256}"
+            )
+
+        layout = _parse_switch_container_tail(donor, label)
+        guarded_topology = _normalize_switch_container_topology(
+            expected_topology, f"{label} expected topology"
+        )
+        if layout.topology != guarded_topology:
+            raise SoundBankError(
+                f"{label}: donor Container {donor_container_id} topology changed"
+            )
+
+        if not isinstance(child_map, Mapping):
+            raise SoundBankError(f"{label}: child_map must be a mapping")
+        normalized_map: dict[int, int | None] = {}
+        for old_child_id, new_child_id in child_map.items():
+            old_child_id = _check_u32(old_child_id, f"{label} old child ID")
+            if new_child_id is not None:
+                new_child_id = _check_u32(new_child_id, f"{label} new child ID")
+            normalized_map[old_child_id] = new_child_id
+
+        expected_children = set(layout.topology.children)
+        actual_children = set(normalized_map)
+        if actual_children != expected_children:
+            raise SoundBankError(
+                f"{label}: child_map must cover every donor child exactly once; "
+                f"missing={sorted(expected_children - actual_children)}, "
+                f"extra={sorted(actual_children - expected_children)}"
+            )
+        retained_children = tuple(
+            normalized_map[child_id]
+            for child_id in layout.topology.children
+            if normalized_map[child_id] is not None
+        )
+        if not retained_children:
+            raise SoundBankError(f"{label}: child_map may not remove every child")
+        if len(retained_children) != len(set(retained_children)):
+            raise SoundBankError(
+                f"{label}: retained replacement child IDs must be unique"
+            )
+        for child_id in retained_children:
+            if child_id not in self._by_id:
+                raise SoundBankError(
+                    f"{label}: replacement child object does not exist: {child_id}"
+                )
+
+        remapped_packages: list[tuple[int, tuple[int, ...]]] = []
+        for switch_id, node_ids in layout.topology.switch_packages:
+            remapped_nodes = tuple(
+                normalized_map[node_id]
+                for node_id in node_ids
+                if normalized_map[node_id] is not None
+            )
+            if remapped_nodes:
+                remapped_packages.append((switch_id, remapped_nodes))
+
+        remapped_params = tuple(
+            SwitchNodeParams(
+                node_id=normalized_map[params.node_id],
+                behavior_flags=params.behavior_flags,
+                transition_flags=params.transition_flags,
+                fade_out_ms=params.fade_out_ms,
+                fade_in_ms=params.fade_in_ms,
+            )
+            for params in layout.topology.node_params
+            if normalized_map[params.node_id] is not None
+        )
+        remapped_topology = _normalize_switch_container_topology(
+            SwitchContainerTopology(
+                group_type=layout.topology.group_type,
+                group_id=layout.topology.group_id,
+                default_switch=layout.topology.default_switch,
+                continuous_validation=layout.topology.continuous_validation,
+                children=retained_children,
+                switch_packages=tuple(remapped_packages),
+                node_params=remapped_params,
+            ),
+            f"{label} remapped topology",
+        )
+
+        cloned = bytearray(donor[: layout.offset])
+        struct.pack_into(
+            "<I", cloned, 0, _check_u32(new_container_id, "new Container ID")
+        )
+        cloned += _build_switch_container_tail(remapped_topology)
+        return self.insert_object(
+            HIRC_SWITCH_CONTAINER,
             new_container_id,
             bytes(cloned[4:]),
             label=label,

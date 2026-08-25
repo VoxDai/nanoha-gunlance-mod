@@ -2,8 +2,9 @@
 
 `tools.soundbank_editor` is the project-local Python Library for lossless NBNK,
 LMT v95/TIML, and WWEV v19 parsing. It provides embedded WEM extraction,
-DIDX/DATA rebuilding, guarded HIRC edits, Motion-scoped request substitution,
-and guarded WWEV record cloning. It has no command-line or JSON-plan interface.
+DIDX/DATA rebuilding, guarded HIRC edits and Container cloning, Motion-scoped
+request substitution, and guarded WWEV record cloning. It has no command-line
+or JSON-plan interface.
 Import its public API with `from tools import soundbank_editor`; the internal
 modules are split by binary format.
 
@@ -105,6 +106,55 @@ reviewed `DirectParentID` field with `patch_u32()`. Any positioning override
 must likewise use its inspected object-relative offset and expected old byte.
 `SoundBankEditor.validate()` reparses added Containers and rejects missing child
 references or malformed child/playlist topology.
+
+## Clone and filter a Switch Container
+
+Inspect a Wwise v120 donor once, persist the reviewed topology and body hash as
+guards, create the replacement child objects, then clone the Switch Container
+with an explicit mapping for every donor child:
+
+```python
+reviewed = soundbank_editor.SwitchContainerTopology(
+    group_type=0,
+    group_id=3251135135,
+    default_switch=3396333570,
+    continuous_validation=0,
+    children=(101900622, 125400496, 127521149, 133098601, 438972177),
+    switch_packages=reviewed_packages,
+    node_params=reviewed_node_params,
+)
+
+editor.hirc.clone_switch_container(
+    donor_container_id=368774789,
+    new_container_id=4010844647,
+    child_map={
+        101900622: None,
+        125400496: None,
+        127521149: 3163089818,
+        133098601: None,
+        438972177: None,
+    },
+    expected_topology=reviewed,
+    expected_body_sha256=(
+        "a6df54f2d29b79482420ff8a17420b0952cbb64589e03dde"
+        "1358c02ab99043bb"
+    ),
+)
+```
+
+`switch_container_topology()` returns the parsed Group, default value,
+Children, ordered Switch packages, and ordered `SwitchNodeParams` records for
+inspection. Persistent edits must use a reviewed literal rather than deriving
+their guard from the live donor during the build.
+
+The clone preserves the donor prefix and property bytes, package order, and
+per-child behavior/transition/fade parameters. Each donor child must map
+exactly once to an existing unique HIRC object or `None`; packages emptied by
+deletion are omitted. The default Switch package must survive. Ambiguous or
+malformed tails, internal package/parameter references that do not exactly
+cover the retained Children, body-hash/topology drift, ID collisions, and
+non-v120 Banks are rejected. `SoundBankEditor.validate()` repeats the topology
+parse after serialization and also rejects missing child objects.
 
 For persistent project work, call these APIs from the guarded `apply_edits()`
 callback of an explicit plan under `builders/`. `SoundBankBuildPlan` declares
