@@ -16,9 +16,11 @@ from builders.base import (
     validate_registry,
 )
 from builders.hm_cm00_epvsp import PLAN as GUARD_PLAN
+from builders.hm_wp07_snd_ev import PLAN as WWEV_PLAN
 from builders.w07_00 import PLAN as LMT_PLAN
 from builders.wp07_gun_epvsp_shell import PLAN as WP07_PLAN
 from builders.wp_cmn_epvsp import PLAN as SHARPEN_PLAN
+from builders.wp_gun_cmn import PLAN as WP_GUN_PLAN
 from tools import soundbank_editor
 
 
@@ -76,8 +78,16 @@ class ExplicitPlanTests(unittest.TestCase):
                 "wp07_gun_epvsp_shell.wyverns_fire",
                 "wp_cmn_epvsp.sharpen",
                 "wp_gun_cmn.stationary_draw",
+                "wp_gun_cmn.overhead_smash",
                 "hm_cm00_epvsp.gunlance_guard",
             },
+        )
+        self.assertEqual(
+            tuple(validator.design_id for validator in MOD_PLAN.validators),
+            (
+                "wp_gun_cmn.stationary_draw",
+                "wp_gun_cmn.overhead_smash",
+            ),
         )
         for removed in (
             "cm_hitmark_epvsp.py",
@@ -124,6 +134,71 @@ class ExplicitPlanTests(unittest.TestCase):
                     "protection_02.1).wav",
                 ),
             ),
+        )
+
+    def test_overhead_smash_shared_plans_and_media_are_explicit(self) -> None:
+        expected_designs = (
+            "wp_gun_cmn.stationary_draw",
+            "wp_gun_cmn.overhead_smash",
+        )
+        for plan in (WP_GUN_PLAN, LMT_PLAN, WWEV_PLAN):
+            self.assertEqual(plan.design_ids, expected_designs)
+        self.assertEqual(
+            (
+                str(WP_GUN_PLAN.source),
+                str(WP_GUN_PLAN.target),
+                WP_GUN_PLAN.expected_bank_id,
+                WP_GUN_PLAN.expected_source_sha256,
+            ),
+            (
+                "original/nbnk/wp_gun_cmn.nbnk",
+                "sound/wwise/Windows/wp_gun_cmn.nbnk",
+                939_294_496,
+                "bba3b716b0bbaf06dfe562adf9867c43dd78b29dd5132b150f1f08142b54cfa1",
+            ),
+        )
+        self.assertEqual(
+            (str(LMT_PLAN.source), str(LMT_PLAN.target)),
+            (
+                "original/lmt/w07_00.lmt",
+                "hm/wp/wp07/mot/w07_00/w07_00.lmt",
+            ),
+        )
+        self.assertEqual(
+            (str(WWEV_PLAN.source), str(WWEV_PLAN.target)),
+            (
+                "original/wwev/hm_wp07_snd_ev.wwev",
+                "sound/pl/hm_wp07_snd_ev.wwev",
+            ),
+        )
+        self.assertEqual(
+            tuple(
+                (item.expected_index, item.media_id, str(item.source_audio))
+                for item in WP_GUN_PLAN.media_additions
+            ),
+            (
+                (
+                    34,
+                    863_865_614,
+                    "audio/wp_gun_cmn/stationary_draw/"
+                    "raising_heart_standby_ready_01(movie_1st.raising_heart."
+                    "standby_ready_set_up.1).wav",
+                ),
+                (
+                    35,
+                    1_280_643_898,
+                    "audio/wp_gun_cmn/overhead_smash/"
+                    "nanoha_accel_01(battle_of_aces.attack_voice.attack_03.2).wav",
+                ),
+            ),
+        )
+        self.assertEqual(
+            LMT_PLAN.expected_output_sha256,
+            "e75b48eb9bb61e2595311b6a026d195f2178bc61729968bd2da3078fbce957d1",
+        )
+        self.assertEqual(
+            WWEV_PLAN.expected_output_sha256,
+            "1818d0547237ef6bed7900ad3fa2bbecda2e040910b88760800c6fdc9b7a6222",
         )
 
     def test_all_sources_hashes_and_summaries_preflight(self) -> None:

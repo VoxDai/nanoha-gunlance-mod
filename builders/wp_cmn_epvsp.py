@@ -71,7 +71,7 @@ PLAN = SoundBankBuildPlan(
             72,
             VOICE_MEDIA_ID,
             "audio/wp_cmn_epvsp/sharpen/"
-            "raising_heart_charging_completed(movie_1st.raising_heart."
+            "raising_heart_charging_completed_01(movie_1st.raising_heart."
             "charging_completed.1).wav",
         ),
     ),

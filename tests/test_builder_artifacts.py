@@ -28,14 +28,28 @@ from builders.hm_cm00_epvsp import (
     VOICE_SWITCH_IDS,
     VOICE_SWITCH_TOPOLOGY,
 )
-from builders.hm_wp07_snd_ev import PLAN as WWEV_PLAN
+from builders.hm_wp07_snd_ev import (
+    NEW_EVENT_ID,
+    NEW_REQUEST,
+    OVERHEAD_DONOR_EVENT_ID,
+    OVERHEAD_DONOR_REQUEST,
+    OVERHEAD_NEW_EVENT_ID,
+    OVERHEAD_NEW_REQUEST,
+    PLAN as WWEV_PLAN,
+)
 from builders.integration import (
     BANK_TARGET,
     LMT_TARGET,
     WWEV_TARGET,
+    validate_overhead_smash,
     validate_stationary_draw,
 )
-from builders.w07_00 import PLAN as LMT_PLAN
+from builders.w07_00 import (
+    OVERHEAD_MOTION_ID,
+    OVERHEAD_REQUEST_OFFSET,
+    PLAN as LMT_PLAN,
+    REQUEST_OFFSET,
+)
 from builders.wp07_gun_epvsp_shell import (
     FULL_BURST_ROUTES,
     PLAN as WP07_PLAN,
@@ -58,6 +72,16 @@ from builders.wp_gun_cmn import (
     ORIGINAL_EVENT_ACTION_ID,
     ORIGINAL_EVENT_ID,
     ORIGINAL_ROUTE_ACTION_ID,
+    OVERHEAD_DONOR_MEDIA_ID,
+    OVERHEAD_DONOR_MEDIA_INDEX,
+    OVERHEAD_DONOR_SOUND_ID,
+    OVERHEAD_ORIGINAL_EVENT_ACTION_ID,
+    OVERHEAD_ORIGINAL_EVENT_ID,
+    OVERHEAD_ORIGINAL_ROUTE_ACTION_ID,
+    OVERHEAD_VOICE_ACTION_ID,
+    OVERHEAD_VOICE_EVENT_ID,
+    OVERHEAD_VOICE_MEDIA_ID,
+    OVERHEAD_VOICE_SOUND_ID,
     PLAN as DRAW_PLAN,
     POSITIONING_VECTOR_OFFSET as DRAW_POSITIONING_OFFSET,
     VOICE_ACTION_ID as DRAW_ACTION_ID,
@@ -420,7 +444,7 @@ class GunlanceGuardSoundBankTests(SoundBankArtifactTestCase):
         self.assertEqual(cloned[4:tail_offset], donor[4:tail_offset])
 
 
-class StationaryDrawSoundBankTests(SoundBankArtifactTestCase):
+class WpGunCommonSoundBankTests(SoundBankArtifactTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.original, cls.editor, cls.rebuilt = rebuild_bank(DRAW_PLAN)
@@ -431,9 +455,19 @@ class StationaryDrawSoundBankTests(SoundBankArtifactTestCase):
             cls.rebuilt.hirc_payload, version=cls.rebuilt.version
         )
 
-    def test_isolated_event_routes_to_original_and_voice_in_order(self) -> None:
+    def test_isolated_events_route_to_original_and_voice_in_order(self) -> None:
         self.assertEqual(self.editor.summary, DRAW_PLAN.expected_summary)
+        self.assertEqual(len(self.original.entries), 33)
+        self.assertEqual(len(self.rebuilt.entries), 35)
+        self.assertEqual(len(self.original_hirc.objects()), 123)
+        self.assertEqual(len(self.rebuilt_hirc.objects()), 131)
+        self.assertEqual(len(self.original.hirc_payload), 7_250)
+        self.assertEqual(len(self.rebuilt.hirc_payload), 7_528)
         self.assertEqual(self.rebuilt.media_entry(index=34).media_id, DRAW_MEDIA_ID)
+        self.assertEqual(
+            self.rebuilt.media_entry(index=35).media_id,
+            OVERHEAD_VOICE_MEDIA_ID,
+        )
         self.assertEqual(
             self.rebuilt_hirc.event_actions(DRAW_EVENT_ID),
             (ORIGINAL_ROUTE_ACTION_ID, DRAW_ACTION_ID),
@@ -458,6 +492,34 @@ class StationaryDrawSoundBankTests(SoundBankArtifactTestCase):
             self.rebuilt_hirc.event_actions(ORIGINAL_EVENT_ID),
             (ORIGINAL_EVENT_ACTION_ID,),
         )
+        self.assertEqual(
+            self.rebuilt_hirc.event_actions(OVERHEAD_VOICE_EVENT_ID),
+            (OVERHEAD_ORIGINAL_ROUTE_ACTION_ID, OVERHEAD_VOICE_ACTION_ID),
+        )
+        self.assertEqual(
+            self.rebuilt_hirc.object_body(
+                soundbank_editor.HIRC_ACTION,
+                OVERHEAD_ORIGINAL_ROUTE_ACTION_ID,
+            ),
+            self.rebuilt_hirc.create_play_event_action(
+                OVERHEAD_ORIGINAL_ROUTE_ACTION_ID,
+                OVERHEAD_ORIGINAL_EVENT_ID,
+            ),
+        )
+        self.assertEqual(
+            self.rebuilt_hirc.object_body(
+                soundbank_editor.HIRC_ACTION, OVERHEAD_VOICE_ACTION_ID
+            ),
+            self.rebuilt_hirc.create_play_action(
+                OVERHEAD_VOICE_ACTION_ID,
+                OVERHEAD_VOICE_SOUND_ID,
+                self.rebuilt.bank_id,
+            ),
+        )
+        self.assertEqual(
+            self.rebuilt_hirc.event_actions(OVERHEAD_ORIGINAL_EVENT_ID),
+            (OVERHEAD_ORIGINAL_EVENT_ACTION_ID,),
+        )
 
     def test_voice_sound_is_guarded_donor_clone_and_originals_are_exact(self) -> None:
         expected_sound = bytearray(
@@ -473,6 +535,29 @@ class StationaryDrawSoundBankTests(SoundBankArtifactTestCase):
         self.assertEqual(
             self.rebuilt_hirc.object_body(soundbank_editor.HIRC_SOUND, DRAW_SOUND_ID),
             bytes(expected_sound),
+        )
+        overhead_sound = bytearray(
+            self.original_hirc.object_body(
+                soundbank_editor.HIRC_SOUND, OVERHEAD_DONOR_SOUND_ID
+            )
+        )
+        self.assertEqual(
+            struct.unpack_from("<I", overhead_sound, 9)[0],
+            OVERHEAD_DONOR_MEDIA_ID,
+        )
+        self.assertEqual(
+            self.original.media_entry(index=OVERHEAD_DONOR_MEDIA_INDEX).media_id,
+            OVERHEAD_DONOR_MEDIA_ID,
+        )
+        struct.pack_into("<I", overhead_sound, 0, OVERHEAD_VOICE_SOUND_ID)
+        struct.pack_into("<I", overhead_sound, 9, OVERHEAD_VOICE_MEDIA_ID)
+        self.assertEqual(overhead_sound[DRAW_POSITIONING_OFFSET], 0xC0)
+        overhead_sound[DRAW_POSITIONING_OFFSET] = 0xC1
+        self.assertEqual(
+            self.rebuilt_hirc.object_body(
+                soundbank_editor.HIRC_SOUND, OVERHEAD_VOICE_SOUND_ID
+            ),
+            bytes(overhead_sound),
         )
         self.assert_original_content_preserved(
             self.original, self.editor, self.rebuilt
@@ -496,14 +581,14 @@ class EventArtifactTests(unittest.TestCase):
         WWEV_PLAN.apply_edits(cls.wwev_editor)
         cls.rebuilt_wwev = cls.wwev_editor.validate()
 
-    def test_lmt_is_one_byte_and_has_fixed_output_hash(self) -> None:
+    def test_lmt_is_two_bytes_and_has_fixed_output_hash(self) -> None:
         before = self.original_lmt.to_bytes()
         after = self.lmt_editor.build()
         self.assertEqual(self.lmt_editor.summary, LMT_PLAN.expected_summary)
         self.assertEqual(len(after), len(before))
         self.assertEqual(
             [index for index, pair in enumerate(zip(before, after)) if pair[0] != pair[1]],
-            [0xCC50],
+            [REQUEST_OFFSET, OVERHEAD_REQUEST_OFFSET],
         )
         self.assertEqual(hashlib.sha256(after).hexdigest(), LMT_PLAN.expected_output_sha256)
 
@@ -512,19 +597,23 @@ class EventArtifactTests(unittest.TestCase):
         after = self.wwev_editor.build()
         self.assertEqual(self.wwev_editor.summary, WWEV_PLAN.expected_summary)
         self.assertEqual(len(self.original_wwev.records), 43)
-        self.assertEqual(len(self.rebuilt_wwev.records), 44)
-        self.assertEqual(len(after) - len(before), 129)
+        self.assertEqual(len(self.rebuilt_wwev.records), 45)
+        self.assertEqual(len(after) - len(before), 258)
         self.assertEqual(after[:8], before[:8])
         self.assertEqual(after[12 : len(before)], before[12:])
         self.assertEqual(
             self.rebuilt_wwev.records[:43], self.original_wwev.records
         )
-        donor = self.original_wwev.record(6470)
-        appended = self.rebuilt_wwev.record(6592)
-        self.assertEqual(appended.size, donor.size)
-        self.assertEqual(appended.unknown, donor.unknown)
-        self.assertEqual(appended.command_hash, donor.command_hash)
-        self.assertEqual(appended.wwpc, donor.wwpc)
+        for donor_request, added_request in (
+            (6470, NEW_REQUEST),
+            (OVERHEAD_DONOR_REQUEST, OVERHEAD_NEW_REQUEST),
+        ):
+            donor = self.original_wwev.record(donor_request)
+            appended = self.rebuilt_wwev.record(added_request)
+            self.assertEqual(appended.size, donor.size)
+            self.assertEqual(appended.unknown, donor.unknown)
+            self.assertEqual(appended.command_hash, donor.command_hash)
+            self.assertEqual(appended.wwpc, donor.wwpc)
         self.assertEqual(
             self.rebuilt_wwev.dependencies, self.original_wwev.dependencies
         )
@@ -536,20 +625,43 @@ class EventArtifactTests(unittest.TestCase):
         routes = [
             route
             for route in self.rebuilt_lmt.triggered_requests(self.rebuilt_wwev)
-            if route.request_no == 6592 or route.event_id == 3_176_129_810
+            if route.request_no in (NEW_REQUEST, OVERHEAD_NEW_REQUEST)
+            or route.event_id in (NEW_EVENT_ID, OVERHEAD_NEW_EVENT_ID)
         ]
-        self.assertEqual(len(routes), 1)
-        route = routes[0]
         self.assertEqual(
-            (
-                route.motion_id,
-                route.trigger_frame,
-                route.slot,
-                route.request_no,
-                route.wwev_mode,
-                route.event_id,
+            tuple(
+                (
+                    route.motion_id,
+                    route.trigger_frame,
+                    route.slot,
+                    route.request_no,
+                    route.wwev_mode,
+                    route.event_id,
+                )
+                for route in routes
             ),
-            (2, 9.0, "B", 6592, 2, 3_176_129_810),
+            (
+                (2, 9.0, "B", NEW_REQUEST, 2, NEW_EVENT_ID),
+                (
+                    OVERHEAD_MOTION_ID,
+                    1.0,
+                    "B",
+                    OVERHEAD_NEW_REQUEST,
+                    100,
+                    OVERHEAD_NEW_EVENT_ID,
+                ),
+            ),
+        )
+        original_overhead_routes = [
+            route
+            for route in self.rebuilt_lmt.triggered_requests(self.rebuilt_wwev)
+            if route.request_no == OVERHEAD_DONOR_REQUEST
+            and route.event_id == OVERHEAD_DONOR_EVENT_ID
+        ]
+        self.assertTrue(original_overhead_routes)
+        self.assertNotIn(
+            OVERHEAD_MOTION_ID,
+            {route.motion_id for route in original_overhead_routes},
         )
 
     def test_bundle_validator_connects_route_to_both_audio_branches(self) -> None:
@@ -567,6 +679,7 @@ class EventArtifactTests(unittest.TestCase):
             paths[WWEV_TARGET].write_bytes(self.wwev_editor.build())
             paths[BANK_TARGET].write_bytes(bank_editor.build())
             validate_stationary_draw(paths)
+            validate_overhead_smash(paths)
 
 
 if __name__ == "__main__":

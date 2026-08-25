@@ -5,7 +5,7 @@ from __future__ import annotations
 from .base import ModBuildPlan, run_all_cli
 from .hm_cm00_epvsp import PLAN as HM_CM00_EPVSP
 from .hm_wp07_snd_ev import PLAN as HM_WP07_SND_EV
-from .integration import STATIONARY_DRAW_VALIDATOR
+from .integration import OVERHEAD_SMASH_VALIDATOR, STATIONARY_DRAW_VALIDATOR
 from .w07_00 import PLAN as W07_00
 from .wp07_gun_epvsp_shell import PLAN as WP07_GUN_EPVSP_SHELL
 from .wp_cmn_epvsp import PLAN as WP_CMN_EPVSP
@@ -26,7 +26,7 @@ PLANS = ARTIFACT_PLANS
 
 MOD_PLAN = ModBuildPlan(
     artifacts=ARTIFACT_PLANS,
-    validators=(STATIONARY_DRAW_VALIDATOR,),
+    validators=(STATIONARY_DRAW_VALIDATOR, OVERHEAD_SMASH_VALIDATOR),
 )
 
 

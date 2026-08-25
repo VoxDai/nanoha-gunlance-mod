@@ -1,4 +1,4 @@
-"""Build the stationary-draw request-to-Event WWEV record."""
+"""Build stationary-draw and overhead-smash request-to-Event records."""
 
 from __future__ import annotations
 
@@ -16,9 +16,18 @@ DONOR_RECORD_SHA256 = (
 NEW_REQUEST = 6592
 NEW_EVENT_ID = 3_176_129_810
 
+OVERHEAD_DONOR_REQUEST = 6505
+OVERHEAD_DONOR_EVENT_ID = 1_129_041_389
+OVERHEAD_DONOR_MODE = 100
+OVERHEAD_DONOR_RECORD_SHA256 = (
+    "716e10c4bb841822f8d5b178580980d654f4367e5753403474bc8b50cfb7f2c8"
+)
+OVERHEAD_NEW_REQUEST = 6593
+OVERHEAD_NEW_EVENT_ID = 2_866_569_635
+
 
 def apply_edits(editor: soundbank_editor.WwevEditor) -> None:
-    """Clone the complete guarded donor and change only ReqNo and Event ID."""
+    """Clone both complete donors and change only ReqNo and Event ID."""
 
     editor.append_cloned_record(
         donor_request=DONOR_REQUEST,
@@ -28,12 +37,20 @@ def apply_edits(editor: soundbank_editor.WwevEditor) -> None:
         new_request=NEW_REQUEST,
         new_event_id=NEW_EVENT_ID,
     )
+    editor.append_cloned_record(
+        donor_request=OVERHEAD_DONOR_REQUEST,
+        expected_donor_event_id=OVERHEAD_DONOR_EVENT_ID,
+        expected_donor_mode=OVERHEAD_DONOR_MODE,
+        expected_donor_sha256=OVERHEAD_DONOR_RECORD_SHA256,
+        new_request=OVERHEAD_NEW_REQUEST,
+        new_event_id=OVERHEAD_NEW_EVENT_ID,
+    )
 
 
 EXPECTED_SUMMARY = soundbank_editor.WwevEditSummary(
     record_count_before=43,
-    record_count_after=44,
-    appended_size=129,
+    record_count_after=45,
+    appended_size=258,
     edits=(
         soundbank_editor.WwevRecordEdit(
             donor_record_index=17,
@@ -44,13 +61,25 @@ EXPECTED_SUMMARY = soundbank_editor.WwevEditSummary(
             new_event_id=NEW_EVENT_ID,
             appended_size=129,
         ),
+        soundbank_editor.WwevRecordEdit(
+            donor_record_index=28,
+            donor_request=OVERHEAD_DONOR_REQUEST,
+            donor_event_id=OVERHEAD_DONOR_EVENT_ID,
+            added_record_index=45,
+            new_request=OVERHEAD_NEW_REQUEST,
+            new_event_id=OVERHEAD_NEW_EVENT_ID,
+            appended_size=129,
+        ),
     ),
 )
 
 
 PLAN = WwevBuildPlan(
     name="hm_wp07_snd_ev",
-    design_ids=("wp_gun_cmn.stationary_draw",),
+    design_ids=(
+        "wp_gun_cmn.stationary_draw",
+        "wp_gun_cmn.overhead_smash",
+    ),
     source="original/wwev/hm_wp07_snd_ev.wwev",
     target="sound/pl/hm_wp07_snd_ev.wwev",
     expected_source_sha256=(
@@ -59,7 +88,7 @@ PLAN = WwevBuildPlan(
     apply_edits=apply_edits,
     expected_summary=EXPECTED_SUMMARY,
     expected_output_sha256=(
-        "8fb3c6134a50ac094540a8134ccb92948cc676dff87ef94afecc87f80194dd04"
+        "1818d0547237ef6bed7900ad3fa2bbecda2e040910b88760800c6fdc9b7a6222"
     ),
 )
 
