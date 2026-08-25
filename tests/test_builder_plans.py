@@ -79,6 +79,7 @@ class ExplicitPlanTests(unittest.TestCase):
                 "wp_cmn_epvsp.sharpen",
                 "wp_gun_cmn.stationary_draw",
                 "wp_gun_cmn.overhead_smash",
+                "wp_gun_cmn.reload",
                 "hm_cm00_epvsp.gunlance_guard",
             },
         )
@@ -136,13 +137,17 @@ class ExplicitPlanTests(unittest.TestCase):
             ),
         )
 
-    def test_overhead_smash_shared_plans_and_media_are_explicit(self) -> None:
-        expected_designs = (
+    def test_wp_gun_shared_plans_and_media_are_explicit(self) -> None:
+        cross_artifact_designs = (
             "wp_gun_cmn.stationary_draw",
             "wp_gun_cmn.overhead_smash",
         )
-        for plan in (WP_GUN_PLAN, LMT_PLAN, WWEV_PLAN):
-            self.assertEqual(plan.design_ids, expected_designs)
+        self.assertEqual(
+            WP_GUN_PLAN.design_ids,
+            cross_artifact_designs + ("wp_gun_cmn.reload",),
+        )
+        for plan in (LMT_PLAN, WWEV_PLAN):
+            self.assertEqual(plan.design_ids, cross_artifact_designs)
         self.assertEqual(
             (
                 str(WP_GUN_PLAN.source),
@@ -189,6 +194,12 @@ class ExplicitPlanTests(unittest.TestCase):
                     1_280_643_898,
                     "audio/wp_gun_cmn/overhead_smash/"
                     "nanoha_accel_01(battle_of_aces.attack_voice.attack_03.2).wav",
+                ),
+                (
+                    36,
+                    1_284_288_484,
+                    "audio/wp_gun_cmn/reload/"
+                    "raising_heart_reload_01(movie_2nd_as.raising_heart.reload.1).wav",
                 ),
             ),
         )

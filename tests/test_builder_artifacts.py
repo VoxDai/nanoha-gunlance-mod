@@ -84,6 +84,15 @@ from builders.wp_gun_cmn import (
     OVERHEAD_VOICE_SOUND_ID,
     PLAN as DRAW_PLAN,
     POSITIONING_VECTOR_OFFSET as DRAW_POSITIONING_OFFSET,
+    RELOAD_CONTAINER_ID,
+    RELOAD_DONOR_MEDIA_ID,
+    RELOAD_DONOR_MEDIA_INDEX,
+    RELOAD_DONOR_SOUND_ID,
+    RELOAD_EVENT_ID,
+    RELOAD_ORIGINAL_ACTION_ID,
+    RELOAD_VOICE_ACTION_ID,
+    RELOAD_VOICE_MEDIA_ID,
+    RELOAD_VOICE_SOUND_ID,
     VOICE_ACTION_ID as DRAW_ACTION_ID,
     VOICE_EVENT_ID as DRAW_EVENT_ID,
     VOICE_MEDIA_ID as DRAW_MEDIA_ID,
@@ -455,18 +464,22 @@ class WpGunCommonSoundBankTests(SoundBankArtifactTestCase):
             cls.rebuilt.hirc_payload, version=cls.rebuilt.version
         )
 
-    def test_isolated_events_route_to_original_and_voice_in_order(self) -> None:
+    def test_event_routes_and_media_order_are_exact(self) -> None:
         self.assertEqual(self.editor.summary, DRAW_PLAN.expected_summary)
         self.assertEqual(len(self.original.entries), 33)
-        self.assertEqual(len(self.rebuilt.entries), 35)
+        self.assertEqual(len(self.rebuilt.entries), 36)
         self.assertEqual(len(self.original_hirc.objects()), 123)
-        self.assertEqual(len(self.rebuilt_hirc.objects()), 131)
+        self.assertEqual(len(self.rebuilt_hirc.objects()), 133)
         self.assertEqual(len(self.original.hirc_payload), 7_250)
-        self.assertEqual(len(self.rebuilt.hirc_payload), 7_528)
+        self.assertEqual(len(self.rebuilt.hirc_payload), 7_632)
         self.assertEqual(self.rebuilt.media_entry(index=34).media_id, DRAW_MEDIA_ID)
         self.assertEqual(
             self.rebuilt.media_entry(index=35).media_id,
             OVERHEAD_VOICE_MEDIA_ID,
+        )
+        self.assertEqual(
+            self.rebuilt.media_entry(index=36).media_id,
+            RELOAD_VOICE_MEDIA_ID,
         )
         self.assertEqual(
             self.rebuilt_hirc.event_actions(DRAW_EVENT_ID),
@@ -520,6 +533,39 @@ class WpGunCommonSoundBankTests(SoundBankArtifactTestCase):
             self.rebuilt_hirc.event_actions(OVERHEAD_ORIGINAL_EVENT_ID),
             (OVERHEAD_ORIGINAL_EVENT_ACTION_ID,),
         )
+        self.assertEqual(
+            self.rebuilt_hirc.event_actions(RELOAD_EVENT_ID),
+            (RELOAD_ORIGINAL_ACTION_ID, RELOAD_VOICE_ACTION_ID),
+        )
+        self.assertEqual(
+            self.rebuilt_hirc.object_body(
+                soundbank_editor.HIRC_ACTION, RELOAD_VOICE_ACTION_ID
+            ),
+            self.rebuilt_hirc.create_play_action(
+                RELOAD_VOICE_ACTION_ID,
+                RELOAD_VOICE_SOUND_ID,
+                self.rebuilt.bank_id,
+            ),
+        )
+        reload_original_action = self.rebuilt_hirc.object_body(
+            soundbank_editor.HIRC_ACTION, RELOAD_ORIGINAL_ACTION_ID
+        )
+        self.assertEqual(
+            struct.unpack_from("<H", reload_original_action, 4)[0],
+            soundbank_editor.ACTION_PLAY,
+        )
+        self.assertEqual(
+            struct.unpack_from("<I", reload_original_action, 6)[0],
+            RELOAD_CONTAINER_ID,
+        )
+        positions = {
+            (item.object_type, item.object_id): item.index
+            for item in self.rebuilt_hirc.objects()
+        }
+        self.assertLess(
+            positions[(soundbank_editor.HIRC_ACTION, RELOAD_VOICE_ACTION_ID)],
+            positions[(soundbank_editor.HIRC_EVENT, RELOAD_EVENT_ID)],
+        )
 
     def test_voice_sound_is_guarded_donor_clone_and_originals_are_exact(self) -> None:
         expected_sound = bytearray(
@@ -558,6 +604,38 @@ class WpGunCommonSoundBankTests(SoundBankArtifactTestCase):
                 soundbank_editor.HIRC_SOUND, OVERHEAD_VOICE_SOUND_ID
             ),
             bytes(overhead_sound),
+        )
+        reload_sound = bytearray(
+            self.original_hirc.object_body(
+                soundbank_editor.HIRC_SOUND, RELOAD_DONOR_SOUND_ID
+            )
+        )
+        self.assertEqual(
+            self.original.media_entry(index=RELOAD_DONOR_MEDIA_INDEX).media_id,
+            RELOAD_DONOR_MEDIA_ID,
+        )
+        self.assertEqual(
+            struct.unpack_from("<I", reload_sound, 9)[0],
+            RELOAD_DONOR_MEDIA_ID,
+        )
+        self.assertEqual(reload_sound[DRAW_POSITIONING_OFFSET], 0xC0)
+        struct.pack_into("<I", reload_sound, 0, RELOAD_VOICE_SOUND_ID)
+        struct.pack_into("<I", reload_sound, 9, RELOAD_VOICE_MEDIA_ID)
+        self.assertEqual(
+            self.rebuilt_hirc.object_body(
+                soundbank_editor.HIRC_SOUND, RELOAD_VOICE_SOUND_ID
+            ),
+            bytes(reload_sound),
+        )
+        self.assertEqual(
+            self.rebuilt_hirc.object_body(
+                soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+                RELOAD_CONTAINER_ID,
+            ),
+            self.original_hirc.object_body(
+                soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+                RELOAD_CONTAINER_ID,
+            ),
         )
         self.assert_original_content_preserved(
             self.original, self.editor, self.rebuilt
