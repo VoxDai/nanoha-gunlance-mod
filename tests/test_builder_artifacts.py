@@ -6,6 +6,28 @@ import struct
 import tempfile
 import unittest
 
+from builders.hm_cm00_epvsp import (
+    DONOR_MEDIA_ID as GUARD_DONOR_MEDIA_ID,
+    DONOR_RANDOM_ID as GUARD_DONOR_RANDOM_ID,
+    DONOR_SOUND_ID as GUARD_DONOR_SOUND_ID,
+    DONOR_SWITCH_ID as GUARD_DONOR_SWITCH_ID,
+    DONOR_SWITCH_TOPOLOGY as GUARD_DONOR_SWITCH_TOPOLOGY,
+    EVENT_ID as GUARD_EVENT_ID,
+    EXCLUDED_SWITCH_IDS,
+    ORIGINAL_ACTION_ID as GUARD_ORIGINAL_ACTION_ID,
+    PLAN as GUARD_PLAN,
+    RANDOM_MAX_INSTANCES_OFFSET,
+    RANDOM_OVER_LIMIT_BEHAVIOR_OFFSET,
+    RANDOM_PARENT_OFFSET,
+    SOUND_PARENT_OFFSET,
+    VOICE_ACTION_ID as GUARD_ACTION_ID,
+    VOICE_MEDIA_IDS as GUARD_MEDIA_IDS,
+    VOICE_RANDOM_ID as GUARD_RANDOM_ID,
+    VOICE_SOUND_IDS as GUARD_SOUND_IDS,
+    VOICE_SWITCH_ID as GUARD_SWITCH_ID,
+    VOICE_SWITCH_IDS,
+    VOICE_SWITCH_TOPOLOGY,
+)
 from builders.hm_wp07_snd_ev import PLAN as WWEV_PLAN
 from builders.integration import (
     BANK_TARGET,
@@ -44,6 +66,8 @@ from builders.wp_gun_cmn import (
     VOICE_SOUND_ID as DRAW_SOUND_ID,
 )
 from tools import soundbank_editor
+
+from ._soundbank_fixtures import make_random_container_tail
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -220,6 +244,180 @@ class SharpenSoundBankTests(SoundBankArtifactTestCase):
         self.assert_original_content_preserved(
             self.original, self.editor, self.rebuilt
         )
+
+
+class GunlanceGuardSoundBankTests(SoundBankArtifactTestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.original, cls.editor, cls.rebuilt = rebuild_bank(GUARD_PLAN)
+        cls.original_hirc = soundbank_editor.HircEditor(
+            cls.original.hirc_payload, version=cls.original.version
+        )
+        cls.rebuilt_hirc = soundbank_editor.HircEditor(
+            cls.rebuilt.hirc_payload, version=cls.rebuilt.version
+        )
+
+    def test_exact_summary_counts_media_order_and_preservation(self) -> None:
+        self.assertEqual(self.editor.summary, GUARD_PLAN.expected_summary)
+        self.assertEqual(len(self.original.entries), 140)
+        self.assertEqual(len(self.rebuilt.entries), 142)
+        self.assertEqual(len(self.original_hirc.objects()), 597)
+        self.assertEqual(len(self.rebuilt_hirc.objects()), 602)
+        self.assertEqual(len(self.original.hirc_payload), 33_313)
+        self.assertEqual(len(self.rebuilt.hirc_payload), 33_825)
+        self.assertEqual(
+            tuple(entry.media_id for entry in self.rebuilt.entries[-2:]),
+            GUARD_MEDIA_IDS,
+        )
+        self.assert_original_content_preserved(
+            self.original, self.editor, self.rebuilt
+        )
+
+    def test_original_guard_route_and_media_are_byte_exact(self) -> None:
+        self.assertEqual(
+            self.rebuilt_hirc.event_actions(GUARD_EVENT_ID),
+            (GUARD_ORIGINAL_ACTION_ID, GUARD_ACTION_ID),
+        )
+        self.assertEqual(
+            self.rebuilt_hirc.object_body(
+                soundbank_editor.HIRC_ACTION, GUARD_ORIGINAL_ACTION_ID
+            ),
+            self.original_hirc.object_body(
+                soundbank_editor.HIRC_ACTION, GUARD_ORIGINAL_ACTION_ID
+            ),
+        )
+        self.assertEqual(
+            self.rebuilt_hirc.object_body(
+                soundbank_editor.HIRC_ACTION, GUARD_ORIGINAL_ACTION_ID
+            ),
+            self.rebuilt_hirc.create_play_action(
+                GUARD_ORIGINAL_ACTION_ID,
+                GUARD_DONOR_SWITCH_ID,
+                self.rebuilt.bank_id,
+                delay_ms=30,
+            ),
+        )
+        for object_type, object_id in (
+                (soundbank_editor.HIRC_SWITCH_CONTAINER, GUARD_DONOR_SWITCH_ID),
+                (
+                        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+                        GUARD_DONOR_RANDOM_ID,
+                ),
+                (soundbank_editor.HIRC_SOUND, GUARD_DONOR_SOUND_ID),
+        ):
+            self.assertEqual(
+                self.rebuilt_hirc.object_body(object_type, object_id),
+                self.original_hirc.object_body(object_type, object_id),
+            )
+        self.assertEqual(
+            self.rebuilt.media_entry(index=88).media_id,
+            GUARD_DONOR_MEDIA_ID,
+        )
+        self.assertEqual(
+            self.rebuilt.media_entry(index=88).payload,
+            self.original.media_entry(index=88).payload,
+        )
+
+    def test_new_action_and_sounds_are_exact_guarded_clones(self) -> None:
+        self.assertEqual(
+            self.rebuilt_hirc.object_body(
+                soundbank_editor.HIRC_ACTION, GUARD_ACTION_ID
+            ),
+            self.rebuilt_hirc.create_play_action(
+                GUARD_ACTION_ID,
+                GUARD_SWITCH_ID,
+                self.rebuilt.bank_id,
+                delay_ms=30,
+            ),
+        )
+        positions = {
+            (item.object_type, item.object_id): index
+            for index, item in enumerate(self.rebuilt_hirc.objects())
+        }
+        self.assertLess(
+            positions[(soundbank_editor.HIRC_ACTION, GUARD_ACTION_ID)],
+            positions[(soundbank_editor.HIRC_EVENT, GUARD_EVENT_ID)],
+        )
+
+        donor = self.original_hirc.object_body(
+            soundbank_editor.HIRC_SOUND, GUARD_DONOR_SOUND_ID
+        )
+        for sound_id, media_id in zip(
+                GUARD_SOUND_IDS, GUARD_MEDIA_IDS, strict=True
+        ):
+            expected = bytearray(donor)
+            struct.pack_into("<I", expected, 0, sound_id)
+            struct.pack_into("<I", expected, 9, media_id)
+            struct.pack_into(
+                "<I", expected, SOUND_PARENT_OFFSET, GUARD_RANDOM_ID
+            )
+            self.assertEqual(
+                self.rebuilt_hirc.object_body(
+                    soundbank_editor.HIRC_SOUND, sound_id
+                ),
+                bytes(expected),
+            )
+
+    def test_random_is_equal_weight_kill_newest_single_instance(self) -> None:
+        donor = self.original_hirc.object_body(
+            soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+            GUARD_DONOR_RANDOM_ID,
+        )
+        donor_tail = make_random_container_tail((GUARD_DONOR_SOUND_ID, 50_000))
+        self.assertTrue(donor.endswith(donor_tail))
+        expected_prefix = bytearray(donor[: -len(donor_tail)])
+        struct.pack_into("<I", expected_prefix, 0, GUARD_RANDOM_ID)
+        struct.pack_into(
+            "<I", expected_prefix, RANDOM_PARENT_OFFSET, GUARD_SWITCH_ID
+        )
+        expected_prefix[RANDOM_OVER_LIMIT_BEHAVIOR_OFFSET] = 1
+        struct.pack_into(
+            "<H", expected_prefix, RANDOM_MAX_INSTANCES_OFFSET, 1
+        )
+        struct.pack_into("<H", expected_prefix, len(expected_prefix) - 6, 0)
+        expected = bytes(expected_prefix) + make_random_container_tail(
+            (GUARD_SOUND_IDS[0], 50_000),
+            (GUARD_SOUND_IDS[1], 50_000),
+        )
+        self.assertEqual(
+            self.rebuilt_hirc.object_body(
+                soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+                GUARD_RANDOM_ID,
+            ),
+            expected,
+        )
+
+    def test_switch_only_retains_gunlance_guard_packages(self) -> None:
+        self.assertEqual(
+            self.original_hirc.switch_container_topology(GUARD_DONOR_SWITCH_ID),
+            GUARD_DONOR_SWITCH_TOPOLOGY,
+        )
+        self.assertEqual(
+            self.rebuilt_hirc.switch_container_topology(GUARD_SWITCH_ID),
+            VOICE_SWITCH_TOPOLOGY,
+        )
+        package_ids = tuple(
+            switch_id
+            for switch_id, _node_ids in VOICE_SWITCH_TOPOLOGY.switch_packages
+        )
+        self.assertEqual(package_ids, VOICE_SWITCH_IDS)
+        self.assertTrue(set(EXCLUDED_SWITCH_IDS).isdisjoint(package_ids))
+
+        donor = self.original_hirc.object_body(
+            soundbank_editor.HIRC_SWITCH_CONTAINER, GUARD_DONOR_SWITCH_ID
+        )
+        cloned = self.rebuilt_hirc.object_body(
+            soundbank_editor.HIRC_SWITCH_CONTAINER, GUARD_SWITCH_ID
+        )
+        tail_marker = struct.pack(
+            "<BIIB",
+            GUARD_DONOR_SWITCH_TOPOLOGY.group_type,
+            GUARD_DONOR_SWITCH_TOPOLOGY.group_id,
+            GUARD_DONOR_SWITCH_TOPOLOGY.default_switch,
+            GUARD_DONOR_SWITCH_TOPOLOGY.continuous_validation,
+        )
+        tail_offset = donor.index(tail_marker)
+        self.assertEqual(cloned[4:tail_offset], donor[4:tail_offset])
 
 
 class StationaryDrawSoundBankTests(SoundBankArtifactTestCase):

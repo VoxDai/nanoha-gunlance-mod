@@ -1,8 +1,9 @@
-"""Build the complete five-artifact design-driven release."""
+"""Build the complete six-artifact design-driven release."""
 
 from __future__ import annotations
 
 from .base import ModBuildPlan, run_all_cli
+from .hm_cm00_epvsp import PLAN as HM_CM00_EPVSP
 from .hm_wp07_snd_ev import PLAN as HM_WP07_SND_EV
 from .integration import STATIONARY_DRAW_VALIDATOR
 from .w07_00 import PLAN as W07_00
@@ -15,6 +16,7 @@ ARTIFACT_PLANS = (
     WP07_GUN_EPVSP_SHELL,
     WP_CMN_EPVSP,
     WP_GUN_CMN,
+    HM_CM00_EPVSP,
     W07_00,
     HM_WP07_SND_EV,
 )

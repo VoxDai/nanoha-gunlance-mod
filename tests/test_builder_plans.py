@@ -15,6 +15,7 @@ from builders.base import (
     prepare_plan,
     validate_registry,
 )
+from builders.hm_cm00_epvsp import PLAN as GUARD_PLAN
 from builders.w07_00 import PLAN as LMT_PLAN
 from builders.wp07_gun_epvsp_shell import PLAN as WP07_PLAN
 from builders.wp_cmn_epvsp import PLAN as SHARPEN_PLAN
@@ -43,15 +44,16 @@ class ExplicitPlanTests(unittest.TestCase):
         for removed in ("MappingInfo", "MappingMediaOverlay", "parse_mapping"):
             self.assertFalse(hasattr(builder_base, removed))
 
-    def test_registry_is_exactly_the_five_design_artifacts(self) -> None:
+    def test_registry_is_exactly_the_six_design_artifacts(self) -> None:
         validate_registry(MOD_PLAN)
-        self.assertEqual(len(MOD_PLAN.artifacts), 5)
+        self.assertEqual(len(MOD_PLAN.artifacts), 6)
         self.assertEqual(
             {plan.name for plan in MOD_PLAN.artifacts},
             {
                 "wp07_gun_epvsp_shell",
                 "wp_cmn_epvsp",
                 "wp_gun_cmn",
+                "hm_cm00_epvsp",
                 "w07_00",
                 "hm_wp07_snd_ev",
             },
@@ -62,6 +64,7 @@ class ExplicitPlanTests(unittest.TestCase):
                 "sound/wwise/Windows/wp07_gun_epvsp_shell.nbnk",
                 "sound/wwise/Windows/wp_cmn_epvsp.nbnk",
                 "sound/wwise/Windows/wp_gun_cmn.nbnk",
+                "sound/wwise/Windows/hm_cm00_epvsp.nbnk",
                 "hm/wp/wp07/mot/w07_00/w07_00.lmt",
                 "sound/pl/hm_wp07_snd_ev.wwev",
             },
@@ -73,14 +76,55 @@ class ExplicitPlanTests(unittest.TestCase):
                 "wp07_gun_epvsp_shell.wyverns_fire",
                 "wp_cmn_epvsp.sharpen",
                 "wp_gun_cmn.stationary_draw",
+                "hm_cm00_epvsp.gunlance_guard",
             },
         )
         for removed in (
             "cm_hitmark_epvsp.py",
-            "hm_cm00_epvsp.py",
             "pl_prop_cmn.py",
         ):
             self.assertFalse((PROJECT_ROOT / "builders" / removed).exists())
+
+    def test_gunlance_guard_plan_identity_and_media_are_explicit(self) -> None:
+        self.assertEqual(
+            GUARD_PLAN.design_ids,
+            ("hm_cm00_epvsp.gunlance_guard",),
+        )
+        self.assertEqual(
+            str(GUARD_PLAN.source),
+            "original/nbnk/hm_cm00_epvsp.nbnk",
+        )
+        self.assertEqual(
+            str(GUARD_PLAN.target),
+            "sound/wwise/Windows/hm_cm00_epvsp.nbnk",
+        )
+        self.assertEqual(GUARD_PLAN.expected_bank_id, 707_566_772)
+        self.assertEqual(
+            GUARD_PLAN.expected_source_sha256,
+            "73b52c1a69532f0a84ab6dfa2e95bd804bf8affc5af77450786d700c177a9977",
+        )
+        self.assertEqual(
+            tuple(
+                (item.expected_index, item.media_id, str(item.source_audio))
+                for item in GUARD_PLAN.media_additions
+            ),
+            (
+                (
+                    141,
+                    141_209_263,
+                    "audio/hm_cm00_epvsp/"
+                    "raising_heart_protection_01(movie_1st.raising_heart."
+                    "protection_01.1).wav",
+                ),
+                (
+                    142,
+                    440_767_416,
+                    "audio/hm_cm00_epvsp/"
+                    "raising_heart_protection_02(movie_1st.raising_heart."
+                    "protection_02.1).wav",
+                ),
+            ),
+        )
 
     def test_all_sources_hashes_and_summaries_preflight(self) -> None:
         prepared = prepare_all_plans(MOD_PLAN, PROJECT_ROOT)
