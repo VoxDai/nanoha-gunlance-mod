@@ -96,16 +96,24 @@ When a request resolves incorrectly:
    decode the rebuilt entry with `tools/utils/pyvgmstream.py`.
 3. Parse the rebuilt Bank with
    `tools/wwiser/wwiser.py -d none`.
-4. Trace every Event → Action → Container → Sound → Media path. Inspect
+4. For added Wwise v120 HIRC graphs, inspect serialized object positions as
+   well as references. Child Sounds/Containers must precede their parent
+   Containers, and Actions must precede their Event; a layered route commonly
+   follows `Sound → Random → Switch → Action → Event`. A Bank can parse in
+   wwiser yet be rejected by MHW when a new parent Switch precedes its child
+   Random. This exact ordering fault was isolated by moving only the Switch
+   record after its child, which restored both the original and added sounds in
+   game.
+5. Trace every Event → Action → Container → Sound → Media path. Inspect
    inherited volume, pitch, positioning, Aux, parents, and paired channels.
-5. For appended audio, confirm original media remains byte-exact and the new
+6. For appended audio, confirm original media remains byte-exact and the new
    Media ID has exactly the intended route.
-6. For animation-driven Events, verify the complete LMT → ReqNo → WWEV Event
+7. For animation-driven Events, verify the complete LMT → ReqNo → WWEV Event
    chain and require the intended route count.
-7. Check Stop behavior, action interruption, duration, and playback limits.
-8. Remove conflicting Mods that provide any of the same NBNK, LMT, or WWEV
+8. Check Stop behavior, action interruption, duration, and playback limits.
+9. Remove conflicting Mods that provide any of the same NBNK, LMT, or WWEV
    files.
-9. Restore originals to verify the game environment, then compare with a
+10. Restore originals to verify the game environment, then compare with a
    known-working test artifact.
 
 ## Validation Boundaries

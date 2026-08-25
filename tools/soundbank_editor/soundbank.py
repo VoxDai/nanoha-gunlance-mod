@@ -534,6 +534,10 @@ class SoundBankEditor:
                 (item.object_type, item.object_id): position
                 for position, item in enumerate(hirc_objects)
             }
+            object_positions_by_id = {
+                item.object_id: position
+                for position, item in enumerate(hirc_objects)
+            }
             action_ids = {
                 item.object_id
                 for item in hirc_objects
@@ -582,33 +586,41 @@ class SoundBankEditor:
                             f"new Sound {object_id} references missing Media ID "
                             f"{source_id}"
                         )
-                elif object_type == HIRC_RANDOM_SEQUENCE_CONTAINER:
-                    layout = _parse_random_sequence_container_tail(
-                        body, f"new Container {object_id}"
-                    )
+                elif object_type in (
+                    HIRC_RANDOM_SEQUENCE_CONTAINER,
+                    HIRC_SWITCH_CONTAINER,
+                ):
+                    if object_type == HIRC_RANDOM_SEQUENCE_CONTAINER:
+                        container_kind = "Container"
+                        children = _parse_random_sequence_container_tail(
+                            body, f"new Container {object_id}"
+                        ).children
+                    else:
+                        container_kind = "Switch Container"
+                        children = _parse_switch_container_tail(
+                            body, f"new Switch Container {object_id}"
+                        ).topology.children
                     missing_children = [
                         child_id
-                        for child_id in layout.children
+                        for child_id in children
                         if child_id not in object_ids
                     ]
                     if missing_children:
                         raise SoundBankError(
-                            f"new Container {object_id} references missing child "
+                            f"new {container_kind} {object_id} references missing child "
                             f"objects: {missing_children}"
                         )
-                elif object_type == HIRC_SWITCH_CONTAINER:
-                    layout = _parse_switch_container_tail(
-                        body, f"new Switch Container {object_id}"
-                    )
-                    missing_children = [
+                    late_children = [
                         child_id
-                        for child_id in layout.topology.children
-                        if child_id not in object_ids
+                        for child_id in children
+                        if object_positions_by_id[child_id]
+                        >= object_positions[(object_type, object_id)]
                     ]
-                    if missing_children:
+                    if late_children:
                         raise SoundBankError(
-                            f"new Switch Container {object_id} references missing "
-                            f"child objects: {missing_children}"
+                            f"new {container_kind} {object_id} child objects must be "
+                            "serialized before their parent for Wwise v120: "
+                            f"{late_children}"
                         )
         diff = self.original.diff(rebuilt)
         declared_hirc = set(self.hirc.added_objects)

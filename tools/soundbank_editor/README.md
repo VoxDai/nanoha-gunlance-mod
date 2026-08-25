@@ -50,9 +50,10 @@ payload = editor.build()
 Field patches are object-relative and require the exact old value. Media edits
 rebuild DIDX/DATA with 16-byte alignment. `validate()` reparses the result and
 rejects undeclared HIRC changes, broken Event/Action references, and invalid new
-Sound-to-Media references. For Wwise v120, every Action referenced by an Event
-must be serialized before that Event; the high-level Action APIs preserve this
-load-order requirement automatically.
+Sound-to-Media references. For Wwise v120, Container children must be serialized
+before their parent Container, and every Action referenced by an Event must be
+serialized before that Event. The high-level Container and Action APIs preserve
+these load-order requirements automatically.
 
 ## Add a custom one-shot Sound
 
@@ -98,8 +99,9 @@ structures, requires an exact expected playlist and avoid-repeat value, and
 rebuilds only that tail. The donor's node, output, positioning, Aux, loop, and
 other unmodeled fields remain byte-exact. Child IDs must already exist and be
 unique; weights must be positive signed 32-bit values. The donor must be in
-Random mode. Setting `avoid_repeat_count=0` allows independent selections;
-omitting it preserves the donor value.
+Random mode. The clone retains stable type-group placement while ensuring that
+it is serialized after every playlist child. Setting `avoid_repeat_count=0`
+allows independent selections; omitting it preserves the donor value.
 
 When cloned Sounds become children of the new Container, separately patch each
 reviewed `DirectParentID` field with `patch_u32()`. Any positioning override
@@ -153,8 +155,10 @@ exactly once to an existing unique HIRC object or `None`; packages emptied by
 deletion are omitted. The default Switch package must survive. Ambiguous or
 malformed tails, internal package/parameter references that do not exactly
 cover the retained Children, body-hash/topology drift, ID collisions, and
-non-v120 Banks are rejected. `SoundBankEditor.validate()` repeats the topology
-parse after serialization and also rejects missing child objects.
+non-v120 Banks are rejected. The clone retains stable type-group placement
+unless a retained child is later, in which case it is placed after that child.
+`SoundBankEditor.validate()` repeats the topology parse after serialization and
+also rejects missing or parent-before-child references.
 
 For persistent project work, call these APIs from the guarded `apply_edits()`
 callback of an explicit plan under `builders/`. `SoundBankBuildPlan` declares

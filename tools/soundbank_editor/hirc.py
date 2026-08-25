@@ -752,6 +752,20 @@ class HircEditor:
         for index, item in enumerate(self._objects):
             item.index = index
 
+    def _container_insertion_anchor(
+        self,
+        object_type: int,
+        child_ids: Iterable[int],
+    ) -> tuple[int, int]:
+        """Keep type grouping while placing a Container after every child."""
+
+        candidates = [
+            item for item in self._objects if item.object_type == object_type
+        ]
+        candidates.extend(self._by_id[child_id] for child_id in child_ids)
+        latest = max(candidates, key=lambda item: item.index)
+        return latest.object_type, latest.object_id
+
     def event_actions(self, event_id: int) -> tuple[int, ...]:
         self._require_v120("parse Event actions")
         body = self.object_body(HIRC_EVENT, event_id)
@@ -958,6 +972,9 @@ class HircEditor:
             HIRC_RANDOM_SEQUENCE_CONTAINER,
             new_container_id,
             bytes(cloned[4:]),
+            after=self._container_insertion_anchor(
+                HIRC_RANDOM_SEQUENCE_CONTAINER, child_ids
+            ),
             label=label,
         )
 
@@ -1091,6 +1108,9 @@ class HircEditor:
             HIRC_SWITCH_CONTAINER,
             new_container_id,
             bytes(cloned[4:]),
+            after=self._container_insertion_anchor(
+                HIRC_SWITCH_CONTAINER, retained_children
+            ),
             label=label,
         )
 

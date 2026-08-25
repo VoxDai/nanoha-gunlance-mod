@@ -367,6 +367,29 @@ class GunlanceGuardSoundBankTests(SoundBankArtifactTestCase):
             (item.object_type, item.object_id): index
             for index, item in enumerate(self.rebuilt_hirc.objects())
         }
+        for sound_id in GUARD_SOUND_IDS:
+            self.assertLess(
+                positions[(soundbank_editor.HIRC_SOUND, sound_id)],
+                positions[
+                    (
+                        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+                        GUARD_RANDOM_ID,
+                    )
+                ],
+            )
+        self.assertLess(
+            positions[
+                (
+                    soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+                    GUARD_RANDOM_ID,
+                )
+            ],
+            positions[(soundbank_editor.HIRC_SWITCH_CONTAINER, GUARD_SWITCH_ID)],
+        )
+        self.assertLess(
+            positions[(soundbank_editor.HIRC_SWITCH_CONTAINER, GUARD_SWITCH_ID)],
+            positions[(soundbank_editor.HIRC_ACTION, GUARD_ACTION_ID)],
+        )
         self.assertLess(
             positions[(soundbank_editor.HIRC_ACTION, GUARD_ACTION_ID)],
             positions[(soundbank_editor.HIRC_EVENT, GUARD_EVENT_ID)],

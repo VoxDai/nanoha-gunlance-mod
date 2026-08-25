@@ -124,6 +124,22 @@ def _guard_original_route(
         )
 
 
+def _guard_voice_route_serialization(
+    editor: soundbank_editor.HircEditor,
+) -> None:
+    positions = {item.object_id: item.index for item in editor.objects()}
+    if not (
+        max(positions[sound_id] for sound_id in VOICE_SOUND_IDS)
+        < positions[VOICE_RANDOM_ID]
+        < positions[VOICE_SWITCH_ID]
+        < positions[VOICE_ACTION_ID]
+        < positions[EVENT_ID]
+    ):
+        raise soundbank_editor.SoundBankError(
+            "gunlance guard HIRC route is not serialized child-before-parent"
+        )
+
+
 def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
     """Add one guarded Switch-to-Random Protection overlay route."""
 
@@ -217,6 +233,7 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
         expected_actions=(ORIGINAL_ACTION_ID,),
         label="append Protection overlay to the gunlance guard Event",
     )
+    _guard_voice_route_serialization(editor)
 
 
 EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(

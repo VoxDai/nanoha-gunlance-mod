@@ -237,6 +237,41 @@ class SoundBankEditTests(unittest.TestCase):
         ):
             editor.validate()
 
+    def test_validate_rejects_new_switch_serialized_before_child(self) -> None:
+        source = soundbank_editor.SoundBankEditor(self.bank)
+        donor_container_id = 368_774_789
+        new_container_id = 4_294_967_000
+        child_id = 127_521_149
+        topology = source.hirc.switch_container_topology(donor_container_id)
+        source.hirc.clone_switch_container(
+            donor_container_id,
+            new_container_id,
+            {
+                item: child_id if item == child_id else None
+                for item in topology.children
+            },
+            expected_topology=topology,
+            expected_body_sha256=(
+                "a6df54f2d29b79482420ff8a17420b0952cbb64589e03dde"
+                "1358c02ab99043bb"
+            ),
+        )
+        cloned = source.hirc.object_body(
+            soundbank_editor.HIRC_SWITCH_CONTAINER, new_container_id
+        )
+
+        invalid = soundbank_editor.SoundBankEditor(self.bank)
+        invalid.hirc.insert_object(
+            soundbank_editor.HIRC_SWITCH_CONTAINER,
+            new_container_id,
+            cloned[4:],
+            before=(soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, child_id),
+        )
+        with self.assertRaisesRegex(
+            soundbank_editor.SoundBankError, "serialized before their parent"
+        ):
+            invalid.validate()
+
     def test_atomic_write_refuses_input_and_reads_back(self) -> None:
         editor = soundbank_editor.SoundBankEditor(self.bank)
         with self.assertRaisesRegex(soundbank_editor.SoundBankError, "overwriting"):

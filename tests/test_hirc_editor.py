@@ -197,6 +197,37 @@ class HircEditorTests(unittest.TestCase):
         )
         self.assertEqual(editor.summary.hirc_size_delta, 105)
 
+    def test_cloned_random_is_serialized_after_its_latest_child(self) -> None:
+        bank = soundbank_editor.SoundBank.from_file(
+            SOUNDBANK_ROOT / "wp07_gun_epvsp_shell.nbnk"
+        )
+        editor = soundbank_editor.SoundBankEditor(bank)
+        donor_container_id = 145_848_034
+        donor_sound_id = 535_190_438
+        new_sound_id = 4_294_966_999
+        new_container_id = 4_294_967_000
+        donor_sound = editor.hirc.object_body(
+            soundbank_editor.HIRC_SOUND, donor_sound_id
+        )
+        donor_media_id = struct.unpack_from("<I", donor_sound, 9)[0]
+        editor.hirc.clone_sound(
+            donor_sound_id,
+            new_sound_id,
+            donor_media_id,
+            expected_source_id=donor_media_id,
+        )
+        editor.hirc.clone_random_sequence_container(
+            donor_container_id,
+            new_container_id,
+            ((new_sound_id, 50_000),),
+            expected_playlist=((donor_sound_id, 50_000),),
+            expected_avoid_repeat_count=1,
+        )
+
+        positions = {item.object_id: item.index for item in editor.hirc.objects()}
+        self.assertLess(positions[new_sound_id], positions[new_container_id])
+        editor.validate()
+
     def test_clone_random_sequence_container_guards_inputs(self) -> None:
         bank = soundbank_editor.SoundBank.from_file(
             SOUNDBANK_ROOT / "wp07_gun_epvsp_shell.nbnk"
@@ -370,6 +401,39 @@ class HircEditorTests(unittest.TestCase):
             ).switch_container_topology(new_container_id),
             expected,
         )
+
+    def test_cloned_switch_is_serialized_after_its_latest_child(self) -> None:
+        bank = soundbank_editor.SoundBank.from_file(
+            SOUNDBANK_ROOT / "hm_cm00_epvsp.nbnk"
+        )
+        editor = soundbank_editor.SoundBankEditor(bank)
+        new_child_id = 4_294_966_999
+        new_container_id = 4_294_967_000
+        donor_sound_id = 925_721_864
+        donor_sound = editor.hirc.object_body(
+            soundbank_editor.HIRC_SOUND, donor_sound_id
+        )
+        donor_media_id = struct.unpack_from("<I", donor_sound, 9)[0]
+        editor.hirc.clone_sound(
+            donor_sound_id,
+            new_child_id,
+            donor_media_id,
+            expected_source_id=donor_media_id,
+        )
+        editor.hirc.clone_switch_container(
+            368_774_789,
+            new_container_id,
+            {
+                child_id: new_child_id if child_id == 127_521_149 else None
+                for child_id in DONOR_SWITCH_TOPOLOGY.children
+            },
+            expected_topology=DONOR_SWITCH_TOPOLOGY,
+            expected_body_sha256=DONOR_SWITCH_BODY_SHA256,
+        )
+
+        positions = {item.object_id: item.index for item in editor.hirc.objects()}
+        self.assertLess(positions[new_child_id], positions[new_container_id])
+        editor.validate()
 
     def test_clone_switch_container_guards_inputs(self) -> None:
         bank = soundbank_editor.SoundBank.from_file(
