@@ -5,6 +5,11 @@ from __future__ import annotations
 from tools import soundbank_editor
 
 from .base import MediaAddition, SoundBankBuildPlan, run_single_cli
+from .voice_standard import (
+    STANDARD_VOICE_PARENT_ID,
+    STANDARD_VOICE_REFERENCE_INPUTS,
+    insert_standard_voice_sound,
+)
 
 EVENT_ID = 4_072_881_687
 ORIGINAL_ACTION_ID = 601_196_071
@@ -18,11 +23,15 @@ VOICE_SWITCH_ID = 4_010_844_647
 VOICE_RANDOM_ID = 3_163_089_818
 VOICE_SOUND_IDS = (2_154_199_438, 640_829_561)
 VOICE_MEDIA_IDS = (141_209_263, 440_767_416)
+SILENCE_SOUND_ID = 3_060_148_569
+SILENCE_MEDIA_ID = 2_901_559_960
+GUNLANCE_SWITCH_ID = 3_529_994_682
 
-SOUND_PARENT_OFFSET = 0x19
 RANDOM_PARENT_OFFSET = 0x0B
 RANDOM_OVER_LIMIT_BEHAVIOR_OFFSET = 0x19
 RANDOM_MAX_INSTANCES_OFFSET = 0x1B
+SWITCH_PARENT_OFFSET = 0x0B
+ORIGINAL_SWITCH_PARENT_ID = 422_956_649
 
 DONOR_SWITCH_BODY_SHA256 = (
     "a6df54f2d29b79482420ff8a17420b0952cbb64589e03dde1358c02ab99043bb"
@@ -65,35 +74,20 @@ DONOR_SWITCH_TOPOLOGY = soundbank_editor.SwitchContainerTopology(
     ),
 )
 
-VOICE_SWITCH_IDS = (
-    3_396_333_570,
-    1_382_012_724,
-    345_916_037,
-    1_839_555_973,
-    3_165_334_324,
-    3_529_994_682,
-    3_846_765_152,
-    1_876_434_011,
-    835_669_289,
-    3_295_588_651,
-    208_142_906,
-)
-EXCLUDED_SWITCH_IDS = (
-    3_893_559_432,
-    3_366_211_890,
-    3_818_705_907,
-    1_341_411_413,
-)
 VOICE_SWITCH_TOPOLOGY = soundbank_editor.SwitchContainerTopology(
     group_type=DONOR_SWITCH_TOPOLOGY.group_type,
     group_id=DONOR_SWITCH_TOPOLOGY.group_id,
     default_switch=DONOR_SWITCH_TOPOLOGY.default_switch,
     continuous_validation=DONOR_SWITCH_TOPOLOGY.continuous_validation,
-    children=(VOICE_RANDOM_ID,),
-    switch_packages=tuple(
-        (switch_id, (VOICE_RANDOM_ID,)) for switch_id in VOICE_SWITCH_IDS
+    children=(SILENCE_SOUND_ID, VOICE_RANDOM_ID),
+    switch_packages=(
+        (DONOR_SWITCH_TOPOLOGY.default_switch, (SILENCE_SOUND_ID,)),
+        (GUNLANCE_SWITCH_ID, (VOICE_RANDOM_ID,)),
     ),
-    node_params=(soundbank_editor.SwitchNodeParams(VOICE_RANDOM_ID, 0, 1, 0, 0),),
+    node_params=(
+        soundbank_editor.SwitchNodeParams(SILENCE_SOUND_ID, 0, 1, 0, 0),
+        soundbank_editor.SwitchNodeParams(VOICE_RANDOM_ID, 0, 1, 0, 0),
+    ),
 )
 
 
@@ -131,6 +125,8 @@ def _guard_voice_route_serialization(
     if not (
         max(positions[sound_id] for sound_id in VOICE_SOUND_IDS)
         < positions[VOICE_RANDOM_ID]
+        and positions[SILENCE_SOUND_ID] < positions[VOICE_SWITCH_ID]
+        and positions[VOICE_RANDOM_ID]
         < positions[VOICE_SWITCH_ID]
         < positions[VOICE_ACTION_ID]
         < positions[EVENT_ID]
@@ -141,29 +137,28 @@ def _guard_voice_route_serialization(
 
 
 def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
-    """Add one guarded Switch-to-Random Protection overlay route."""
+    """Add the accepted gunlance-only Protection overlay route."""
 
     _guard_original_route(bank)
-    for media_id in VOICE_MEDIA_IDS:
+    for media_id in (*VOICE_MEDIA_IDS, SILENCE_MEDIA_ID):
         bank.media_entry(media_id=media_id)
 
     editor = bank.hirc
     for sound_id, media_id in zip(VOICE_SOUND_IDS, VOICE_MEDIA_IDS, strict=True):
-        editor.clone_sound(
-            DONOR_SOUND_ID,
+        insert_standard_voice_sound(
+            editor,
             sound_id,
             media_id,
-            expected_source_id=DONOR_MEDIA_ID,
-            label=f"clone gunlance guard donor Sound as {sound_id}",
+            direct_parent_id=VOICE_RANDOM_ID,
+            label=f"insert Protection standard Sound {sound_id}",
         )
-        editor.patch_u32(
-            soundbank_editor.HIRC_SOUND,
-            sound_id,
-            SOUND_PARENT_OFFSET,
-            DONOR_RANDOM_ID,
-            VOICE_RANDOM_ID,
-            label=f"route Protection Sound {sound_id} to the voice Random",
-        )
+    insert_standard_voice_sound(
+        editor,
+        SILENCE_SOUND_ID,
+        SILENCE_MEDIA_ID,
+        direct_parent_id=VOICE_SWITCH_ID,
+        label="insert Protection silent default Sound",
+    )
 
     editor.clone_random_sequence_container(
         DONOR_RANDOM_ID,
@@ -199,19 +194,21 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
         label="limit Protection Random to one audio instance",
     )
 
-    editor.clone_switch_container(
+    editor.clone_switch_container_with_topology(
         DONOR_SWITCH_ID,
         VOICE_SWITCH_ID,
-        {
-            101_900_622: None,
-            125_400_496: None,
-            DONOR_RANDOM_ID: VOICE_RANDOM_ID,
-            133_098_601: None,
-            438_972_177: None,
-        },
+        VOICE_SWITCH_TOPOLOGY,
         expected_topology=DONOR_SWITCH_TOPOLOGY,
         expected_body_sha256=DONOR_SWITCH_BODY_SHA256,
-        label="clone and isolate the gunlance guard Switch Container",
+        label="clone gunlance-only Protection Switch",
+    )
+    editor.patch_u32(
+        soundbank_editor.HIRC_SWITCH_CONTAINER,
+        VOICE_SWITCH_ID,
+        SWITCH_PARENT_OFFSET,
+        ORIGINAL_SWITCH_PARENT_ID,
+        STANDARD_VOICE_PARENT_ID,
+        label="route Protection Switch to Actor-Mixer 209038110",
     )
 
     action = editor.create_play_action(
@@ -238,17 +235,22 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
 
 EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
     replaced_media=(),
-    added_media=((141, VOICE_MEDIA_IDS[0]), (142, VOICE_MEDIA_IDS[1])),
-    hirc_changed_bytes=15,
+    added_media=(
+        (141, VOICE_MEDIA_IDS[0]),
+        (142, VOICE_MEDIA_IDS[1]),
+        (143, SILENCE_MEDIA_ID),
+    ),
+    hirc_changed_bytes=11,
     added_hirc_objects=(
         (soundbank_editor.HIRC_SOUND, VOICE_SOUND_IDS[0]),
         (soundbank_editor.HIRC_SOUND, VOICE_SOUND_IDS[1]),
+        (soundbank_editor.HIRC_SOUND, SILENCE_SOUND_ID),
         (soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, VOICE_RANDOM_ID),
         (soundbank_editor.HIRC_SWITCH_CONTAINER, VOICE_SWITCH_ID),
         (soundbank_editor.HIRC_ACTION, VOICE_ACTION_ID),
     ),
     resized_hirc_objects=((soundbank_editor.HIRC_EVENT, EVENT_ID, 12, 16),),
-    hirc_size_delta=512,
+    hirc_size_delta=421,
 )
 
 PLAN = SoundBankBuildPlan(
@@ -266,16 +268,25 @@ PLAN = SoundBankBuildPlan(
             VOICE_MEDIA_IDS[0],
             "audio/hm_cm00_epvsp/"
             "raising_heart_protection_01(movie_1st.raising_heart.protection_01.1).wav",
+            wem_channels=1,
         ),
         MediaAddition(
             142,
             VOICE_MEDIA_IDS[1],
             "audio/hm_cm00_epvsp/"
             "raising_heart_protection_02(movie_1st.raising_heart.protection_02.1).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            143,
+            SILENCE_MEDIA_ID,
+            "audio/hm_cm00_epvsp/silence_10ms.wav",
+            wem_channels=1,
         ),
     ),
     apply_edits=apply_edits,
     expected_summary=EXPECTED_SUMMARY,
+    reference_inputs=STANDARD_VOICE_REFERENCE_INPUTS,
 )
 
 if __name__ == "__main__":

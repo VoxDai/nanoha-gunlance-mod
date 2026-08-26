@@ -14,6 +14,7 @@ from builders.base import (
     build_one,
     publish_release_tree,
 )
+from builders.hm_cm00_epvsp import PLAN as GUARD_PLAN
 from builders.hm_wp07_snd_ev import PLAN as WWEV_PLAN
 from builders.w07_00 import PLAN as LMT_PLAN
 
@@ -67,6 +68,16 @@ class BuilderPublicationTests(unittest.TestCase):
                 force=True,
             )
             self.assertEqual(forced.sha256, LMT_PLAN.expected_output_sha256)
+
+    def test_guard_build_matches_the_accepted_candidate_04(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="guard-candidate-04-test.") as directory:
+            output = Path(directory) / "output"
+            result = build_one(GUARD_PLAN, root=PROJECT_ROOT, output_dir=output)
+            self.assertIsNotNone(result)
+            self.assertEqual(
+                result.sha256,
+                "e61c7bccccd630d903ac36245a4d135374fd8fb6bdbcfd5c536929d8f63e283e",
+            )
 
     def test_bundle_validator_failure_publishes_nothing(self) -> None:
         with tempfile.TemporaryDirectory(prefix="builder-failure-test.") as directory:

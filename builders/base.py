@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import uuid
+import wave
 
 from tools import soundbank_editor
 
@@ -33,6 +34,7 @@ __all__ = (
     "MediaAddition",
     "MediaReplacement",
     "ModBuildPlan",
+    "ReferenceInput",
     "SoundBankBuildPlan",
     "WwevBuildPlan",
     "build_all",
@@ -118,6 +120,7 @@ class MediaReplacement:
     index: int
     expected_media_id: int
     source_audio: Path
+    wem_channels: int = 2
 
     def __post_init__(self) -> None:
         _positive_index(self.index, "media replacement index")
@@ -127,6 +130,12 @@ class MediaReplacement:
             "source_audio",
             _declared_path(self.source_audio, "source audio", suffix=".wav"),
         )
+        if (
+            not isinstance(self.wem_channels, int)
+            or isinstance(self.wem_channels, bool)
+            or self.wem_channels not in (1, 2)
+        ):
+            raise ValueError("wem_channels must be 1 or 2")
 
 
 @dataclass(frozen=True)
@@ -136,6 +145,7 @@ class MediaAddition:
     expected_index: int
     media_id: int
     source_audio: Path
+    wem_channels: int = 2
 
     def __post_init__(self) -> None:
         _positive_index(self.expected_index, "expected added media index")
@@ -144,6 +154,44 @@ class MediaAddition:
             self,
             "source_audio",
             _declared_path(self.source_audio, "source audio", suffix=".wav"),
+        )
+        if (
+            not isinstance(self.wem_channels, int)
+            or isinstance(self.wem_channels, bool)
+            or self.wem_channels not in (1, 2)
+        ):
+            raise ValueError("wem_channels must be 1 or 2")
+
+
+@dataclass(frozen=True)
+class ReferenceInput:
+    """One immutable project input used to guard a cross-Bank build contract."""
+
+    path: Path
+    expected_sha256: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.path, (Path, str)):
+            raise TypeError("reference input must be a path")
+        raw = str(self.path)
+        path = Path(raw)
+        if (
+            not raw
+            or raw != raw.strip()
+            or path.is_absolute()
+            or any(part in ("", ".", "..") for part in path.parts)
+            or "\\" in raw
+            or not path.parts
+            or path.parts[0] != "original"
+        ):
+            raise ValueError(
+                f"reference input must be a safe path below original/: {self.path!r}"
+            )
+        object.__setattr__(self, "path", path)
+        object.__setattr__(
+            self,
+            "expected_sha256",
+            _sha256_guard(self.expected_sha256, "reference input SHA-256"),
         )
 
 
@@ -166,6 +214,7 @@ class SoundBankBuildPlan:
     expected_summary: soundbank_editor.SoundBankEditSummary
     media_replacements: tuple[MediaReplacement, ...] = ()
     media_additions: tuple[MediaAddition, ...] = ()
+    reference_inputs: tuple[ReferenceInput, ...] = ()
 
     def __post_init__(self) -> None:
         _plan_identity(self.name, self.design_ids, self.apply_edits)
@@ -193,6 +242,10 @@ class SoundBankBuildPlan:
             not isinstance(item, MediaAddition) for item in self.media_additions
         ):
             raise TypeError("media_additions must be a tuple of MediaAddition")
+        if not isinstance(self.reference_inputs, tuple) or any(
+            not isinstance(item, ReferenceInput) for item in self.reference_inputs
+        ):
+            raise TypeError("reference_inputs must be a tuple of ReferenceInput")
         replacement_indices = [item.index for item in self.media_replacements]
         addition_indices = [item.expected_index for item in self.media_additions]
         media_ids = [item.media_id for item in self.media_additions]
@@ -204,6 +257,9 @@ class SoundBankBuildPlan:
             raise ValueError(f"{self.name}: replacement and addition indices overlap")
         if len(media_ids) != len(set(media_ids)):
             raise ValueError(f"{self.name}: duplicate added Media ID")
+        reference_paths = [item.path for item in self.reference_inputs]
+        if len(reference_paths) != len(set(reference_paths)):
+            raise ValueError(f"{self.name}: duplicate reference input")
 
 
 @dataclass(frozen=True)
@@ -462,6 +518,42 @@ def _verify_audio_sources(plan: SoundBankBuildPlan, project_root: Path) -> None:
         )
         if not source.is_file():
             raise BuildError(f"{plan.name}: source audio does not exist: {source}")
+        try:
+            with wave.open(str(source), "rb") as wav:
+                channels = wav.getnchannels()
+                sample_rate = wav.getframerate()
+                sample_width = wav.getsampwidth()
+                compression = wav.getcomptype()
+        except (OSError, EOFError, wave.Error) as error:
+            raise BuildError(
+                f"{plan.name}: source audio is not a readable PCM WAV: {source}"
+            ) from error
+        if (
+            channels != 2
+            or sample_rate != 48_000
+            or sample_width not in (2, 3)
+            or compression != "NONE"
+        ):
+            raise BuildError(
+                f"{plan.name}: source audio must be 48 kHz stereo PCM at 16/24-bit; "
+                f"found {sample_rate} Hz, {channels} channel(s), "
+                f"{sample_width * 8}-bit, compression={compression}: {source}"
+            )
+
+
+def _verify_reference_inputs(plan: SoundBankBuildPlan, project_root: Path) -> None:
+    for reference in plan.reference_inputs:
+        source = _resolve_declared(
+            project_root, reference.path, f"{plan.name} reference input"
+        )
+        if not source.is_file():
+            raise BuildError(f"{plan.name}: reference input does not exist: {source}")
+        actual = sha256(source)
+        if actual != reference.expected_sha256:
+            raise BuildError(
+                f"{plan.name}: reference input SHA-256 expected "
+                f"{reference.expected_sha256} but found {actual}: {source}"
+            )
 
 
 def _summary_mismatch(name: str, expected: ArtifactSummary, actual: ArtifactSummary) -> BuildError:
@@ -525,6 +617,7 @@ def prepare_plan(plan: ArtifactBuildPlan, project_root: Path) -> PreparedArtifac
     source = _verify_source(plan, project_root)
     try:
         if isinstance(plan, SoundBankBuildPlan):
+            _verify_reference_inputs(plan, project_root)
             _verify_audio_sources(plan, project_root)
             original = soundbank_editor.SoundBank.from_file(source)
             if original.bank_id != plan.expected_bank_id:
@@ -633,16 +726,17 @@ def _convert_media(
     converted_dir: Path,
     project_root: Path,
     tools: ToolPaths,
-) -> dict[Path, bytes]:
+) -> dict[tuple[Path, int], bytes]:
     plan = prepared.plan
     if not isinstance(plan, SoundBankBuildPlan):
         return {}
     converted_dir.mkdir(parents=True, exist_ok=True)
-    payloads: dict[Path, bytes] = {}
+    payloads: dict[tuple[Path, int], bytes] = {}
     edits = (*plan.media_replacements, *plan.media_additions)
     for ordinal, edit in enumerate(edits, 1):
         source = _resolve_declared(project_root, edit.source_audio, "source audio")
-        if source in payloads:
+        key = (source, edit.wem_channels)
+        if key in payloads:
             continue
         wem_path = converted_dir / f"{plan.name}_{ordinal:02d}.wem"
         run_tool(
@@ -652,14 +746,26 @@ def _convert_media(
                 str(source),
                 str(wem_path),
                 "--force",
+                "--channels",
+                str(edit.wem_channels),
             ],
             f"convert {source}",
             project_root,
         )
         try:
-            payloads[source] = soundbank_editor.validate_wem(wem_path)
+            payload = soundbank_editor.validate_wem(wem_path)
         except soundbank_editor.SoundBankError as error:
             raise BuildError(f"Converted WEM is invalid: {wem_path}: {error}") from error
+        fmt_offset = payload.find(b"fmt ")
+        if fmt_offset < 0 or fmt_offset + 18 > len(payload):
+            raise BuildError(f"Converted WEM has no readable fmt chunk: {wem_path}")
+        channels = int.from_bytes(payload[fmt_offset + 10 : fmt_offset + 12], "little")
+        if channels != edit.wem_channels:
+            raise BuildError(
+                f"Converted WEM expected {edit.wem_channels} channel(s) but found "
+                f"{channels}: {wem_path}"
+            )
+        payloads[key] = payload
     return payloads
 
 
@@ -830,13 +936,16 @@ def build_plan(
             for replacement in plan.media_replacements:
                 source = _resolve_declared(project_root, replacement.source_audio, "source audio")
                 editor.replace_media(
-                    payloads[source],
+                    payloads[(source, replacement.wem_channels)],
                     index=replacement.index,
                     expected_media_id=replacement.expected_media_id,
                 )
             for addition in plan.media_additions:
                 source = _resolve_declared(project_root, addition.source_audio, "source audio")
-                editor.append_media(addition.media_id, payloads[source])
+                editor.append_media(
+                    addition.media_id,
+                    payloads[(source, addition.wem_channels)],
+                )
             plan.apply_edits(editor)
             editor.validate()
             _verify_declared_soundbank_media(plan, editor.summary)

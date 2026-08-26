@@ -435,6 +435,67 @@ class HircEditorTests(unittest.TestCase):
         self.assertLess(positions[new_child_id], positions[new_container_id])
         editor.validate()
 
+    def test_clone_switch_container_with_explicit_topology(self) -> None:
+        bank = soundbank_editor.SoundBank.from_file(
+            SOUNDBANK_ROOT / "hm_cm00_epvsp.nbnk"
+        )
+        editor = soundbank_editor.SoundBankEditor(bank)
+        donor_container_id = 368_774_789
+        new_container_id = 4_294_967_000
+        default_child_id = 330_120_372
+        gunlance_child_id = 925_721_864
+        replacement = soundbank_editor.SwitchContainerTopology(
+            group_type=0,
+            group_id=3_251_135_135,
+            default_switch=3_396_333_570,
+            continuous_validation=0,
+            children=(default_child_id, gunlance_child_id),
+            switch_packages=(
+                (3_396_333_570, (default_child_id,)),
+                (3_529_994_682, (gunlance_child_id,)),
+            ),
+            node_params=(
+                soundbank_editor.SwitchNodeParams(default_child_id, 0, 1, 0, 0),
+                soundbank_editor.SwitchNodeParams(gunlance_child_id, 0, 1, 0, 0),
+            ),
+        )
+
+        editor.hirc.clone_switch_container_with_topology(
+            donor_container_id,
+            new_container_id,
+            replacement,
+            expected_topology=DONOR_SWITCH_TOPOLOGY,
+            expected_body_sha256=DONOR_SWITCH_BODY_SHA256,
+        )
+        self.assertEqual(
+            editor.hirc.switch_container_topology(new_container_id), replacement
+        )
+        positions = {item.object_id: item.index for item in editor.hirc.objects()}
+        self.assertLess(positions[default_child_id], positions[new_container_id])
+        self.assertLess(positions[gunlance_child_id], positions[new_container_id])
+        editor.validate()
+
+        missing = soundbank_editor.SoundBankEditor(bank)
+        invalid_replacement = soundbank_editor.SwitchContainerTopology(
+            group_type=0,
+            group_id=3_251_135_135,
+            default_switch=3_396_333_570,
+            continuous_validation=0,
+            children=(4_294_966_999,),
+            switch_packages=((3_396_333_570, (4_294_966_999,)),),
+            node_params=(
+                soundbank_editor.SwitchNodeParams(4_294_966_999, 0, 1, 0, 0),
+            ),
+        )
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "does not exist"):
+            missing.hirc.clone_switch_container_with_topology(
+                donor_container_id,
+                new_container_id,
+                invalid_replacement,
+                expected_topology=DONOR_SWITCH_TOPOLOGY,
+                expected_body_sha256=DONOR_SWITCH_BODY_SHA256,
+            )
+
     def test_clone_switch_container_guards_inputs(self) -> None:
         bank = soundbank_editor.SoundBank.from_file(
             SOUNDBANK_ROOT / "hm_cm00_epvsp.nbnk"

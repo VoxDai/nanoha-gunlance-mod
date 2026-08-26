@@ -5,6 +5,11 @@ from __future__ import annotations
 from tools import soundbank_editor
 
 from .base import MediaAddition, SoundBankBuildPlan, run_single_cli
+from .voice_standard import (
+    STANDARD_DONOR_SOUND_BODY,
+    STANDARD_VOICE_REFERENCE_INPUTS,
+    insert_standard_voice_sound,
+)
 
 
 EVENT_ID = 166_276_485
@@ -17,16 +22,21 @@ VOICE_SOUND_ID = 84_645_870
 
 
 def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
-    """Clone the reviewed donor topology and append one guarded Play Action."""
+    """Insert the standard custom-voice Sound and one guarded Play Action."""
 
     bank.media_entry(media_id=VOICE_MEDIA_ID)
     editor = bank.hirc
-    editor.clone_sound(
-        DONOR_SOUND_ID,
+    if editor.object_body(soundbank_editor.HIRC_SOUND, DONOR_SOUND_ID) != (
+        STANDARD_DONOR_SOUND_BODY
+    ):
+        raise soundbank_editor.SoundBankError(
+            "standard donor Sound differs from the reviewed 46-byte body"
+        )
+    insert_standard_voice_sound(
+        editor,
         VOICE_SOUND_ID,
         VOICE_MEDIA_ID,
-        expected_source_id=DONOR_MEDIA_ID,
-        label="clone sharpening-complete donor Sound",
+        label="insert standard sharpening-complete custom-voice Sound",
     )
     action = editor.create_play_action(VOICE_ACTION_ID, VOICE_SOUND_ID, bank.bank_id)
     editor.insert_object(
@@ -66,6 +76,7 @@ PLAN = SoundBankBuildPlan(
         "76b1bc422e3041fafc5cdb2cd671937d298bd9de86421cfc597df1a61998c3c8"
     ),
     expected_bank_id=1_149_256_632,
+    reference_inputs=STANDARD_VOICE_REFERENCE_INPUTS,
     media_additions=(
         MediaAddition(
             72,
@@ -73,6 +84,7 @@ PLAN = SoundBankBuildPlan(
             "audio/wp_cmn_epvsp/sharpen/"
             "raising_heart_charging_completed_01(movie_1st.raising_heart."
             "charging_completed.1).wav",
+            wem_channels=1,
         ),
     ),
     apply_edits=apply_edits,

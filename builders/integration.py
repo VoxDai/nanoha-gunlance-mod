@@ -39,12 +39,12 @@ from .wp_gun_cmn import (
     OVERHEAD_VOICE_EVENT_ID,
     OVERHEAD_VOICE_MEDIA_ID,
     OVERHEAD_VOICE_SOUND_ID,
-    POSITIONING_VECTOR_OFFSET,
     VOICE_ACTION_ID,
     VOICE_EVENT_ID,
     VOICE_MEDIA_ID,
     VOICE_SOUND_ID,
 )
+from .voice_standard import standard_voice_sound_body
 
 
 LMT_TARGET = Path("hm/wp/wp07/mot/w07_00/w07_00.lmt")
@@ -146,8 +146,8 @@ def validate_stationary_draw(staged: Mapping[Path, Path]) -> None:
     if voice_action != expected_voice_action:
         raise BuildError("stationary draw voice Action does not target the new Sound")
     voice_sound = hirc.object_body(soundbank_editor.HIRC_SOUND, VOICE_SOUND_ID)
-    if struct.unpack_from("<I", voice_sound, 9)[0] != VOICE_MEDIA_ID:
-        raise BuildError("stationary draw voice Sound does not reference the new media")
+    if voice_sound != standard_voice_sound_body(VOICE_SOUND_ID, VOICE_MEDIA_ID):
+        raise BuildError("stationary draw voice Sound is not the standard custom-voice body")
     if bank.media_entry(index=34).media_id != VOICE_MEDIA_ID:
         raise BuildError("stationary draw added DIDX #34 identity changed")
 
@@ -276,12 +276,10 @@ def validate_overhead_smash(staged: Mapping[Path, Path]) -> None:
     voice_sound = hirc.object_body(
         soundbank_editor.HIRC_SOUND, OVERHEAD_VOICE_SOUND_ID
     )
-    expected_voice_sound = bytearray(donor_sound)
-    struct.pack_into("<I", expected_voice_sound, 0, OVERHEAD_VOICE_SOUND_ID)
-    struct.pack_into("<I", expected_voice_sound, 9, OVERHEAD_VOICE_MEDIA_ID)
-    expected_voice_sound[POSITIONING_VECTOR_OFFSET] = 0xC1
-    if voice_sound != bytes(expected_voice_sound):
-        raise BuildError("overhead smash voice Sound is not the guarded local-2D clone")
+    if voice_sound != standard_voice_sound_body(
+        OVERHEAD_VOICE_SOUND_ID, OVERHEAD_VOICE_MEDIA_ID
+    ):
+        raise BuildError("overhead smash voice Sound is not the standard custom-voice body")
     if bank.media_entry(index=35).media_id != OVERHEAD_VOICE_MEDIA_ID:
         raise BuildError("overhead smash added DIDX #35 identity changed")
     if sum(

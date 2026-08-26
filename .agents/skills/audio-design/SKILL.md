@@ -17,8 +17,9 @@ contract under `designs/`. The design is the complete input for
 - Unless the user explicitly expands the task, modify only the selected design
   and promote any missing dependent game artifacts from `assets/chunk/` to
   `original/` as byte-exact copies.
-- Never edit `builders/`, `audio/`, `docs/mapping/`, existing
-  `original/` files, `output/`, or `release/`. Existing builders may be
+- Never edit `builders/`, `docs/mapping/`, existing `original/` files,
+  `output/`, or `release/`. Do not edit `audio/` unless a loudness validation has failed and the user explicitly
+  confirms the exact files and target LUFS-I for a separately reviewed standardization task. Existing builders may be
   inspected only to find and report design-to-implementation drift.
 - Never modify, move, or delete a source under `assets/chunk/`. Never
   overwrite an `original/` destination. If an existing destination differs
@@ -29,6 +30,9 @@ contract under `designs/`. The design is the complete input for
   offset, record, or summary values. Preserve an existing `design_id`.
 - Use only final project WAVs. Probes, placeholders, and unprocessed source
   clips do not satisfy a complete design.
+- For custom character voice, read
+  `references/custom-voice-sound.md` before selecting the Sound route or
+  documenting media conversion.
 
 ## Standard Design Contract
 
@@ -67,13 +71,26 @@ Describe what the player must hear, not the implementation mechanics.
 List only final repository audio with links relative to the design file:
 
 ```markdown
-| 名称 | 音频 | 播放方式 |
+| 名称 | 音频 | 响度（LUFS-I） | 播放方式 |
 ```
 
-Record replacement versus independent append, sharing, synchronization, delay,
-and distinct spatial paths. Final project WAVs may be 48 kHz stereo PCM at
-16-bit or 24-bit depth. Inspect and report other formats, but do not convert
-audio during this task.
+Record replacement versus independent append, sharing, synchronization, delay, and distinct spatial paths. Measure
+integrated loudness read-only with FFmpeg
+`loudnorm` and use its unrounded `input_i` to validate the inclusive
+`[-25.00, -20.00]` LUFS-I range. Record the measured value rounded to the nearest integer in the table.
+
+Ordinary final project WAVs must be 48 kHz, stereo, 24-bit PCM and use
+`<character>_<content>_<NN>(<audio_source>).wav`: character and content are lowercase snake case, `NN` is a zero-padded
+two-digit number, and the source is non-empty. A functionally necessary special audio file may violate loudness, format,
+or naming requirements only when the audio section identifies it as an exception and records its purpose, actual
+loudness, and actual format.
+
+Report every loudness, format, or naming failure before changing anything. Do not rename, re-encode, or adjust a failing
+file on your own. For an otherwise compliant WAV outside the loudness range, offer `-21` and `-24` LUFS-I as the
+recommended targets. After the user explicitly confirms the files and target, standardize with a constant linear FFmpeg
+`volume=<target-minus-input_i>dB:precision=double` gain, re-export as 48 kHz stereo `pcm_s24le`, and remeasure before
+replacing the final WAV. Do not use dynamic compression, limiting, or `loudnorm` as a write filter, and do not encode
+the correction in a design or builder.
 
 ### 实现契约
 
@@ -119,6 +136,8 @@ Do not reduce a cross-format route to its final Event ID.
 
 1. Read the request, the selected design if it exists, both standard design
    examples, and only the mapping or research material relevant to the action.
+   For custom character voice, also read
+   `references/custom-voice-sound.md` before route analysis.
 2. Inventory every NBNK, LMT, WWEV, and final WAV dependency. Each game binary
    must exist in its documented `original/nbnk/`, `original/lmt/`, or
    `original/wwev/` directory.
@@ -130,9 +149,10 @@ Do not reduce a cross-format route to its final Event ID.
    `soundbank-workflow` and a task-specific wwiser dump under `/tmp` when
    topology needs deeper proof. Resolve LMT routes with
    `LmtFile.triggered_requests()` and the matching `WwevFile`.
-5. Verify every final audio link and its metadata. Build an in-memory guarded
-   prototype when exact summaries, output hashes, or collision checks cannot be
-   established by inspection alone; do not publish it.
+5. Verify every final audio link, measure its unrounded LUFS-I, and validate its format and filename. Stop and report
+   ordinary WAVs outside the loudness range or media contract; document any justified special-audio exception. Build an
+   in-memory guarded prototype when exact summaries, output hashes, or collision checks cannot be established by
+   inspection alone; do not publish it.
 6. Create or update the design, keeping behavior, audio, and implementation
    facts in their respective sections.
 7. Reparse the front matter, require a unique `design_id`, validate every

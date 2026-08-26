@@ -11,6 +11,7 @@ from builders.base import (
     MediaAddition,
     MediaReplacement,
     ModBuildPlan,
+    ReferenceInput,
     prepare_all_plans,
     prepare_plan,
     validate_registry,
@@ -21,6 +22,7 @@ from builders.w07_00 import PLAN as LMT_PLAN
 from builders.wp07_gun_epvsp_shell import PLAN as WP07_PLAN
 from builders.wp_cmn_epvsp import PLAN as SHARPEN_PLAN
 from builders.wp_gun_cmn import PLAN as WP_GUN_PLAN
+from builders.voice_standard import STANDARD_VOICE_REFERENCE_INPUTS
 from tools import soundbank_editor
 
 
@@ -36,6 +38,7 @@ class ExplicitPlanTests(unittest.TestCase):
         for name in (
             "MediaReplacement",
             "MediaAddition",
+            "ReferenceInput",
             "SoundBankBuildPlan",
             "LmtBuildPlan",
             "WwevBuildPlan",
@@ -116,7 +119,12 @@ class ExplicitPlanTests(unittest.TestCase):
         )
         self.assertEqual(
             tuple(
-                (item.expected_index, item.media_id, str(item.source_audio))
+                (
+                    item.expected_index,
+                    item.media_id,
+                    str(item.source_audio),
+                    item.wem_channels,
+                )
                 for item in GUARD_PLAN.media_additions
             ),
             (
@@ -126,6 +134,7 @@ class ExplicitPlanTests(unittest.TestCase):
                     "audio/hm_cm00_epvsp/"
                     "raising_heart_protection_01(movie_1st.raising_heart."
                     "protection_01.1).wav",
+                    1,
                 ),
                 (
                     142,
@@ -133,6 +142,13 @@ class ExplicitPlanTests(unittest.TestCase):
                     "audio/hm_cm00_epvsp/"
                     "raising_heart_protection_02(movie_1st.raising_heart."
                     "protection_02.1).wav",
+                    1,
+                ),
+                (
+                    143,
+                    2_901_559_960,
+                    "audio/hm_cm00_epvsp/silence_10ms.wav",
+                    1,
                 ),
             ),
         )
@@ -178,7 +194,12 @@ class ExplicitPlanTests(unittest.TestCase):
         )
         self.assertEqual(
             tuple(
-                (item.expected_index, item.media_id, str(item.source_audio))
+                (
+                    item.expected_index,
+                    item.media_id,
+                    str(item.source_audio),
+                    item.wem_channels,
+                )
                 for item in WP_GUN_PLAN.media_additions
             ),
             (
@@ -188,18 +209,21 @@ class ExplicitPlanTests(unittest.TestCase):
                     "audio/wp_gun_cmn/stationary_draw/"
                     "raising_heart_standby_ready_01(movie_1st.raising_heart."
                     "standby_ready_set_up.1).wav",
+                    1,
                 ),
                 (
                     35,
                     1_280_643_898,
                     "audio/wp_gun_cmn/overhead_smash/"
                     "nanoha_accel_01(battle_of_aces.attack_voice.attack_03.2).wav",
+                    1,
                 ),
                 (
                     36,
                     1_284_288_484,
                     "audio/wp_gun_cmn/reload/"
                     "raising_heart_reload_01(movie_2nd_as.raising_heart.reload.1).wav",
+                    1,
                 ),
             ),
         )
@@ -231,6 +255,35 @@ class ExplicitPlanTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(ValueError, "safe project-relative"):
             replace(WP07_PLAN, target="../outside.nbnk")
+        with self.assertRaisesRegex(ValueError, "below original"):
+            ReferenceInput("assets/chunk/unsafe.nbnk", "00" * 32)
+        with self.assertRaisesRegex(ValueError, "below original"):
+            ReferenceInput("original/../unsafe.nbnk", "00" * 32)
+
+    def test_standard_voice_channels_and_reference_inputs_are_explicit(self) -> None:
+        for plan in (WP07_PLAN, SHARPEN_PLAN, WP_GUN_PLAN, GUARD_PLAN):
+            self.assertEqual(plan.reference_inputs, STANDARD_VOICE_REFERENCE_INPUTS)
+            self.assertTrue(plan.media_additions)
+            self.assertEqual(
+                {item.wem_channels for item in plan.media_additions},
+                {1},
+            )
+        with self.assertRaisesRegex(ValueError, "wem_channels"):
+            replace(SHARPEN_PLAN.media_additions[0], wem_channels=3)
+        with self.assertRaisesRegex(ValueError, "wem_channels"):
+            replace(SHARPEN_PLAN.media_additions[0], wem_channels=True)
+
+    def test_reference_sha_guard_fails_before_editing(self) -> None:
+        first = WP07_PLAN.reference_inputs[0]
+        bad = replace(
+            WP07_PLAN,
+            reference_inputs=(
+                replace(first, expected_sha256="00" * 32),
+                *WP07_PLAN.reference_inputs[1:],
+            ),
+        )
+        with self.assertRaisesRegex(BuildError, "reference input SHA-256"):
+            prepare_plan(bad, PROJECT_ROOT)
 
     def test_source_sha_guard_fails_before_editing(self) -> None:
         bad = replace(LMT_PLAN, expected_source_sha256="00" * 32)

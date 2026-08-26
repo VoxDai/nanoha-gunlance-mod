@@ -7,6 +7,10 @@ import struct
 from tools import soundbank_editor
 
 from .base import MediaAddition, SoundBankBuildPlan, run_single_cli
+from .voice_standard import (
+    STANDARD_VOICE_REFERENCE_INPUTS,
+    insert_standard_voice_sound,
+)
 
 
 VOICE_MEDIA_ID = 863_865_614
@@ -75,20 +79,22 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
             "original stationary-draw Event route differs from its design guard"
         )
 
-    editor.clone_sound(
-        DONOR_SOUND_ID,
+    stationary_donor = editor.object_body(
+        soundbank_editor.HIRC_SOUND, DONOR_SOUND_ID
+    )
+    if (
+        len(stationary_donor) < 13
+        or stationary_donor[8] != 0
+        or struct.unpack_from("<I", stationary_donor, 9)[0] != DONOR_MEDIA_ID
+    ):
+        raise soundbank_editor.SoundBankError(
+            "stationary-draw donor Sound differs from its design guard"
+        )
+    insert_standard_voice_sound(
+        editor,
         VOICE_SOUND_ID,
         VOICE_MEDIA_ID,
-        expected_source_id=DONOR_MEDIA_ID,
-        label="clone frame-9 draw Sound topology for stationary-draw voice",
-    )
-    editor.patch_u8(
-        soundbank_editor.HIRC_SOUND,
-        VOICE_SOUND_ID,
-        POSITIONING_VECTOR_OFFSET,
-        0xC0,
-        0xC1,
-        label="enable local 2D positioning for stationary-draw voice",
+        label="insert standard stationary-draw custom-voice Sound",
     )
 
     original_route = editor.create_play_event_action(
@@ -158,20 +164,11 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
             "overhead-smash donor Sound topology differs from its design guard"
         )
 
-    editor.clone_sound(
-        OVERHEAD_DONOR_SOUND_ID,
+    insert_standard_voice_sound(
+        editor,
         OVERHEAD_VOICE_SOUND_ID,
         OVERHEAD_VOICE_MEDIA_ID,
-        expected_source_id=OVERHEAD_DONOR_MEDIA_ID,
-        label="clone overhead-smash donor Sound for Accel voice",
-    )
-    editor.patch_u8(
-        soundbank_editor.HIRC_SOUND,
-        OVERHEAD_VOICE_SOUND_ID,
-        POSITIONING_VECTOR_OFFSET,
-        0xC0,
-        0xC1,
-        label="enable local 2D positioning for overhead-smash Accel voice",
+        label="insert standard overhead-smash custom-voice Sound",
     )
 
     overhead_original_route = editor.create_play_event_action(
@@ -264,12 +261,11 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
             "reload Container playlist differs from its design guard"
         )
 
-    editor.clone_sound(
-        RELOAD_DONOR_SOUND_ID,
+    insert_standard_voice_sound(
+        editor,
         RELOAD_VOICE_SOUND_ID,
         RELOAD_VOICE_MEDIA_ID,
-        expected_source_id=RELOAD_DONOR_MEDIA_ID,
-        label="clone reload donor Sound for Raising Heart voice",
+        label="insert standard reload custom-voice Sound",
     )
     reload_voice = editor.create_play_action(
         RELOAD_VOICE_ACTION_ID,
@@ -298,7 +294,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (35, OVERHEAD_VOICE_MEDIA_ID),
         (36, RELOAD_VOICE_MEDIA_ID),
     ),
-    hirc_changed_bytes=3,
+    hirc_changed_bytes=1,
     added_hirc_objects=(
         (soundbank_editor.HIRC_SOUND, VOICE_SOUND_ID),
         (soundbank_editor.HIRC_ACTION, ORIGINAL_ROUTE_ACTION_ID),
@@ -314,7 +310,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
     resized_hirc_objects=(
         (soundbank_editor.HIRC_EVENT, RELOAD_EVENT_ID, 12, 16),
     ),
-    hirc_size_delta=382,
+    hirc_size_delta=304,
 )
 
 
@@ -331,6 +327,7 @@ PLAN = SoundBankBuildPlan(
         "bba3b716b0bbaf06dfe562adf9867c43dd78b29dd5132b150f1f08142b54cfa1"
     ),
     expected_bank_id=939_294_496,
+    reference_inputs=STANDARD_VOICE_REFERENCE_INPUTS,
     media_additions=(
         MediaAddition(
             34,
@@ -338,18 +335,21 @@ PLAN = SoundBankBuildPlan(
             "audio/wp_gun_cmn/stationary_draw/"
             "raising_heart_standby_ready_01(movie_1st.raising_heart."
             "standby_ready_set_up.1).wav",
+            wem_channels=1,
         ),
         MediaAddition(
             35,
             OVERHEAD_VOICE_MEDIA_ID,
             "audio/wp_gun_cmn/overhead_smash/"
             "nanoha_accel_01(battle_of_aces.attack_voice.attack_03.2).wav",
+            wem_channels=1,
         ),
         MediaAddition(
             36,
             RELOAD_VOICE_MEDIA_ID,
             "audio/wp_gun_cmn/reload/"
             "raising_heart_reload_01(movie_2nd_as.raising_heart.reload.1).wav",
+            wem_channels=1,
         ),
     ),
     apply_edits=apply_edits,

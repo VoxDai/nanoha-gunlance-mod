@@ -3,17 +3,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import struct
 
 from tools import soundbank_editor
 
 from .base import MediaAddition, SoundBankBuildPlan, run_single_cli
+from .voice_standard import (
+    STANDARD_VOICE_REFERENCE_INPUTS,
+    insert_standard_voice_sound,
+)
 
 
 FULL_BURST_MEDIA_ID = 242_768_048
 STARLIGHT_MEDIA_ID = 322_318_543
 STARLIGHT_BREAKER_MEDIA_ID = 3_332_910_283
 BREAKER_MEDIA_ID = 2_217_266_443
-POSITIONING_VECTOR_OFFSET = 0x2A
+WYVERN_LEFT_EVENT_ID = 3_253_425_110
+WYVERN_LEFT_ORIGINAL_ACTION_ID = 120_830_402
+REMOVED_LEFT_BREAKER_ACTION_ID = 2_807_447_016
+REMOVED_LEFT_BREAKER_SOUND_ID = 3_070_096_299
 
 
 @dataclass(frozen=True)
@@ -28,7 +36,6 @@ class OverlayRoute:
     media_id: int
     action_id: int
     sound_id: int
-    local_2d: bool = False
 
 
 FULL_BURST_ROUTES = (
@@ -41,7 +48,6 @@ FULL_BURST_ROUTES = (
         FULL_BURST_MEDIA_ID,
         3_386_055_930,
         960_803_121,
-        True,
     ),
     OverlayRoute(
         "2-shell full burst",
@@ -52,7 +58,6 @@ FULL_BURST_ROUTES = (
         FULL_BURST_MEDIA_ID,
         4_199_321_359,
         479_969_098,
-        True,
     ),
     OverlayRoute(
         "3-shell full burst",
@@ -63,7 +68,6 @@ FULL_BURST_ROUTES = (
         FULL_BURST_MEDIA_ID,
         4_100_049_135,
         2_544_331_946,
-        True,
     ),
     OverlayRoute(
         "4-shell full burst",
@@ -74,7 +78,6 @@ FULL_BURST_ROUTES = (
         FULL_BURST_MEDIA_ID,
         4_272_498_343,
         4_251_385_954,
-        True,
     ),
     OverlayRoute(
         "5-shell full burst",
@@ -85,7 +88,6 @@ FULL_BURST_ROUTES = (
         FULL_BURST_MEDIA_ID,
         3_047_212_046,
         1_519_403_237,
-        True,
     ),
 )
 
@@ -120,16 +122,6 @@ WYVERNS_FIRE_ROUTES = (
         1_866_468_495,
         2_472_459_210,
     ),
-    OverlayRoute(
-        "Wyvern explosion left Breaker",
-        3_253_425_110,
-        (120_830_402,),
-        249_028_781,
-        661_341_708,
-        BREAKER_MEDIA_ID,
-        2_807_447_016,
-        3_070_096_299,
-    ),
 )
 
 
@@ -138,22 +130,21 @@ def _add_overlay(
 ) -> None:
     editor = bank.hirc
     bank.media_entry(media_id=route.media_id)
-    editor.clone_sound(
-        route.donor_sound_id,
+    donor = editor.object_body(soundbank_editor.HIRC_SOUND, route.donor_sound_id)
+    if (
+        len(donor) < 13
+        or donor[8] != 0
+        or struct.unpack_from("<I", donor, 9)[0] != route.expected_donor_source_id
+    ):
+        raise soundbank_editor.SoundBankError(
+            f"target route donor Sound differs from its guard for {route.label}"
+        )
+    insert_standard_voice_sound(
+        editor,
         route.sound_id,
         route.media_id,
-        expected_source_id=route.expected_donor_source_id,
-        label=f"clone donor Sound for {route.label}",
+        label=f"insert standard custom-voice Sound for {route.label}",
     )
-    if route.local_2d:
-        editor.patch_u8(
-            soundbank_editor.HIRC_SOUND,
-            route.sound_id,
-            POSITIONING_VECTOR_OFFSET,
-            0xC0,
-            0xC1,
-            label=f"enable local 2D positioning for {route.label}",
-        )
     action = editor.create_play_action(route.action_id, route.sound_id, bank.bank_id)
     editor.insert_object(
         soundbank_editor.HIRC_ACTION,
@@ -173,6 +164,12 @@ def _add_overlay(
 def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
     """Apply the two reviewed designs in deterministic serialization order."""
 
+    if bank.hirc.event_actions(WYVERN_LEFT_EVENT_ID) != (
+        WYVERN_LEFT_ORIGINAL_ACTION_ID,
+    ):
+        raise soundbank_editor.SoundBankError(
+            "Wyvern left Event differs from the byte-exact no-voice path guard"
+        )
     for route in (*FULL_BURST_ROUTES, *WYVERNS_FIRE_ROUTES):
         _add_overlay(bank, route)
 
@@ -185,7 +182,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (45, STARLIGHT_BREAKER_MEDIA_ID),
         (46, BREAKER_MEDIA_ID),
     ),
-    hirc_changed_bytes=14,
+    hirc_changed_bytes=8,
     added_hirc_objects=(
         (soundbank_editor.HIRC_SOUND, 960_803_121),
         (soundbank_editor.HIRC_ACTION, 3_386_055_930),
@@ -203,8 +200,6 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (soundbank_editor.HIRC_ACTION, 254_514_827),
         (soundbank_editor.HIRC_SOUND, 2_472_459_210),
         (soundbank_editor.HIRC_ACTION, 1_866_468_495),
-        (soundbank_editor.HIRC_SOUND, 3_070_096_299),
-        (soundbank_editor.HIRC_ACTION, 2_807_447_016),
     ),
     resized_hirc_objects=(
         (soundbank_editor.HIRC_EVENT, 302_768_804, 12, 20),
@@ -213,10 +208,9 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (soundbank_editor.HIRC_EVENT, 1_765_608_260, 12, 16),
         (soundbank_editor.HIRC_EVENT, 2_727_643_337, 12, 16),
         (soundbank_editor.HIRC_EVENT, 2_727_643_338, 12, 16),
-        (soundbank_editor.HIRC_EVENT, 3_253_425_110, 12, 16),
         (soundbank_editor.HIRC_EVENT, 3_655_102_100, 12, 16),
     ),
-    hirc_size_delta=832,
+    hirc_size_delta=624,
 )
 
 
@@ -232,18 +226,21 @@ PLAN = SoundBankBuildPlan(
         "41bb0136e89e8434d716caed9c37b399e44cd0cb057f3fa9ab706437696782a1"
     ),
     expected_bank_id=3_273_965_928,
+    reference_inputs=STANDARD_VOICE_REFERENCE_INPUTS,
     media_additions=(
         MediaAddition(
             43,
             FULL_BURST_MEDIA_ID,
             "audio/wp07_gun_epvsp_shell/full_burst/"
             "nanoha_shoot_01(battle_of_aces.attack_voice.attack_03.1).wav",
+            wem_channels=1,
         ),
         MediaAddition(
             44,
             STARLIGHT_MEDIA_ID,
             "audio/wp07_gun_epvsp_shell/wyverns_fire/"
             "nanoha_starlight_01(gears_of_destiny.attack_voice.attack_06.1).wav",
+            wem_channels=1,
         ),
         MediaAddition(
             45,
@@ -251,12 +248,14 @@ PLAN = SoundBankBuildPlan(
             "audio/wp07_gun_epvsp_shell/wyverns_fire/"
             "raising_heart_starlight_breaker_01(movie_1st.raising_heart."
             "starlight_breaker.1).wav",
+            wem_channels=1,
         ),
         MediaAddition(
             46,
             BREAKER_MEDIA_ID,
             "audio/wp07_gun_epvsp_shell/wyverns_fire/"
             "nanoha_breaker_01(gears_of_destiny.attack_voice.attack_06.2).wav",
+            wem_channels=1,
         ),
     ),
     apply_edits=apply_edits,

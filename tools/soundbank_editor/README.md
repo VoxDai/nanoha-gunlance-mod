@@ -160,6 +160,12 @@ unless a retained child is later, in which case it is placed after that child.
 `SoundBankEditor.validate()` repeats the topology parse after serialization and
 also rejects missing or parent-before-child references.
 
+When a reviewed route must assign packages independently of the donor's shared children, use
+`clone_switch_container_with_topology()`. It accepts a complete replacement `SwitchContainerTopology`, while retaining
+the donor prefix and requiring the same exact donor topology and body SHA-256 guards. Every replacement child must
+already exist; default-package coverage, unique IDs, package-to-child coverage, serialization order, and v120
+compatibility are validated identically to the filtered clone API.
+
 For persistent project work, call these APIs from the guarded `apply_edits()`
 callback of an explicit plan under `builders/`. `SoundBankBuildPlan` declares
 each `MediaReplacement` or `MediaAddition` directly, including its 1-based DIDX

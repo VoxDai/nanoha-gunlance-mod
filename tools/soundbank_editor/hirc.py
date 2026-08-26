@@ -1114,6 +1114,71 @@ class HircEditor:
             label=label,
         )
 
+    def clone_switch_container_with_topology(
+            self,
+            donor_container_id: int,
+            new_container_id: int,
+            replacement_topology: SwitchContainerTopology,
+            *,
+            expected_topology: SwitchContainerTopology,
+            expected_body_sha256: str,
+            label: str = "clone Switch Container with explicit topology",
+    ) -> HircObject:
+        """Clone a reviewed v120 Switch Container with an explicit new tail."""
+
+        self._require_v120(label)
+        donor = self.object_body(HIRC_SWITCH_CONTAINER, donor_container_id)
+        if (
+                not isinstance(expected_body_sha256, str)
+                or len(expected_body_sha256) != 64
+                or any(
+            character not in "0123456789abcdef"
+            for character in expected_body_sha256
+        )
+        ):
+            raise SoundBankError(
+                f"{label}: expected body SHA-256 must be 64 lowercase hex characters"
+            )
+        actual_sha256 = hashlib.sha256(donor).hexdigest()
+        if actual_sha256 != expected_body_sha256:
+            raise SoundBankError(
+                f"{label}: donor Container {donor_container_id} expected body "
+                f"SHA-256 {expected_body_sha256} but found {actual_sha256}"
+            )
+
+        layout = _parse_switch_container_tail(donor, label)
+        guarded_topology = _normalize_switch_container_topology(
+            expected_topology, f"{label} expected topology"
+        )
+        if layout.topology != guarded_topology:
+            raise SoundBankError(
+                f"{label}: donor Container {donor_container_id} topology changed"
+            )
+
+        replacement = _normalize_switch_container_topology(
+            replacement_topology, f"{label} replacement topology"
+        )
+        for child_id in replacement.children:
+            if child_id not in self._by_id:
+                raise SoundBankError(
+                    f"{label}: replacement child object does not exist: {child_id}"
+                )
+
+        cloned = bytearray(donor[: layout.offset])
+        struct.pack_into(
+            "<I", cloned, 0, _check_u32(new_container_id, "new Container ID")
+        )
+        cloned += _build_switch_container_tail(replacement)
+        return self.insert_object(
+            HIRC_SWITCH_CONTAINER,
+            new_container_id,
+            bytes(cloned[4:]),
+            after=self._container_insertion_anchor(
+                HIRC_SWITCH_CONTAINER, replacement.children
+            ),
+            label=label,
+        )
+
     @property
     def resized_objects(self) -> tuple[tuple[int, int, int, int], ...]:
         resized: list[tuple[int, int, int, int]] = []
