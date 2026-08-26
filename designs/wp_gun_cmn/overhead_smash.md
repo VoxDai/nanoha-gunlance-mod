@@ -10,11 +10,11 @@ target_artifacts:
 
 ## 描述
 
-保留普通地面下砸的全部原版机械、金属和挥动声；仅在该动作开始时追加一次奈叶「Accel」，不污染上捞、横扫、装填、拔刀或其它砸击变体。
+保留普通地面下砸的全部原版机械、金属和挥动声；仅在该动作第 32 帧追加一次奈叶「Accel」，不污染上捞、横扫、装填、拔刀或其它砸击变体。
 
 | 名称         | 动作或状态                              | 预期行为                                      |
 |--------------|-----------------------------------------|-----------------------------------------------|
-| 普通下砸     | 地面连段中的 `WP_07::STRIKE` / Action 83 | 保留全部原声，并从动作第 1 帧播放一次「Accel」 |
+| 普通下砸     | 地面连段中的 `WP_07::STRIKE` / Action 83 | 保留全部原声，并从动作第 32 帧播放一次「Accel」 |
 | 相邻地面动作 | 上捞、横扫、装填或普通拔刀              | 不播放「Accel」                               |
 | 其它砸击变体 | 跳跃砸击、跳跃装填砸击或快速装填派生    | 不播放「Accel」                               |
 
@@ -22,7 +22,7 @@ target_artifacts:
 
 | 名称          | 音频                                                                                                                               | 播放方式                                                   |
 |---------------|------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------|
-| 奈叶「Accel」 | [nanoha_accel](<../../audio/wp_gun_cmn/overhead_smash/nanoha_accel_01(battle_of_aces.attack_voice.attack_03.2).wav>) | 追加独立媒体；第 1 帧无 delay 开始，以本地 2D 播放且不随机 |
+| 奈叶「Accel」 | [nanoha_accel](<../../audio/wp_gun_cmn/overhead_smash/nanoha_accel_01(battle_of_aces.attack_voice.attack_03.2).wav>) | 追加独立媒体；第 32 帧无 delay 开始，以本地 2D 播放且不随机 |
 
 ## 实现契约
 
@@ -36,15 +36,15 @@ target_artifacts:
 
 | 名称     | LMT                         | Motion | EventGroup   | Slot | 赋值帧 | 原 ReqNo | 新 ReqNo | 预期触发帧 |
 |----------|-----------------------------|--------|--------------|------|--------|----------|----------|------------|
-| 普通下砸 | `original/lmt/w07_00.lmt` | 138    | EventGroup06 | B    | 0      | 6505     | 6593     | 1          |
+| 普通下砸 | `original/lmt/w07_00.lmt` | 128    | EventGroup06 | F    | 0      | 6505     | 6593     | 32         |
 
 | 名称     | WWEV                                      | donor ReqNo | donor Event ID | mode | record SHA-256                                                     | 新 ReqNo | 新 Event ID |
 |----------|-------------------------------------------|-------------|----------------|------|--------------------------------------------------------------------|----------|-------------|
 | 普通下砸 | `original/wwev/hm_wp07_snd_ev.wwev` | 6505        | 1129041389     | 100  | `716e10c4bb841822f8d5b178580980d654f4367e5753403474bc8b50cfb7f2c8` | 6593     | 2866569635  |
 
-- LMT 固定为 v95，原文件 SHA-256 为 `7897e766963b177b2dc157f65204e8a4ef9a35aba4b294c8d0f0635209800b94`。Motion 138
-  共 107 帧，TIML `0x112CA0` 仅由该 Motion 使用；只允许将 EventGroup06 槽 B 赋值帧 0、偏移 `0x113570` 的 ReqNo
-  `6505` 改为 `6593`，并仅在第 1 帧以 trigger mask `0x02` 触发。文件长度不变，本设计 changed-byte count 为 `1`；与
+- LMT 固定为 v95，原文件 SHA-256 为 `7897e766963b177b2dc157f65204e8a4ef9a35aba4b294c8d0f0635209800b94`。Motion 128
+  共 199 帧，TIML `0xEF7C0` 仅由该 Motion 使用；只允许将 EventGroup06 槽 F 赋值帧 0、偏移 `0xF0510` 的 ReqNo
+  `6505` 改为 `6593`，并仅在第 32 帧以 trigger mask `0x20` 触发。文件长度不变，本设计 changed-byte count 为 `1`；与
   `stationary_draw` 合并后累计 changed-byte count 为 `2`。
 - WWEV 固定为 v19，原文件 SHA-256 为 `82c7162f3cb502e3ce3e1e7c1e6ff4823d373a764148d6d761f675420bcd2a0f`。完整克隆第 28
   条、大小 `129` 字节的 donor 记录，只替换 ReqNo 和 Event ID；在 `stationary_draw` 的第 44 条记录之后追加为第 45 条，原有 43
@@ -65,5 +65,5 @@ target_artifacts:
   `2866569635` 分别由 `nanoha_wp_gun_cmn_overhead_smash_accel_media`、`nanoha_wp_gun_cmn_overhead_smash_accel_sound`、
   `nanoha_wp_gun_cmn_overhead_smash_original_action`、`nanoha_wp_gun_cmn_overhead_smash_voice_action` 和
   `nanoha_wp_gun_cmn_overhead_smash_event` 的 `wwise_fnv1()` 值固定，已通过原 Bank 全部 Media/HIRC ID 及
-  `stationary_draw` 已占用 ID 的碰撞检查。端到端读回必须只新增 Motion 138 / 第 1 帧 / EventGroup06 / 槽 B / ReqNo
+  `stationary_draw` 已占用 ID 的碰撞检查。端到端读回必须只新增 Motion 128 / 第 32 帧 / EventGroup06 / 槽 F / ReqNo
   `6593` / mode `100` / Event `2866569635` 路由，并保留既有 Motion 2 / 第 9 帧 / ReqNo `6592` 路由。

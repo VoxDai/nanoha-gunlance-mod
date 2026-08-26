@@ -745,8 +745,8 @@ class EventArtifactTests(unittest.TestCase):
                 (2, 9.0, "B", NEW_REQUEST, 2, NEW_EVENT_ID),
                 (
                     OVERHEAD_MOTION_ID,
-                    1.0,
-                    "B",
+                    32.0,
+                    "F",
                     OVERHEAD_NEW_REQUEST,
                     100,
                     OVERHEAD_NEW_EVENT_ID,

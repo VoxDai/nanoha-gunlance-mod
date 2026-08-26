@@ -205,7 +205,7 @@ class ExplicitPlanTests(unittest.TestCase):
         )
         self.assertEqual(
             LMT_PLAN.expected_output_sha256,
-            "e75b48eb9bb61e2595311b6a026d195f2178bc61729968bd2da3078fbce957d1",
+            "e66a66bb2d77f51fc6b7dfad1353bc95424fcefdbd4509d22994f1340b4b87aa",
         )
         self.assertEqual(
             WWEV_PLAN.expected_output_sha256,

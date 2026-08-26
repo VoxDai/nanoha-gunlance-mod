@@ -16,16 +16,17 @@ OLD_REQUEST = 6470
 NEW_REQUEST = 6592
 REQUEST_OFFSET = 0xCC50
 
-OVERHEAD_MOTION_ID = 138
+OVERHEAD_MOTION_ID = 128
+OVERHEAD_SLOT = "F"
 OVERHEAD_REQUEST_KEYFRAME = 0.0
-OVERHEAD_TRIGGER_FRAMES = (1.0,)
+OVERHEAD_TRIGGER_FRAMES = (32.0,)
 OVERHEAD_OLD_REQUEST = 6505
 OVERHEAD_NEW_REQUEST = 6593
-OVERHEAD_REQUEST_OFFSET = 0x113570
+OVERHEAD_REQUEST_OFFSET = 0xF0510
 
 
 def apply_edits(editor: soundbank_editor.LmtEditor) -> None:
-    """Guard and replace both isolated TIML slot-B request assignments."""
+    """Guard and replace both isolated TIML request assignments."""
 
     editor.replace_request(
         motion_id=MOTION_ID,
@@ -39,7 +40,7 @@ def apply_edits(editor: soundbank_editor.LmtEditor) -> None:
     editor.replace_request(
         motion_id=OVERHEAD_MOTION_ID,
         event_group=EVENT_GROUP,
-        slot=SLOT,
+        slot=OVERHEAD_SLOT,
         request_keyframe_frame=OVERHEAD_REQUEST_KEYFRAME,
         expected_request=OVERHEAD_OLD_REQUEST,
         replacement_request=OVERHEAD_NEW_REQUEST,
@@ -64,7 +65,7 @@ EXPECTED_SUMMARY = soundbank_editor.LmtEditSummary(
         soundbank_editor.LmtRequestEdit(
             motion_id=OVERHEAD_MOTION_ID,
             event_group=EVENT_GROUP,
-            slot=SLOT,
+            slot=OVERHEAD_SLOT,
             request_keyframe_frame=OVERHEAD_REQUEST_KEYFRAME,
             trigger_frames=OVERHEAD_TRIGGER_FRAMES,
             offset=OVERHEAD_REQUEST_OFFSET,
@@ -90,7 +91,7 @@ PLAN = LmtBuildPlan(
     apply_edits=apply_edits,
     expected_summary=EXPECTED_SUMMARY,
     expected_output_sha256=(
-        "e75b48eb9bb61e2595311b6a026d195f2178bc61729968bd2da3078fbce957d1"
+        "e66a66bb2d77f51fc6b7dfad1353bc95424fcefdbd4509d22994f1340b4b87aa"
     ),
 )
 

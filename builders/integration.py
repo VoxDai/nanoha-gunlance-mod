@@ -15,7 +15,13 @@ from .hm_wp07_snd_ev import (
     OVERHEAD_NEW_EVENT_ID,
     OVERHEAD_NEW_REQUEST,
 )
-from .w07_00 import EVENT_GROUP, MOTION_ID, OVERHEAD_MOTION_ID, SLOT
+from .w07_00 import (
+    EVENT_GROUP,
+    MOTION_ID,
+    OVERHEAD_MOTION_ID,
+    OVERHEAD_SLOT,
+    SLOT,
+)
 from .wp_gun_cmn import (
     DONOR_MEDIA_ID,
     DONOR_SOUND_ID,
@@ -167,7 +173,7 @@ STATIONARY_DRAW_VALIDATOR = BundleValidator(
 
 
 def validate_overhead_smash(staged: Mapping[Path, Path]) -> None:
-    """Require the isolated frame-1 overhead-smash route and original audio."""
+    """Require the isolated frame-32 overhead-smash route and original audio."""
 
     validate_stationary_draw(staged)
     lmt = soundbank_editor.LmtFile.from_file(
@@ -188,13 +194,13 @@ def validate_overhead_smash(staged: Mapping[Path, Path]) -> None:
     )
     expected_route = soundbank_editor.TriggeredRequest(
         motion_id=OVERHEAD_MOTION_ID,
-        frame_count=107,
-        timl_offset=0x112CA0,
+        frame_count=199,
+        timl_offset=0xEF7C0,
         shared_timl_motions=(OVERHEAD_MOTION_ID,),
         event_group=EVENT_GROUP,
-        trigger_frame=1.0,
-        trigger_mask=0x02,
-        slot=SLOT,
+        trigger_frame=32.0,
+        trigger_mask=0x20,
+        slot=OVERHEAD_SLOT,
         request_no=OVERHEAD_NEW_REQUEST,
         wwev_record=45,
         wwev_mode=100,
