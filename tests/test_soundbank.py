@@ -198,6 +198,39 @@ class SoundBankEditTests(unittest.TestCase):
         ):
             editor.validate()
 
+    def test_validate_rejects_stop_action_with_missing_target(self) -> None:
+        bank = soundbank_editor.SoundBank.from_file(
+            SOUNDBANK_ROOT / "wp07_gun_epvsp_shell.nbnk"
+        )
+        editor = soundbank_editor.SoundBankEditor(bank)
+        donor_action_id = 743_936_681
+        stop_event_id = 461_444_626
+        new_action_id = 4_294_966_999
+        missing_target_id = 4_294_966_998
+        cloned = bytearray(
+            editor.hirc.object_body(
+                soundbank_editor.HIRC_ACTION, donor_action_id
+            )
+        )
+        struct.pack_into("<I", cloned, 0, new_action_id)
+        struct.pack_into("<I", cloned, 6, missing_target_id)
+        editor.hirc.insert_object(
+            soundbank_editor.HIRC_ACTION,
+            new_action_id,
+            bytes(cloned[4:]),
+            before=(soundbank_editor.HIRC_EVENT, stop_event_id),
+        )
+        editor.hirc.append_event_action(
+            stop_event_id,
+            new_action_id,
+            expected_actions=(donor_action_id,),
+        )
+
+        with self.assertRaisesRegex(
+            soundbank_editor.SoundBankError, "Stop Action.*missing object"
+        ):
+            editor.validate()
+
     def test_validate_rejects_new_switch_with_missing_child(self) -> None:
         editor = soundbank_editor.SoundBankEditor(self.bank)
         donor_container_id = 368_774_789
@@ -300,6 +333,7 @@ class PublicApiCompatibilityTests(unittest.TestCase):
             soundbank_editor.SwitchNodeParams,
         )
         self.assertEqual(soundbank_editor.HIRC_SWITCH_CONTAINER, 0x06)
+        self.assertEqual(soundbank_editor.ACTION_STOP, 0x0103)
         self.assertIs(
             soundbank_editor.EditSummary, soundbank_editor.SoundBankEditSummary
         )

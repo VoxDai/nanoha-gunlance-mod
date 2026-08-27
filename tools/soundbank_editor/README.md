@@ -78,6 +78,39 @@ the end of the Action objects, matching the ordering used by the original Banks.
 Use distinct explicit IDs; `wwise_fnv1(name)` is available when a deterministic
 Wwise-style ID is wanted.
 
+## Clone a native Stop Action
+
+When a custom playback object must follow an existing Event's interruption
+behavior, clone the reviewed native Stop Action instead of reconstructing its
+version-specific fields:
+
+```python
+editor.hirc.clone_stop_action(
+    donor_action_id=743936681,
+    new_action_id=2987046856,
+    new_target_id=4149261730,
+    expected_target_id=60034062,
+    expected_body_sha256=(
+        "137f38d973a5e3b84d35d84146d2b562e21e575abbfee532"
+        "b8531d3583ae0ebd"
+    ),
+    before_event_id=461444626,
+)
+editor.hirc.append_event_action(
+    461444626,
+    2987046856,
+    expected_actions=(743936681,),
+)
+```
+
+This v120-only API requires an exact donor target and full body hash, verifies
+that the new target and serialization anchor exist, and rejects ID collisions.
+It preserves every donor field except the Action ID and target ID, including
+scope, properties, transition, fade curve, exception data, and unknown bytes.
+The clone is serialized before the selected Event; attach it separately with
+the guarded `append_event_action()` API. `SoundBankEditor.validate()` reparses
+Stop Action targets and rejects missing references.
+
 ## Clone a random Container
 
 Create every child object first, then clone a reviewed v120 Random/Sequence

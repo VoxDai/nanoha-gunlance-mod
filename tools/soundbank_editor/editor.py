@@ -7,6 +7,7 @@ from .errors import SoundBankError
 from .hirc import (
     ACTION_PLAY,
     ACTION_PLAY_EVENT,
+    ACTION_STOP,
     HIRC_ACTION,
     HIRC_EVENT,
     HIRC_RANDOM_SEQUENCE_CONTAINER,
@@ -35,6 +36,7 @@ from .soundbank import (
 __all__ = (
     "ACTION_PLAY",
     "ACTION_PLAY_EVENT",
+    "ACTION_STOP",
     "ALIGNMENT",
     "HIRC_ACTION",
     "HIRC_EVENT",

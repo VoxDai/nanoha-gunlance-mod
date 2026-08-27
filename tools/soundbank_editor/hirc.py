@@ -17,6 +17,7 @@ HIRC_ACTION = 0x03
 HIRC_EVENT = 0x04
 HIRC_RANDOM_SEQUENCE_CONTAINER = 0x05
 HIRC_SWITCH_CONTAINER = 0x06
+ACTION_STOP = 0x0103
 ACTION_PLAY = 0x0403
 ACTION_PLAY_EVENT = 0x2103
 
@@ -861,6 +862,75 @@ class HircEditor:
         body += struct.pack("<B", _check_u8(fade_curve, "fade_curve"))
         body += struct.pack("<I", _check_u32(bank_id, "Bank ID"))
         return bytes(body)
+
+    def clone_stop_action(
+        self,
+        donor_action_id: int,
+        new_action_id: int,
+        new_target_id: int,
+        *,
+        expected_target_id: int,
+        expected_body_sha256: str,
+        before_event_id: int,
+        label: str = "clone Stop Action",
+    ) -> HircObject:
+        """Clone a reviewed v120 Stop Action and retarget its playback object."""
+
+        self._require_v120(label)
+        donor = self.object_body(HIRC_ACTION, donor_action_id)
+        if len(donor) < 10:
+            raise SoundBankError(
+                f"{label}: donor Action {donor_action_id} is too short"
+            )
+        action_type = struct.unpack_from("<H", donor, 4)[0]
+        if action_type != ACTION_STOP:
+            raise SoundBankError(
+                f"{label}: donor Action {donor_action_id} is not a Stop Action"
+            )
+        if (
+            not isinstance(expected_body_sha256, str)
+            or len(expected_body_sha256) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in expected_body_sha256
+            )
+        ):
+            raise SoundBankError(
+                f"{label}: expected body SHA-256 must be 64 lowercase hex characters"
+            )
+        actual_sha256 = hashlib.sha256(donor).hexdigest()
+        if actual_sha256 != expected_body_sha256:
+            raise SoundBankError(
+                f"{label}: donor Action {donor_action_id} expected body SHA-256 "
+                f"{expected_body_sha256} but found {actual_sha256}"
+            )
+        expected_target_id = _check_u32(
+            expected_target_id, "expected target object ID"
+        )
+        actual_target_id = struct.unpack_from("<I", donor, 6)[0]
+        if actual_target_id != expected_target_id:
+            raise SoundBankError(
+                f"{label}: donor Action {donor_action_id} expected target object "
+                f"ID {expected_target_id} but found {actual_target_id}"
+            )
+        new_target_id = _check_u32(new_target_id, "new target object ID")
+        if new_target_id not in self._by_id:
+            raise SoundBankError(
+                f"{label}: target object does not exist: {new_target_id}"
+            )
+        before_event_id = _check_u32(before_event_id, "before Event ID")
+        self._get_object(HIRC_EVENT, before_event_id)
+
+        cloned = bytearray(donor)
+        struct.pack_into("<I", cloned, 0, _check_u32(new_action_id, "new Action ID"))
+        struct.pack_into("<I", cloned, 6, new_target_id)
+        return self.insert_object(
+            HIRC_ACTION,
+            new_action_id,
+            bytes(cloned[4:]),
+            before=(HIRC_EVENT, before_event_id),
+            label=label,
+        )
 
     def clone_sound(
         self,

@@ -38,6 +38,20 @@ class OverlayRoute:
     sound_id: int
 
 
+@dataclass(frozen=True)
+class StopRoute:
+    """One guarded native Stop Action clone for a custom playback root."""
+
+    label: str
+    event_id: int
+    expected_actions: tuple[int, ...]
+    donor_action_id: int
+    expected_donor_target_id: int
+    expected_donor_body_sha256: str
+    action_id: int
+    target_id: int
+
+
 FULL_BURST_ROUTES = (
     OverlayRoute(
         "1-shell full burst",
@@ -124,6 +138,29 @@ WYVERNS_FIRE_ROUTES = (
     ),
 )
 
+WYVERNS_FIRE_STOP_ROUTES = (
+    StopRoute(
+        "Wyvern charge Nanoha Starlight",
+        461_444_626,
+        (743_936_681,),
+        743_936_681,
+        60_034_062,
+        "137f38d973a5e3b84d35d84146d2b562e21e575abbfee532b8531d3583ae0ebd",
+        2_987_046_856,
+        4_149_261_730,
+    ),
+    StopRoute(
+        "Wyvern charge Raising Heart Starlight Breaker",
+        461_444_626,
+        (743_936_681, 2_987_046_856),
+        743_936_681,
+        60_034_062,
+        "137f38d973a5e3b84d35d84146d2b562e21e575abbfee532b8531d3583ae0ebd",
+        3_645_807_405,
+        36_215_958,
+    ),
+)
+
 
 def _add_overlay(
     bank: soundbank_editor.SoundBankEditor, route: OverlayRoute
@@ -161,6 +198,27 @@ def _add_overlay(
     )
 
 
+def _add_stop_route(
+    bank: soundbank_editor.SoundBankEditor, route: StopRoute
+) -> None:
+    editor = bank.hirc
+    editor.clone_stop_action(
+        route.donor_action_id,
+        route.action_id,
+        route.target_id,
+        expected_target_id=route.expected_donor_target_id,
+        expected_body_sha256=route.expected_donor_body_sha256,
+        before_event_id=route.event_id,
+        label=f"clone native Stop Action for {route.label}",
+    )
+    editor.append_event_action(
+        route.event_id,
+        route.action_id,
+        expected_actions=route.expected_actions,
+        label=f"append Stop Action for {route.label}",
+    )
+
+
 def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
     """Apply the two reviewed designs in deterministic serialization order."""
 
@@ -172,6 +230,8 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
         )
     for route in (*FULL_BURST_ROUTES, *WYVERNS_FIRE_ROUTES):
         _add_overlay(bank, route)
+    for route in WYVERNS_FIRE_STOP_ROUTES:
+        _add_stop_route(bank, route)
 
 
 EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
@@ -182,7 +242,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (45, STARLIGHT_BREAKER_MEDIA_ID),
         (46, BREAKER_MEDIA_ID),
     ),
-    hirc_changed_bytes=8,
+    hirc_changed_bytes=10,
     added_hirc_objects=(
         (soundbank_editor.HIRC_SOUND, 960_803_121),
         (soundbank_editor.HIRC_ACTION, 3_386_055_930),
@@ -200,9 +260,12 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (soundbank_editor.HIRC_ACTION, 254_514_827),
         (soundbank_editor.HIRC_SOUND, 2_472_459_210),
         (soundbank_editor.HIRC_ACTION, 1_866_468_495),
+        (soundbank_editor.HIRC_ACTION, 2_987_046_856),
+        (soundbank_editor.HIRC_ACTION, 3_645_807_405),
     ),
     resized_hirc_objects=(
         (soundbank_editor.HIRC_EVENT, 302_768_804, 12, 20),
+        (soundbank_editor.HIRC_EVENT, 461_444_626, 12, 20),
         (soundbank_editor.HIRC_EVENT, 680_296_805, 12, 16),
         (soundbank_editor.HIRC_EVENT, 1_124_197_610, 12, 16),
         (soundbank_editor.HIRC_EVENT, 1_765_608_260, 12, 16),
@@ -210,7 +273,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (soundbank_editor.HIRC_EVENT, 2_727_643_338, 12, 16),
         (soundbank_editor.HIRC_EVENT, 3_655_102_100, 12, 16),
     ),
-    hirc_size_delta=624,
+    hirc_size_delta=688,
 )
 
 

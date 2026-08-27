@@ -113,6 +113,23 @@ Each row fixes one route. After the table, specify:
 - exact object counts, changed-byte counts, size deltas, and summary values
   proven by an existing implementation or in-memory prototype.
 
+For every custom playback route, inspect the native Play target and its parent
+Container chain for Stop Actions referenced by native Events. When a matching
+native Stop route exists and the user has not explicitly requested that the
+custom sound finish uninterrupted, clone each matching native Stop Action for
+each custom playback root. Retarget only the clone; preserve its scope,
+properties, transition, fade curve, exceptions, and unknown bytes. Add this
+table inside `实现契约` only when at least one matching Stop route exists:
+
+```markdown
+| 名称 | Stop Event ID | donor Stop Action ID / target | scope | transition / fade | exceptions | 新 Stop Action ID | 新 Stop target |
+```
+
+Record the donor Action's complete body SHA-256, the Stop Event's original and
+final Action lists, collision-checked clone IDs, custom root targets, and the
+requirement that every cloned Action serialize before its Stop Event. If no
+matching native Stop route exists, do not create a Stop Action.
+
 New Wwise and media IDs must be explicit collision-checked unsigned 32-bit
 values. Derive stable candidates with
 `tools.soundbank_editor.wwise_fnv1()`, verify them against all target Media
@@ -147,7 +164,9 @@ Do not reduce a cross-format route to its final Event ID.
    differing existing destination.
 4. Inspect every original through `tools.soundbank_editor`; use
    `soundbank-workflow` and a task-specific wwiser dump under `/tmp` when
-   topology needs deeper proof. Resolve LMT routes with
+   topology needs deeper proof. For each custom playback route, complete the
+   native Stop Action audit described above before fixing its HIRC contract.
+   Resolve LMT routes with
    `LmtFile.triggered_requests()` and the matching `WwevFile`.
 5. Verify every final audio link, measure its unrounded LUFS-I, and validate its format and filename. Stop and report
    ordinary WAVs outside the loudness range or media contract; document any justified special-audio exception. Build an

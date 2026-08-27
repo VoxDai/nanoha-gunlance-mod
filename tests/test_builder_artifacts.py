@@ -59,6 +59,7 @@ from builders.wp07_gun_epvsp_shell import (
     WYVERN_LEFT_EVENT_ID,
     WYVERN_LEFT_ORIGINAL_ACTION_ID,
     WYVERNS_FIRE_ROUTES,
+    WYVERNS_FIRE_STOP_ROUTES,
 )
 from builders.wp_cmn_epvsp import (
     DONOR_MEDIA_ID as SHARPEN_DONOR_MEDIA_ID,
@@ -179,6 +180,12 @@ class Wp07SoundBankTests(SoundBankArtifactTestCase):
 
     def test_exact_summary_media_order_and_preservation(self) -> None:
         self.assertEqual(self.editor.summary, WP07_PLAN.expected_summary)
+        self.assertEqual(len(self.original_hirc.objects()), 181)
+        self.assertEqual(len(self.rebuilt_hirc.objects()), 199)
+        self.assertEqual(
+            len(self.rebuilt.hirc_payload) - len(self.original.hirc_payload),
+            688,
+        )
         self.assertEqual(
             tuple(entry.media_id for entry in self.rebuilt.entries[-4:]),
             tuple(item.media_id for item in WP07_PLAN.media_additions),
@@ -220,6 +227,37 @@ class Wp07SoundBankTests(SoundBankArtifactTestCase):
                 sound,
                 standard_voice_sound_body(route.sound_id, route.media_id),
             )
+
+    def test_charge_stop_actions_clone_native_interruption_exactly(self) -> None:
+        positions = {
+            (item.object_type, item.object_id): item.index
+            for item in self.rebuilt_hirc.objects()
+        }
+        final_actions: dict[int, tuple[int, ...]] = {}
+        for route in WYVERNS_FIRE_STOP_ROUTES:
+            final_actions[route.event_id] = route.expected_actions + (
+                route.action_id,
+            )
+            donor = self.original_hirc.object_body(
+                soundbank_editor.HIRC_ACTION, route.donor_action_id
+            )
+            expected = bytearray(donor)
+            struct.pack_into("<I", expected, 0, route.action_id)
+            struct.pack_into("<I", expected, 6, route.target_id)
+            actual = self.rebuilt_hirc.object_body(
+                soundbank_editor.HIRC_ACTION, route.action_id
+            )
+            self.assertEqual(actual, bytes(expected))
+            self.assertEqual(
+                struct.unpack_from("<H", actual, 4)[0],
+                soundbank_editor.ACTION_STOP,
+            )
+            self.assertLess(
+                positions[(soundbank_editor.HIRC_ACTION, route.action_id)],
+                positions[(soundbank_editor.HIRC_EVENT, route.event_id)],
+            )
+        for event_id, actions in final_actions.items():
+            self.assertEqual(self.rebuilt_hirc.event_actions(event_id), actions)
 
     def test_left_breaker_path_is_byte_exact_and_has_no_custom_voice(self) -> None:
         self.assertEqual(

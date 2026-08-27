@@ -47,6 +47,12 @@ DONOR_SWITCH_TOPOLOGY = soundbank_editor.SwitchContainerTopology(
 DONOR_SWITCH_BODY_SHA256 = (
     "a6df54f2d29b79482420ff8a17420b0952cbb64589e03dde1358c02ab99043bb"
 )
+STOP_EVENT_ID = 461_444_626
+STOP_DONOR_ACTION_ID = 743_936_681
+STOP_DONOR_TARGET_ID = 60_034_062
+STOP_DONOR_BODY_SHA256 = (
+    "137f38d973a5e3b84d35d84146d2b562e21e575abbfee532b8531d3583ae0ebd"
+)
 
 
 class HircEditorTests(unittest.TestCase):
@@ -110,6 +116,134 @@ class HircEditorTests(unittest.TestCase):
         self.assertEqual(play_event.hex(), "2674460b03218937e400000000")
         play = editor.create_play_action(101454437, 1004943696, 4182706408)
         self.assertEqual(play.hex(), "65120c0603045039e63b00000004e8084ff9")
+
+    def test_clone_stop_action_is_byte_exact_and_serialized_before_event(self) -> None:
+        bank = soundbank_editor.SoundBank.from_file(
+            SOUNDBANK_ROOT / "wp07_gun_epvsp_shell.nbnk"
+        )
+        editor = soundbank_editor.SoundBankEditor(bank)
+        new_action_id = 4_294_966_999
+        new_target_id = 990_545_535
+        donor = editor.hirc.object_body(
+            soundbank_editor.HIRC_ACTION, STOP_DONOR_ACTION_ID
+        )
+
+        cloned = editor.hirc.clone_stop_action(
+            STOP_DONOR_ACTION_ID,
+            new_action_id,
+            new_target_id,
+            expected_target_id=STOP_DONOR_TARGET_ID,
+            expected_body_sha256=STOP_DONOR_BODY_SHA256,
+            before_event_id=STOP_EVENT_ID,
+        )
+        editor.hirc.append_event_action(
+            STOP_EVENT_ID,
+            new_action_id,
+            expected_actions=(STOP_DONOR_ACTION_ID,),
+        )
+
+        expected = bytearray(donor)
+        struct.pack_into("<I", expected, 0, new_action_id)
+        struct.pack_into("<I", expected, 6, new_target_id)
+        self.assertEqual(bytes(cloned.body), bytes(expected))
+        self.assertEqual(
+            editor.hirc.object_body(soundbank_editor.HIRC_ACTION, new_action_id),
+            bytes(expected),
+        )
+        self.assertEqual(
+            editor.hirc.event_actions(STOP_EVENT_ID),
+            (STOP_DONOR_ACTION_ID, new_action_id),
+        )
+        positions = {
+            (item.object_type, item.object_id): item.index
+            for item in editor.hirc.objects()
+        }
+        self.assertLess(
+            positions[(soundbank_editor.HIRC_ACTION, new_action_id)],
+            positions[(soundbank_editor.HIRC_EVENT, STOP_EVENT_ID)],
+        )
+        rebuilt = editor.validate()
+        reparsed = soundbank_editor.HircEditor(
+            rebuilt.hirc_payload, version=rebuilt.version
+        )
+        self.assertEqual(
+            reparsed.object_body(soundbank_editor.HIRC_ACTION, new_action_id),
+            bytes(expected),
+        )
+
+    def test_clone_stop_action_guards_donor_target_hash_and_references(self) -> None:
+        bank = soundbank_editor.SoundBank.from_file(
+            SOUNDBANK_ROOT / "wp07_gun_epvsp_shell.nbnk"
+        )
+        new_action_id = 4_294_966_999
+        new_target_id = 990_545_535
+
+        def clone(editor, **overrides):
+            arguments = {
+                "donor_action_id": STOP_DONOR_ACTION_ID,
+                "new_action_id": new_action_id,
+                "new_target_id": new_target_id,
+                "expected_target_id": STOP_DONOR_TARGET_ID,
+                "expected_body_sha256": STOP_DONOR_BODY_SHA256,
+                "before_event_id": STOP_EVENT_ID,
+            }
+            return editor.hirc.clone_stop_action(**(arguments | overrides))
+
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "not a Stop"):
+            play_editor = soundbank_editor.SoundBankEditor(bank)
+            play_body = play_editor.hirc.object_body(
+                soundbank_editor.HIRC_ACTION, 51_759_545
+            )
+            clone(
+                play_editor,
+                donor_action_id=51_759_545,
+                expected_body_sha256=hashlib.sha256(play_body).hexdigest(),
+            )
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "body SHA-256"):
+            clone(
+                soundbank_editor.SoundBankEditor(bank),
+                expected_body_sha256="00" * 32,
+            )
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "expected target"):
+            clone(
+                soundbank_editor.SoundBankEditor(bank),
+                expected_target_id=STOP_DONOR_TARGET_ID + 1,
+            )
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "does not exist"):
+            clone(
+                soundbank_editor.SoundBankEditor(bank),
+                new_target_id=4_294_966_998,
+            )
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "ID already exists"):
+            clone(
+                soundbank_editor.SoundBankEditor(bank),
+                new_action_id=STOP_DONOR_ACTION_ID,
+            )
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "object not found"):
+            clone(
+                soundbank_editor.SoundBankEditor(bank),
+                before_event_id=4_294_966_998,
+            )
+
+        drifted_event = soundbank_editor.SoundBankEditor(bank)
+        clone(drifted_event)
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "expected actions"):
+            drifted_event.hirc.append_event_action(
+                STOP_EVENT_ID,
+                new_action_id,
+                expected_actions=(),
+            )
+
+        unsupported = soundbank_editor.HircEditor(bank.hirc_payload, version=121)
+        with self.assertRaisesRegex(soundbank_editor.SoundBankError, "requires Wwise v120"):
+            unsupported.clone_stop_action(
+                STOP_DONOR_ACTION_ID,
+                new_action_id,
+                new_target_id,
+                expected_target_id=STOP_DONOR_TARGET_ID,
+                expected_body_sha256=STOP_DONOR_BODY_SHA256,
+                before_event_id=STOP_EVENT_ID,
+            )
 
     def test_event_can_be_rebuilt_more_than_once(self) -> None:
         event_id = 30

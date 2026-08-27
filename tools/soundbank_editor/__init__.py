@@ -4,6 +4,7 @@ from .errors import EditorError, LmtError, SoundBankError, WwevError
 from .hirc import (
     ACTION_PLAY,
     ACTION_PLAY_EVENT,
+    ACTION_STOP,
     HIRC_ACTION,
     HIRC_EVENT,
     HIRC_RANDOM_SEQUENCE_CONTAINER,
@@ -55,6 +56,7 @@ from .wwev import (
 __all__ = (
     "ACTION_PLAY",
     "ACTION_PLAY_EVENT",
+    "ACTION_STOP",
     "ALIGNMENT",
     "EditorError",
     "EVENT_GROUP_HASHES",

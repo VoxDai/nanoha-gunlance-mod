@@ -13,6 +13,7 @@ from .errors import SoundBankError
 from .hirc import (
     ACTION_PLAY,
     ACTION_PLAY_EVENT,
+    ACTION_STOP,
     HIRC_ACTION,
     HIRC_EVENT,
     HIRC_RANDOM_SEQUENCE_CONTAINER,
@@ -574,6 +575,11 @@ class SoundBankEditor:
                     if action_type == ACTION_PLAY and target_id not in object_ids:
                         raise SoundBankError(
                             f"Play Action {item.object_id} references missing object "
+                            f"{target_id}"
+                        )
+                    if action_type == ACTION_STOP and target_id not in object_ids:
+                        raise SoundBankError(
+                            f"Stop Action {item.object_id} references missing object "
                             f"{target_id}"
                         )
             media_ids = {entry.media_id for entry in rebuilt.entries}
