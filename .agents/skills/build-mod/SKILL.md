@@ -57,16 +57,18 @@ Every full dry-run and release build uses a task-specific temporary tree and:
 
 1. validates unique registered targets, design IDs, safe source/target paths,
    original hashes, Bank IDs, media identities, audio inputs, callbacks, exact
-   summaries, and LMT/WWEV output hashes;
+   summaries, and editor guards;
 2. converts declared WAVs, applies declared media edits and guarded callbacks,
    then reparses every artifact;
 3. runs wwiser and pyvgmstream validation for changed SoundBanks and media;
 4. runs every `BundleValidator` against the staged nativePC files;
 5. publishes only after the complete set succeeds.
 
-Report artifact names, design IDs, target paths, summaries, output hashes, and
-the validator that failed. Structural success does not replace in-game trigger,
-mix, spatialization, interruption, and Mod-conflict testing.
+Report artifact names, design IDs, target paths, summaries, observed output
+hashes when artifacts are published, and the validator that failed. Output
+hashes are diagnostic metadata, not fixed acceptance guards. Structural success
+does not replace in-game trigger, mix, spatialization, interruption, and
+Mod-conflict testing.
 
 ## Failure and Ownership Boundaries
 
@@ -76,5 +78,4 @@ mix, spatialization, interruption, and Mod-conflict testing.
 - Keep converted WEMs, decoded WAVs, wwiser dumps, and semantic diffs out of
   `output/` and `release/`.
 - Route incomplete or incorrect design contracts to `audio-design`. Route
-  implementation, registry, summary, output-hash, or validator drift to
-  `design-implement`.
+  implementation, registry, summary, or validator drift to `design-implement`.

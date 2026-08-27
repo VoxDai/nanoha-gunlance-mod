@@ -87,9 +87,6 @@ PLAN = WwevBuildPlan(
     ),
     apply_edits=apply_edits,
     expected_summary=EXPECTED_SUMMARY,
-    expected_output_sha256=(
-        "1818d0547237ef6bed7900ad3fa2bbecda2e040910b88760800c6fdc9b7a6222"
-    ),
 )
 
 

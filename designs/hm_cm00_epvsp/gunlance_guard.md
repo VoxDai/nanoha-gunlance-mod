@@ -64,10 +64,9 @@ Heart「Protection」语音。其它武器命中同一 Event 时只经过 10 ms 
 - 外部父级由 `original/nbnk/pl_act_vo_event.nbnk` 锁定：文件 SHA-256
   `4830c1c0394a5af14f52adf8d7b96463032b7631f0e20061ee6a829da6358582`、Bank ID `3755575407`、Actor-Mixer `209038110` body
   SHA-256 `3f95ef076e1c9119c81973022288e86d273d5dd4de8501fc0aad26c218584a80`；该参考 Bank 不打入 Mod。
-- 依次追加 DIDX #141 / Media `141209263`、#142 / Media `440767416`、#143 / Media `2901559960`。三份运行时媒体均为 mono
-  Wwise PCM；DIDX #143 WEM SHA-256 为 `21678436497ff0733dc0984150cc8a318d37bc74e0e21be2cbc4f4d7db7c8a75`。
+- 依次追加 DIDX #141 / Media `141209263`、#142 / Media `440767416`、#143 / Media `2901559960`。三份运行时媒体均为
+  48 kHz、16-bit mono Wwise PCM，并由构建读回验证格式。
 - 新 ID `4197300369`、`4010844647`、`3163089818`、`2154199438`、`640829561`、`3060148569`、`141209263`、`440767416`、
   `2901559960` 已通过原 Bank 全部 HIRC 与 Media ID 碰撞检查。读回摘要固定为：媒体 `140→143`、HIRC 对象 `597→603`、HIRC
   payload `33313→33734`、Event body `12→16`、changed-byte count `11`、HIRC 增量 `+421`。新增 HIRC 对象为三个 Sound、Random
-  `3163089818`、Switch `4010844647`、Action `4197300369`；除 DIDX、DATA、HIRC 外其它内容保持 byte-exact。实测候选 04 Bank
-  SHA-256 为 `e61c7bccccd630d903ac36245a4d135374fd8fb6bdbcfd5c536929d8f63e283e`。
+  `3163089818`、Switch `4010844647`、Action `4197300369`；除 DIDX、DATA、HIRC 外其它内容保持 byte-exact。

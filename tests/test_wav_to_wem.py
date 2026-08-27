@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
 import struct
 import tempfile
@@ -13,9 +12,6 @@ from tools.utils.wav_to_wem import (
     build_wem,
     convert_to_raw,
 )
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
 
 def fmt_fields(wem: bytes) -> tuple[int, int, int, int, int, int, bytes]:
     offset = wem.index(b"fmt ") + 8
@@ -65,17 +61,6 @@ class WavToWemTests(unittest.TestCase):
             mono = convert_to_raw(source, root / "mono.pcm", 1)
         self.assertEqual(stereo, stereo_pcm)
         self.assertEqual(struct.unpack(f"<{len(samples)}h", mono), samples)
-
-    def test_guard_silence_converts_to_the_accepted_mono_wem(self) -> None:
-        source = PROJECT_ROOT / "audio/hm_cm00_epvsp/silence_10ms.wav"
-        with tempfile.TemporaryDirectory(prefix="guard-silence-wem-test.") as directory:
-            raw = convert_to_raw(source, Path(directory) / "silence.pcm", 1)
-        self.assertEqual(raw, bytes(960))
-        self.assertEqual(
-            hashlib.sha256(build_wem(raw, 1)).hexdigest(),
-            "21678436497ff0733dc0984150cc8a318d37bc74e0e21be2cbc4f4d7db7c8a75",
-        )
-
 
 if __name__ == "__main__":
     unittest.main()

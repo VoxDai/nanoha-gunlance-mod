@@ -273,7 +273,6 @@ class LmtBuildPlan:
     expected_source_sha256: str
     apply_edits: LmtEditHook
     expected_summary: soundbank_editor.LmtEditSummary
-    expected_output_sha256: str
 
     def __post_init__(self) -> None:
         _plan_identity(self.name, self.design_ids, self.apply_edits)
@@ -290,11 +289,6 @@ class LmtBuildPlan:
             "expected_source_sha256",
             _sha256_guard(self.expected_source_sha256, "source LMT SHA-256"),
         )
-        object.__setattr__(
-            self,
-            "expected_output_sha256",
-            _sha256_guard(self.expected_output_sha256, "output LMT SHA-256"),
-        )
         if not isinstance(self.expected_summary, soundbank_editor.LmtEditSummary):
             raise TypeError("expected_summary must be LmtEditSummary")
 
@@ -310,7 +304,6 @@ class WwevBuildPlan:
     expected_source_sha256: str
     apply_edits: WwevEditHook
     expected_summary: soundbank_editor.WwevEditSummary
-    expected_output_sha256: str
 
     def __post_init__(self) -> None:
         _plan_identity(self.name, self.design_ids, self.apply_edits)
@@ -326,11 +319,6 @@ class WwevBuildPlan:
             self,
             "expected_source_sha256",
             _sha256_guard(self.expected_source_sha256, "source WWEV SHA-256"),
-        )
-        object.__setattr__(
-            self,
-            "expected_output_sha256",
-            _sha256_guard(self.expected_output_sha256, "output WWEV SHA-256"),
         )
         if not isinstance(self.expected_summary, soundbank_editor.WwevEditSummary):
             raise TypeError("expected_summary must be WwevEditSummary")
@@ -451,10 +439,6 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def _bytes_sha256(payload: bytes) -> str:
-    return hashlib.sha256(payload).hexdigest()
 
 
 def run_tool(
@@ -666,12 +650,6 @@ def prepare_plan(plan: ArtifactBuildPlan, project_root: Path) -> PreparedArtifac
             summary = editor.summary
             if summary != plan.expected_summary:
                 raise _summary_mismatch(plan.name, plan.expected_summary, summary)
-            actual_output = _bytes_sha256(editor.build())
-            if actual_output != plan.expected_output_sha256:
-                raise BuildError(
-                    f"{plan.name}: output SHA-256 expected {plan.expected_output_sha256} "
-                    f"but found {actual_output}"
-                )
         else:
             original = soundbank_editor.WwevFile.from_file(source)
             editor = soundbank_editor.WwevEditor(original)
@@ -680,12 +658,6 @@ def prepare_plan(plan: ArtifactBuildPlan, project_root: Path) -> PreparedArtifac
             summary = editor.summary
             if summary != plan.expected_summary:
                 raise _summary_mismatch(plan.name, plan.expected_summary, summary)
-            actual_output = _bytes_sha256(editor.build())
-            if actual_output != plan.expected_output_sha256:
-                raise BuildError(
-                    f"{plan.name}: output SHA-256 expected {plan.expected_output_sha256} "
-                    f"but found {actual_output}"
-                )
     except soundbank_editor.EditorError as error:
         raise BuildError(f"{plan.name}: invalid artifact edit plan: {error}") from error
     return PreparedArtifact(plan, source, original, summary)
@@ -963,8 +935,6 @@ def build_plan(
             editor.write_atomic(stage)
             if editor.summary != plan.expected_summary:
                 raise _summary_mismatch(plan.name, plan.expected_summary, editor.summary)
-            if sha256(stage) != plan.expected_output_sha256:
-                raise BuildError(f"{plan.name}: staged LMT SHA-256 differs from its plan")
             if soundbank_editor.LmtFile.from_file(stage).to_bytes() != editor.build():
                 raise BuildError(f"{plan.name}: staged LMT failed byte-exact read-back")
         else:
@@ -975,8 +945,6 @@ def build_plan(
             editor.write_atomic(stage)
             if editor.summary != plan.expected_summary:
                 raise _summary_mismatch(plan.name, plan.expected_summary, editor.summary)
-            if sha256(stage) != plan.expected_output_sha256:
-                raise BuildError(f"{plan.name}: staged WWEV SHA-256 differs from its plan")
             if soundbank_editor.WwevFile.from_file(stage).to_bytes() != editor.build():
                 raise BuildError(f"{plan.name}: staged WWEV failed byte-exact read-back")
     except soundbank_editor.EditorError as error:

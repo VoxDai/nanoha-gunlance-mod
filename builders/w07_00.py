@@ -90,9 +90,6 @@ PLAN = LmtBuildPlan(
     ),
     apply_edits=apply_edits,
     expected_summary=EXPECTED_SUMMARY,
-    expected_output_sha256=(
-        "e66a66bb2d77f51fc6b7dfad1353bc95424fcefdbd4509d22994f1340b4b87aa"
-    ),
 )
 
 

@@ -48,8 +48,8 @@ target_artifacts:
   `stationary_draw` 合并后累计 changed-byte count 为 `2`。
 - WWEV 固定为 v19，原文件 SHA-256 为 `82c7162f3cb502e3ce3e1e7c1e6ff4823d373a764148d6d761f675420bcd2a0f`。完整克隆第 28
   条、大小 `129` 字节的 donor 记录，只替换 ReqNo 和 Event ID；在 `stationary_draw` 的第 44 条记录之后追加为第 45 条，原有 43
-  条记录、依赖字符串及顺序保持 byte-exact。donor ReqNo `6505` 只有一条 WWEV 记录，不展开成对路径；ReqNo `6593` 已确认在
-  `assets/chunk/` 的 1300 个 WWEV 中未占用。
+  条记录、依赖字符串及顺序保持 byte-exact。donor ReqNo `6505` 只有一条 WWEV 记录，不展开成对路径；ReqNo `6593` 在正式输入
+  `original/wwev/hm_wp07_snd_ev.wwev` 中不存在，并由 `append_cloned_record()` 的碰撞 guard 锁定。
 - 原 Event `1129041389` 的 Action 列表保持 `948030399`，原路由为 Action `948030399` → Container `968655714` →
   Sound `959908164` / Media `554875117`。新 Event `2866569635` 的 Action 列表固定为 `2557911997, 3750542142`：第一条为
   PlayEvent，委托完整原 Event；第二条为无 delay 的 Play，目标新 Sound `1643477631`。两条 Action 和新 Event 必须按 Wwise

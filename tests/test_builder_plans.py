@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+import tempfile
 import unittest
+from unittest import mock
+import wave
 
 import builders.base as builder_base
-from builders.__main__ import MOD_PLAN
 from builders.base import (
     BuildError,
+    BundleValidator,
     MediaAddition,
     MediaReplacement,
     ModBuildPlan,
@@ -16,25 +19,33 @@ from builders.base import (
     prepare_plan,
     validate_registry,
 )
-from builders.hm_cm00_epvsp import PLAN as GUARD_PLAN
-from builders.hm_wp07_snd_ev import PLAN as WWEV_PLAN
-from builders.w07_00 import PLAN as LMT_PLAN
-from builders.wp07_gun_epvsp_shell import PLAN as WP07_PLAN
-from builders.wp_cmn_epvsp import PLAN as SHARPEN_PLAN
-from builders.wp_gun_cmn import PLAN as WP_GUN_PLAN
-from builders.voice_standard import STANDARD_VOICE_REFERENCE_INPUTS
 from tools import soundbank_editor
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+from ._builder_fixtures import (
+    ADDED_MEDIA_ID,
+    TEST_DESIGN_ID,
+    TEST_MEDIA_ID,
+    SyntheticBuilderProject,
+)
 
 
 def append_undeclared_media(editor: soundbank_editor.SoundBankEditor) -> None:
-    editor.append_media(242_768_048, editor.original.extract_media(index=1))
+    editor.append_media(
+        ADDED_MEDIA_ID,
+        editor.original.extract_media(index=1),
+    )
 
 
-class ExplicitPlanTests(unittest.TestCase):
-    def test_public_plan_api_has_no_mapping_parser_types(self) -> None:
+class GenericPlanTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory(prefix="builder-plan-test.")
+        self.root = Path(self.temporary.name).resolve()
+        self.project = SyntheticBuilderProject.create(self.root)
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def test_public_plan_api_is_generic(self) -> None:
         for name in (
             "MediaReplacement",
             "MediaAddition",
@@ -49,312 +60,243 @@ class ExplicitPlanTests(unittest.TestCase):
         for removed in ("MappingInfo", "MappingMediaOverlay", "parse_mapping"):
             self.assertFalse(hasattr(builder_base, removed))
 
-    def test_registry_is_exactly_the_six_design_artifacts(self) -> None:
-        validate_registry(MOD_PLAN)
-        self.assertEqual(len(MOD_PLAN.artifacts), 6)
-        self.assertEqual(
-            {plan.name for plan in MOD_PLAN.artifacts},
-            {
-                "wp07_gun_epvsp_shell",
-                "wp_cmn_epvsp",
-                "wp_gun_cmn",
-                "hm_cm00_epvsp",
-                "w07_00",
-                "hm_wp07_snd_ev",
-            },
-        )
-        self.assertEqual(
-            {str(plan.target) for plan in MOD_PLAN.artifacts},
-            {
-                "sound/wwise/Windows/wp07_gun_epvsp_shell.nbnk",
-                "sound/wwise/Windows/wp_cmn_epvsp.nbnk",
-                "sound/wwise/Windows/wp_gun_cmn.nbnk",
-                "sound/wwise/Windows/hm_cm00_epvsp.nbnk",
-                "hm/wp/wp07/mot/w07_00/w07_00.lmt",
-                "sound/pl/hm_wp07_snd_ev.wwev",
-            },
-        )
-        self.assertEqual(
-            {design for plan in MOD_PLAN.artifacts for design in plan.design_ids},
-            {
-                "wp07_gun_epvsp_shell.full_burst",
-                "wp07_gun_epvsp_shell.wyverns_fire",
-                "wp_cmn_epvsp.sharpen",
-                "wp_gun_cmn.stationary_draw",
-                "wp_gun_cmn.overhead_smash",
-                "wp_gun_cmn.reload",
-                "hm_cm00_epvsp.gunlance_guard",
-            },
-        )
-        self.assertEqual(
-            tuple(validator.design_id for validator in MOD_PLAN.validators),
-            (
-                "wp_gun_cmn.stationary_draw",
-                "wp_gun_cmn.overhead_smash",
-            ),
-        )
-        for removed in (
-            "cm_hitmark_epvsp.py",
-            "pl_prop_cmn.py",
-        ):
-            self.assertFalse((PROJECT_ROOT / "builders" / removed).exists())
+    def test_declared_paths_channels_and_collection_invariants(self) -> None:
+        bank = self.project.soundbank_plan()
+        lmt = self.project.lmt_plan()
+        addition = bank.media_additions[0]
 
-    def test_gunlance_guard_plan_identity_and_media_are_explicit(self) -> None:
-        self.assertEqual(
-            GUARD_PLAN.design_ids,
-            ("hm_cm00_epvsp.gunlance_guard",),
-        )
-        self.assertEqual(
-            str(GUARD_PLAN.source),
-            "original/nbnk/hm_cm00_epvsp.nbnk",
-        )
-        self.assertEqual(
-            str(GUARD_PLAN.target),
-            "sound/wwise/Windows/hm_cm00_epvsp.nbnk",
-        )
-        self.assertEqual(GUARD_PLAN.expected_bank_id, 707_566_772)
-        self.assertEqual(
-            GUARD_PLAN.expected_source_sha256,
-            "73b52c1a69532f0a84ab6dfa2e95bd804bf8affc5af77450786d700c177a9977",
-        )
-        self.assertEqual(
-            tuple(
-                (
-                    item.expected_index,
-                    item.media_id,
-                    str(item.source_audio),
-                    item.wem_channels,
-                )
-                for item in GUARD_PLAN.media_additions
-            ),
-            (
-                (
-                    141,
-                    141_209_263,
-                    "audio/hm_cm00_epvsp/"
-                    "raising_heart_protection_01(movie_1st.raising_heart."
-                    "protection_01.1).wav",
-                    1,
-                ),
-                (
-                    142,
-                    440_767_416,
-                    "audio/hm_cm00_epvsp/"
-                    "raising_heart_protection_02(movie_1st.raising_heart."
-                    "protection_02.1).wav",
-                    1,
-                ),
-                (
-                    143,
-                    2_901_559_960,
-                    "audio/hm_cm00_epvsp/silence_10ms.wav",
-                    1,
-                ),
-            ),
-        )
-
-    def test_wp_gun_shared_plans_and_media_are_explicit(self) -> None:
-        cross_artifact_designs = (
-            "wp_gun_cmn.stationary_draw",
-            "wp_gun_cmn.overhead_smash",
-        )
-        self.assertEqual(
-            WP_GUN_PLAN.design_ids,
-            cross_artifact_designs + ("wp_gun_cmn.reload",),
-        )
-        for plan in (LMT_PLAN, WWEV_PLAN):
-            self.assertEqual(plan.design_ids, cross_artifact_designs)
-        self.assertEqual(
-            (
-                str(WP_GUN_PLAN.source),
-                str(WP_GUN_PLAN.target),
-                WP_GUN_PLAN.expected_bank_id,
-                WP_GUN_PLAN.expected_source_sha256,
-            ),
-            (
-                "original/nbnk/wp_gun_cmn.nbnk",
-                "sound/wwise/Windows/wp_gun_cmn.nbnk",
-                939_294_496,
-                "bba3b716b0bbaf06dfe562adf9867c43dd78b29dd5132b150f1f08142b54cfa1",
-            ),
-        )
-        self.assertEqual(
-            (str(LMT_PLAN.source), str(LMT_PLAN.target)),
-            (
-                "original/lmt/w07_00.lmt",
-                "hm/wp/wp07/mot/w07_00/w07_00.lmt",
-            ),
-        )
-        self.assertEqual(
-            (str(WWEV_PLAN.source), str(WWEV_PLAN.target)),
-            (
-                "original/wwev/hm_wp07_snd_ev.wwev",
-                "sound/pl/hm_wp07_snd_ev.wwev",
-            ),
-        )
-        self.assertEqual(
-            tuple(
-                (
-                    item.expected_index,
-                    item.media_id,
-                    str(item.source_audio),
-                    item.wem_channels,
-                )
-                for item in WP_GUN_PLAN.media_additions
-            ),
-            (
-                (
-                    34,
-                    863_865_614,
-                    "audio/wp_gun_cmn/stationary_draw/"
-                    "raising_heart_standby_ready_01(movie_1st.raising_heart."
-                    "standby_ready_set_up.1).wav",
-                    1,
-                ),
-                (
-                    35,
-                    1_280_643_898,
-                    "audio/wp_gun_cmn/overhead_smash/"
-                    "nanoha_accel_01(battle_of_aces.attack_voice.attack_03.2).wav",
-                    1,
-                ),
-                (
-                    36,
-                    1_284_288_484,
-                    "audio/wp_gun_cmn/reload/"
-                    "raising_heart_reload_01(movie_2nd_as.raising_heart.reload.1).wav",
-                    1,
-                ),
-            ),
-        )
-        self.assertEqual(
-            LMT_PLAN.expected_output_sha256,
-            "e66a66bb2d77f51fc6b7dfad1353bc95424fcefdbd4509d22994f1340b4b87aa",
-        )
-        self.assertEqual(
-            WWEV_PLAN.expected_output_sha256,
-            "1818d0547237ef6bed7900ad3fa2bbecda2e040910b88760800c6fdc9b7a6222",
-        )
-
-    def test_all_sources_hashes_and_summaries_preflight(self) -> None:
-        prepared = prepare_all_plans(MOD_PLAN, PROJECT_ROOT)
-        self.assertEqual(
-            [item.plan.name for item in prepared],
-            [item.name for item in MOD_PLAN.artifacts],
-        )
-        for item in prepared:
-            self.assertEqual(item.preview_summary, item.plan.expected_summary)
-
-    def test_declared_paths_reject_escape_and_nativepc_prefix(self) -> None:
         with self.assertRaisesRegex(ValueError, "safe project-relative"):
             MediaAddition(1, 1, "../voice.wav")
         with self.assertRaisesRegex(ValueError, "must not include"):
-            replace(
-                WP07_PLAN,
-                target="nativePC/sound/wwise/Windows/wp07_gun_epvsp_shell.nbnk",
-            )
+            replace(lmt, target="nativePC/motion/test.lmt")
         with self.assertRaisesRegex(ValueError, "safe project-relative"):
-            replace(WP07_PLAN, target="../outside.nbnk")
+            replace(lmt, source="../outside.lmt")
         with self.assertRaisesRegex(ValueError, "below original"):
             ReferenceInput("assets/chunk/unsafe.nbnk", "00" * 32)
         with self.assertRaisesRegex(ValueError, "below original"):
             ReferenceInput("original/../unsafe.nbnk", "00" * 32)
+        for invalid_channels in (3, True):
+            with self.subTest(wem_channels=invalid_channels):
+                with self.assertRaisesRegex(ValueError, "wem_channels"):
+                    replace(addition, wem_channels=invalid_channels)
 
-    def test_standard_voice_channels_and_reference_inputs_are_explicit(self) -> None:
-        for plan in (WP07_PLAN, SHARPEN_PLAN, WP_GUN_PLAN, GUARD_PLAN):
-            self.assertEqual(plan.reference_inputs, STANDARD_VOICE_REFERENCE_INPUTS)
-            self.assertTrue(plan.media_additions)
-            self.assertEqual(
-                {item.wem_channels for item in plan.media_additions},
-                {1},
-            )
-        with self.assertRaisesRegex(ValueError, "wem_channels"):
-            replace(SHARPEN_PLAN.media_additions[0], wem_channels=3)
-        with self.assertRaisesRegex(ValueError, "wem_channels"):
-            replace(SHARPEN_PLAN.media_additions[0], wem_channels=True)
-
-    def test_reference_sha_guard_fails_before_editing(self) -> None:
-        first = WP07_PLAN.reference_inputs[0]
-        bad = replace(
-            WP07_PLAN,
-            reference_inputs=(
-                replace(first, expected_sha256="00" * 32),
-                *WP07_PLAN.reference_inputs[1:],
-            ),
-        )
-        with self.assertRaisesRegex(BuildError, "reference input SHA-256"):
-            prepare_plan(bad, PROJECT_ROOT)
-
-    def test_source_sha_guard_fails_before_editing(self) -> None:
-        bad = replace(LMT_PLAN, expected_source_sha256="00" * 32)
-        with self.assertRaisesRegex(BuildError, "source SHA-256"):
-            prepare_plan(bad, PROJECT_ROOT)
-
-    def test_media_index_and_identity_guards(self) -> None:
-        addition = SHARPEN_PLAN.media_additions[0]
-        wrong_index = replace(
-            SHARPEN_PLAN,
-            media_additions=(replace(addition, expected_index=73),),
-        )
-        with self.assertRaisesRegex(BuildError, "added media indices"):
-            prepare_plan(wrong_index, PROJECT_ROOT)
-
-        original = soundbank_editor.SoundBank.from_file(
-            PROJECT_ROOT / SHARPEN_PLAN.source
-        )
-        collision = replace(
-            SHARPEN_PLAN,
-            media_additions=(replace(addition, media_id=original.entries[0].media_id),),
-        )
-        with self.assertRaisesRegex(BuildError, "Media ID already exists"):
-            prepare_plan(collision, PROJECT_ROOT)
-
-        replacement = replace(
-            SHARPEN_PLAN,
-            media_additions=(),
-            media_replacements=(
-                MediaReplacement(
-                    1,
-                    original.entries[0].media_id + 1,
-                    addition.source_audio,
+        with self.assertRaisesRegex(ValueError, "duplicate media addition index"):
+            replace(
+                bank,
+                media_additions=(
+                    addition,
+                    MediaAddition(
+                        addition.expected_index,
+                        addition.media_id + 1,
+                        addition.source_audio,
+                    ),
                 ),
-            ),
-        )
-        with self.assertRaisesRegex(BuildError, "expected Media ID"):
-            prepare_plan(replacement, PROJECT_ROOT)
+            )
+        with self.assertRaisesRegex(ValueError, "duplicate added Media ID"):
+            replace(
+                bank,
+                media_additions=(
+                    addition,
+                    MediaAddition(
+                        addition.expected_index + 1,
+                        addition.media_id,
+                        addition.source_audio,
+                    ),
+                ),
+            )
+        with self.assertRaisesRegex(ValueError, "indices overlap"):
+            replace(
+                bank,
+                media_replacements=(
+                    MediaReplacement(
+                        addition.expected_index,
+                        TEST_MEDIA_ID,
+                        addition.source_audio,
+                    ),
+                ),
+            )
+        with self.assertRaisesRegex(ValueError, "duplicate reference input"):
+            replace(
+                bank,
+                reference_inputs=(
+                    bank.reference_inputs[0],
+                    bank.reference_inputs[0],
+                ),
+            )
 
-    def test_duplicate_target_and_summary_mismatch_are_rejected(self) -> None:
-        duplicate = replace(
-            LMT_PLAN,
-            name="w07_00_duplicate",
-            source="original/lmt/w07_00_duplicate.lmt",
+    def test_registry_rejects_generic_identity_and_validator_conflicts(self) -> None:
+        plan = self.project.lmt_plan()
+        validate_registry(
+            ModBuildPlan(
+                (plan,),
+                (
+                    BundleValidator(
+                        "route",
+                        TEST_DESIGN_ID,
+                        lambda _staged: None,
+                    ),
+                ),
+            )
+        )
+
+        duplicate_name = replace(
+            plan,
+            source="original/lmt/other-name.lmt",
+            target="motion/other-name.lmt",
+        )
+        with self.assertRaisesRegex(BuildError, "Duplicate builder name"):
+            validate_registry(ModBuildPlan((plan, duplicate_name)))
+
+        duplicate_source = replace(
+            plan,
+            name="other_source_owner",
+            target="motion/other-source.lmt",
+        )
+        with self.assertRaisesRegex(BuildError, "Duplicate source artifact"):
+            validate_registry(ModBuildPlan((plan, duplicate_source)))
+
+        duplicate_target = replace(
+            plan,
+            name="other_target_owner",
+            source="original/lmt/other-target.lmt",
         )
         with self.assertRaisesRegex(BuildError, "Duplicate target artifact"):
-            validate_registry(ModBuildPlan((LMT_PLAN, duplicate)))
+            validate_registry(ModBuildPlan((plan, duplicate_target)))
 
-        wrong_summary = replace(
-            LMT_PLAN,
-            expected_summary=soundbank_editor.LmtEditSummary(0, ()),
-        )
-        with self.assertRaisesRegex(BuildError, "edit summary differs"):
-            prepare_plan(wrong_summary, PROJECT_ROOT)
+        validator = BundleValidator("route", TEST_DESIGN_ID, lambda _staged: None)
+        with self.assertRaisesRegex(BuildError, "Duplicate bundle validator"):
+            validate_registry(ModBuildPlan((plan,), (validator, validator)))
+        with self.assertRaisesRegex(BuildError, "unregistered design"):
+            validate_registry(
+                ModBuildPlan(
+                    (plan,),
+                    (
+                        BundleValidator(
+                            "orphan_route",
+                            "test.unregistered",
+                            lambda _staged: None,
+                        ),
+                    ),
+                )
+            )
 
-    def test_hirc_callback_cannot_hide_undeclared_media_edits(self) -> None:
-        undeclared = replace(
-            WP07_PLAN,
-            media_additions=(),
-            apply_edits=append_undeclared_media,
-            expected_summary=soundbank_editor.SoundBankEditSummary(
-                replaced_media=(),
-                added_media=((43, 242_768_048),),
-                hirc_changed_bytes=0,
-                added_hirc_objects=(),
-                resized_hirc_objects=(),
-                hirc_size_delta=0,
-            ),
+    def test_all_synthetic_plan_types_preflight_in_registry_order(self) -> None:
+        plans = (
+            self.project.soundbank_plan(),
+            self.project.lmt_plan(),
+            self.project.wwev_plan(),
         )
+        prepared = prepare_all_plans(ModBuildPlan(plans), self.root)
+        self.assertEqual(
+            [item.plan.name for item in prepared],
+            [plan.name for plan in plans],
+        )
+        self.assertEqual(
+            [item.preview_summary for item in prepared],
+            [plan.expected_summary for plan in plans],
+        )
+
+    def test_source_reference_bank_and_audio_guards_run_before_editing(self) -> None:
+        edit = mock.Mock()
+        bad_source = replace(
+            self.project.lmt_plan(),
+            expected_source_sha256="00" * 32,
+            apply_edits=edit,
+        )
+        with self.assertRaisesRegex(BuildError, "source SHA-256"):
+            prepare_plan(bad_source, self.root)
+        edit.assert_not_called()
+
+        bank = self.project.soundbank_plan()
+        bad_reference = replace(
+            bank.reference_inputs[0],
+            expected_sha256="00" * 32,
+        )
+        with self.assertRaisesRegex(BuildError, "reference input SHA-256"):
+            prepare_plan(
+                replace(bank, reference_inputs=(bad_reference,)),
+                self.root,
+            )
+        with self.assertRaisesRegex(BuildError, "expected Bank ID"):
+            prepare_plan(
+                replace(bank, expected_bank_id=bank.expected_bank_id + 1),
+                self.root,
+            )
+
+        audio = self.root / bank.media_additions[0].source_audio
+        with wave.open(str(audio), "wb") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(48_000)
+            wav.writeframes(bytes(8))
+        with self.assertRaisesRegex(BuildError, "source audio must be"):
+            prepare_plan(bank, self.root)
+
+    def test_media_identity_and_declaration_guards(self) -> None:
+        plan = self.project.soundbank_plan()
+        addition = plan.media_additions[0]
+
+        with self.assertRaisesRegex(BuildError, "added media indices"):
+            prepare_plan(
+                replace(
+                    plan,
+                    media_additions=(replace(addition, expected_index=3),),
+                ),
+                self.root,
+            )
+        with self.assertRaisesRegex(BuildError, "Media ID already exists"):
+            prepare_plan(
+                replace(
+                    plan,
+                    media_additions=(replace(addition, media_id=TEST_MEDIA_ID),),
+                ),
+                self.root,
+            )
+
+        replacement = MediaReplacement(
+            1,
+            TEST_MEDIA_ID + 1,
+            addition.source_audio,
+            wem_channels=1,
+        )
+        with self.assertRaisesRegex(BuildError, "expected Media ID"):
+            prepare_plan(
+                replace(
+                    plan,
+                    media_additions=(),
+                    media_replacements=(replacement,),
+                ),
+                self.root,
+            )
+
         with self.assertRaisesRegex(BuildError, "undeclared media additions"):
-            prepare_plan(undeclared, PROJECT_ROOT)
+            prepare_plan(
+                replace(
+                    plan,
+                    media_additions=(),
+                    apply_edits=append_undeclared_media,
+                    expected_summary=soundbank_editor.SoundBankEditSummary(
+                        replaced_media=(),
+                        added_media=((2, ADDED_MEDIA_ID),),
+                        hirc_changed_bytes=0,
+                        added_hirc_objects=(),
+                        resized_hirc_objects=(),
+                        hirc_size_delta=0,
+                    ),
+                ),
+                self.root,
+            )
+
+    def test_summary_mismatch_is_rejected_without_an_output_hash(self) -> None:
+        wrong_summary = soundbank_editor.LmtEditSummary(0, ())
+        with self.assertRaisesRegex(BuildError, "edit summary differs"):
+            prepare_plan(
+                replace(
+                    self.project.lmt_plan(),
+                    expected_summary=wrong_summary,
+                ),
+                self.root,
+            )
 
 
 if __name__ == "__main__":
