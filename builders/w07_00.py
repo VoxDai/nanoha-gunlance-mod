@@ -1,4 +1,4 @@
-"""Build isolated stationary-draw and overhead-smash LMT requests."""
+"""Build stationary-draw and overhead-smash character-voice requests."""
 
 from __future__ import annotations
 
@@ -16,17 +16,29 @@ OLD_REQUEST = 6470
 NEW_REQUEST = 6592
 REQUEST_OFFSET = 0xCC50
 
-OVERHEAD_MOTION_ID = 128
-OVERHEAD_SLOT = "F"
+OVERHEAD_EVENT_GROUP = "EventGroup02"
 OVERHEAD_REQUEST_KEYFRAME = 0.0
-OVERHEAD_TRIGGER_FRAMES = (32.0,)
-OVERHEAD_OLD_REQUEST = 6505
-OVERHEAD_NEW_REQUEST = 6593
-OVERHEAD_REQUEST_OFFSET = 0xF0510
+OVERHEAD_OLD_REQUEST = 1409
+OVERHEAD_NEW_REQUEST = 6595
+
+QUICK_RELOAD_MOTION_ID = 128
+QUICK_RELOAD_SLOT = "B"
+QUICK_RELOAD_TRIGGER_FRAMES = (18.0,)
+QUICK_RELOAD_REQUEST_OFFSET = 0xF03C0
+
+LINK_MOTION_ID = 131
+LINK_SLOT = "A"
+LINK_TRIGGER_FRAMES = (14.0,)
+LINK_REQUEST_OFFSET = 0xFC5A0
+
+ORIGINAL_MECHANICAL_EVENT_GROUP = EVENT_GROUP
+ORIGINAL_MECHANICAL_SLOT = "F"
+ORIGINAL_MECHANICAL_REQUEST = 6505
+ORIGINAL_MECHANICAL_TRIGGER_FRAMES = (32.0,)
 
 
 def apply_edits(editor: soundbank_editor.LmtEditor) -> None:
-    """Guard and replace both isolated TIML request assignments."""
+    """Guard and replace the stationary-draw and two character-voice requests."""
 
     editor.replace_request(
         motion_id=MOTION_ID,
@@ -38,18 +50,27 @@ def apply_edits(editor: soundbank_editor.LmtEditor) -> None:
         expected_trigger_frames=TRIGGER_FRAMES,
     )
     editor.replace_request(
-        motion_id=OVERHEAD_MOTION_ID,
-        event_group=EVENT_GROUP,
-        slot=OVERHEAD_SLOT,
+        motion_id=QUICK_RELOAD_MOTION_ID,
+        event_group=OVERHEAD_EVENT_GROUP,
+        slot=QUICK_RELOAD_SLOT,
         request_keyframe_frame=OVERHEAD_REQUEST_KEYFRAME,
         expected_request=OVERHEAD_OLD_REQUEST,
         replacement_request=OVERHEAD_NEW_REQUEST,
-        expected_trigger_frames=OVERHEAD_TRIGGER_FRAMES,
+        expected_trigger_frames=QUICK_RELOAD_TRIGGER_FRAMES,
+    )
+    editor.replace_request(
+        motion_id=LINK_MOTION_ID,
+        event_group=OVERHEAD_EVENT_GROUP,
+        slot=LINK_SLOT,
+        request_keyframe_frame=OVERHEAD_REQUEST_KEYFRAME,
+        expected_request=OVERHEAD_OLD_REQUEST,
+        replacement_request=OVERHEAD_NEW_REQUEST,
+        expected_trigger_frames=LINK_TRIGGER_FRAMES,
     )
 
 
 EXPECTED_SUMMARY = soundbank_editor.LmtEditSummary(
-    changed_byte_count=2,
+    changed_byte_count=5,
     edits=(
         soundbank_editor.LmtRequestEdit(
             motion_id=MOTION_ID,
@@ -63,15 +84,26 @@ EXPECTED_SUMMARY = soundbank_editor.LmtEditSummary(
             changed_byte_count=1,
         ),
         soundbank_editor.LmtRequestEdit(
-            motion_id=OVERHEAD_MOTION_ID,
-            event_group=EVENT_GROUP,
-            slot=OVERHEAD_SLOT,
+            motion_id=QUICK_RELOAD_MOTION_ID,
+            event_group=OVERHEAD_EVENT_GROUP,
+            slot=QUICK_RELOAD_SLOT,
             request_keyframe_frame=OVERHEAD_REQUEST_KEYFRAME,
-            trigger_frames=OVERHEAD_TRIGGER_FRAMES,
-            offset=OVERHEAD_REQUEST_OFFSET,
+            trigger_frames=QUICK_RELOAD_TRIGGER_FRAMES,
+            offset=QUICK_RELOAD_REQUEST_OFFSET,
             old_request=OVERHEAD_OLD_REQUEST,
             new_request=OVERHEAD_NEW_REQUEST,
-            changed_byte_count=1,
+            changed_byte_count=2,
+        ),
+        soundbank_editor.LmtRequestEdit(
+            motion_id=LINK_MOTION_ID,
+            event_group=OVERHEAD_EVENT_GROUP,
+            slot=LINK_SLOT,
+            request_keyframe_frame=OVERHEAD_REQUEST_KEYFRAME,
+            trigger_frames=LINK_TRIGGER_FRAMES,
+            offset=LINK_REQUEST_OFFSET,
+            old_request=OVERHEAD_OLD_REQUEST,
+            new_request=OVERHEAD_NEW_REQUEST,
+            changed_byte_count=2,
         ),
     ),
 )

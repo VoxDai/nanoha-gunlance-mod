@@ -12,14 +12,27 @@ from .base import BuildError, BundleValidator
 from .hm_wp07_snd_ev import (
     NEW_EVENT_ID,
     NEW_REQUEST,
-    OVERHEAD_NEW_EVENT_ID,
-    OVERHEAD_NEW_REQUEST,
+    OVERHEAD_ORIGINAL_MODE,
+    OVERHEAD_ORIGINAL_RECORD_SHA256,
+    OVERHEAD_ORIGINAL_REQUEST,
+)
+from .pl_voice import (
+    DONOR_EVENT_ID as ORIGINAL_GRUNT_EVENT_ID,
+    DONOR_REQUEST as ORIGINAL_GRUNT_REQUEST,
+    NEW_EVENT_ID as OVERHEAD_REPLACEMENT_EVENT_ID,
+    NEW_RECORD_SHA256 as OVERHEAD_REPLACEMENT_RECORD_SHA256,
+    NEW_REQUEST as OVERHEAD_REPLACEMENT_REQUEST,
 )
 from .w07_00 import (
     EVENT_GROUP,
+    LINK_MOTION_ID,
+    LINK_SLOT,
     MOTION_ID,
-    OVERHEAD_MOTION_ID,
-    OVERHEAD_SLOT,
+    ORIGINAL_MECHANICAL_EVENT_GROUP,
+    ORIGINAL_MECHANICAL_SLOT,
+    OVERHEAD_EVENT_GROUP,
+    QUICK_RELOAD_MOTION_ID,
+    QUICK_RELOAD_SLOT,
     SLOT,
 )
 from .wp_gun_cmn import (
@@ -34,7 +47,9 @@ from .wp_gun_cmn import (
     OVERHEAD_ORIGINAL_CONTAINER_ID,
     OVERHEAD_ORIGINAL_EVENT_ACTION_ID,
     OVERHEAD_ORIGINAL_EVENT_ID,
-    OVERHEAD_ORIGINAL_ROUTE_ACTION_ID,
+    OBSOLETE_OVERHEAD_ORIGINAL_ROUTE_ACTION_ID,
+    OVERHEAD_SILENT_EVENT_ID,
+    OVERHEAD_SILENT_PRIME_ACTION_ID,
     OVERHEAD_VOICE_ACTION_ID,
     OVERHEAD_VOICE_EVENT_ID,
     OVERHEAD_VOICE_MEDIA_ID,
@@ -49,8 +64,11 @@ from .voice_standard import standard_voice_sound_body
 
 LMT_TARGET = Path("hm/wp/wp07/mot/w07_00/w07_00.lmt")
 WWEV_TARGET = Path("sound/pl/hm_wp07_snd_ev.wwev")
+PL_VOICE_WWEV_TARGET = Path("sound/pl/pl_voice.wwev")
 BANK_TARGET = Path("sound/wwise/Windows/wp_gun_cmn.nbnk")
 ORIGINAL_CONTAINER_ID = 522_283_251
+OBSOLETE_OVERHEAD_REQUEST = 6593
+CONTROL_MOTION_ID = 151
 
 
 def _path(staged: Mapping[Path, Path], target: Path, route: str) -> Path:
@@ -173,50 +191,135 @@ STATIONARY_DRAW_VALIDATOR = BundleValidator(
 
 
 def validate_overhead_smash(staged: Mapping[Path, Path]) -> None:
-    """Require the isolated frame-32 overhead-smash route and original audio."""
+    """Require both grunt replacements and the restored original mechanical route."""
 
     validate_stationary_draw(staged)
     lmt = soundbank_editor.LmtFile.from_file(
         _path(staged, LMT_TARGET, "overhead smash")
     )
-    wwev = soundbank_editor.WwevFile.from_file(
+    mechanical_wwev = soundbank_editor.WwevFile.from_file(
         _path(staged, WWEV_TARGET, "overhead smash")
+    )
+    voice_wwev = soundbank_editor.WwevFile.from_file(
+        _path(staged, PL_VOICE_WWEV_TARGET, "overhead smash")
     )
     bank = soundbank_editor.SoundBank.from_file(
         _path(staged, BANK_TARGET, "overhead smash")
     )
 
-    routes = tuple(
+    replacement_routes = tuple(
         route
-        for route in lmt.triggered_requests(wwev)
-        if route.request_no == OVERHEAD_NEW_REQUEST
-        or route.event_id == OVERHEAD_NEW_EVENT_ID
+        for route in lmt.triggered_requests(voice_wwev)
+        if route.request_no == OVERHEAD_REPLACEMENT_REQUEST
+        or route.event_id == OVERHEAD_REPLACEMENT_EVENT_ID
     )
-    expected_route = soundbank_editor.TriggeredRequest(
-        motion_id=OVERHEAD_MOTION_ID,
+    expected_quick_reload = soundbank_editor.TriggeredRequest(
+        motion_id=QUICK_RELOAD_MOTION_ID,
         frame_count=199,
         timl_offset=0xEF7C0,
-        shared_timl_motions=(OVERHEAD_MOTION_ID,),
-        event_group=EVENT_GROUP,
-        trigger_frame=32.0,
-        trigger_mask=0x20,
-        slot=OVERHEAD_SLOT,
-        request_no=OVERHEAD_NEW_REQUEST,
-        wwev_record=45,
-        wwev_mode=100,
-        event_id=OVERHEAD_NEW_EVENT_ID,
+        shared_timl_motions=(QUICK_RELOAD_MOTION_ID,),
+        event_group=OVERHEAD_EVENT_GROUP,
+        trigger_frame=18.0,
+        trigger_mask=0x02,
+        slot=QUICK_RELOAD_SLOT,
+        request_no=OVERHEAD_REPLACEMENT_REQUEST,
+        wwev_record=101,
+        wwev_mode=4,
+        event_id=OVERHEAD_REPLACEMENT_EVENT_ID,
     )
-    if routes != (expected_route,):
+    expected_link = soundbank_editor.TriggeredRequest(
+        motion_id=LINK_MOTION_ID,
+        frame_count=23,
+        timl_offset=0xFC040,
+        shared_timl_motions=(LINK_MOTION_ID,),
+        event_group=OVERHEAD_EVENT_GROUP,
+        trigger_frame=14.0,
+        trigger_mask=0x01,
+        slot=LINK_SLOT,
+        request_no=OVERHEAD_REPLACEMENT_REQUEST,
+        wwev_record=101,
+        wwev_mode=4,
+        event_id=OVERHEAD_REPLACEMENT_EVENT_ID,
+    )
+    if replacement_routes != (expected_quick_reload, expected_link):
         raise BuildError(
-            "overhead smash bundle expected exactly one reviewed cross-format route; "
-            f"found {routes!r}"
+            "overhead smash bundle expected exactly the Motion 128 and Motion 131 "
+            f"character-voice replacement routes; found {replacement_routes!r}"
         )
 
+    replacement_record = voice_wwev.record(OVERHEAD_REPLACEMENT_REQUEST)
+    if (
+        replacement_record.index != 101
+        or replacement_record.mode != 4
+        or replacement_record.event_id != OVERHEAD_REPLACEMENT_EVENT_ID
+        or replacement_record.sha256 != OVERHEAD_REPLACEMENT_RECORD_SHA256
+    ):
+        raise BuildError("overhead smash replacement WWEV record differs from its guard")
+
+    control_routes = tuple(
+        route
+        for route in lmt.triggered_requests(voice_wwev)
+        if route.motion_id == CONTROL_MOTION_ID
+        and route.request_no == ORIGINAL_GRUNT_REQUEST
+    )
+    expected_control = soundbank_editor.TriggeredRequest(
+        motion_id=CONTROL_MOTION_ID,
+        frame_count=199,
+        timl_offset=0x14B7D0,
+        shared_timl_motions=(CONTROL_MOTION_ID,),
+        event_group=OVERHEAD_EVENT_GROUP,
+        trigger_frame=18.0,
+        trigger_mask=0x02,
+        slot=QUICK_RELOAD_SLOT,
+        request_no=ORIGINAL_GRUNT_REQUEST,
+        wwev_record=20,
+        wwev_mode=4,
+        event_id=ORIGINAL_GRUNT_EVENT_ID,
+    )
+    if control_routes != (expected_control,):
+        raise BuildError(
+            "overhead smash Motion 151 original-character-voice control changed; "
+            f"found {control_routes!r}"
+        )
+
+    mechanical_routes = tuple(
+        route
+        for route in lmt.triggered_requests(mechanical_wwev)
+        if route.motion_id == QUICK_RELOAD_MOTION_ID
+        and route.event_group == ORIGINAL_MECHANICAL_EVENT_GROUP
+        and route.slot == ORIGINAL_MECHANICAL_SLOT
+        and route.trigger_frame == 32.0
+    )
+    expected_mechanical = soundbank_editor.TriggeredRequest(
+        motion_id=QUICK_RELOAD_MOTION_ID,
+        frame_count=199,
+        timl_offset=0xEF7C0,
+        shared_timl_motions=(QUICK_RELOAD_MOTION_ID,),
+        event_group=ORIGINAL_MECHANICAL_EVENT_GROUP,
+        trigger_frame=32.0,
+        trigger_mask=0x20,
+        slot=ORIGINAL_MECHANICAL_SLOT,
+        request_no=OVERHEAD_ORIGINAL_REQUEST,
+        wwev_record=28,
+        wwev_mode=OVERHEAD_ORIGINAL_MODE,
+        event_id=OVERHEAD_ORIGINAL_EVENT_ID,
+    )
+    if mechanical_routes != (expected_mechanical,):
+        raise BuildError(
+            "overhead smash original frame-32 mechanical route changed; "
+            f"found {mechanical_routes!r}"
+        )
+    mechanical_record = mechanical_wwev.record(OVERHEAD_ORIGINAL_REQUEST)
+    if mechanical_record.sha256 != OVERHEAD_ORIGINAL_RECORD_SHA256:
+        raise BuildError("overhead smash original mechanical WWEV record changed")
+    if mechanical_wwev.records_for_request(OBSOLETE_OVERHEAD_REQUEST):
+        raise BuildError("overhead smash obsolete ReqNo 6593 route is still present")
+
     hirc = soundbank_editor.HircEditor(bank.hirc_payload, version=bank.version)
-    if OVERHEAD_VOICE_EVENT_ID != OVERHEAD_NEW_EVENT_ID:
+    if OVERHEAD_VOICE_EVENT_ID != OVERHEAD_REPLACEMENT_EVENT_ID:
         raise BuildError("overhead smash WWEV and Bank Event IDs diverged")
     expected_actions = (
-        OVERHEAD_ORIGINAL_ROUTE_ACTION_ID,
+        OVERHEAD_SILENT_PRIME_ACTION_ID,
         OVERHEAD_VOICE_ACTION_ID,
     )
     if hirc.event_actions(OVERHEAD_VOICE_EVENT_ID) != expected_actions:
@@ -224,15 +327,20 @@ def validate_overhead_smash(staged: Mapping[Path, Path]) -> None:
             f"overhead smash Event {OVERHEAD_VOICE_EVENT_ID} does not contain "
             f"{expected_actions} in order"
         )
-
-    original_route = hirc.object_body(
-        soundbank_editor.HIRC_ACTION, OVERHEAD_ORIGINAL_ROUTE_ACTION_ID
+    silent_prime = hirc.object_body(
+        soundbank_editor.HIRC_ACTION, OVERHEAD_SILENT_PRIME_ACTION_ID
     )
-    expected_original_route = hirc.create_play_event_action(
-        OVERHEAD_ORIGINAL_ROUTE_ACTION_ID, OVERHEAD_ORIGINAL_EVENT_ID
+    expected_silent_prime = hirc.create_play_event_action(
+        OVERHEAD_SILENT_PRIME_ACTION_ID, OVERHEAD_SILENT_EVENT_ID
     )
-    if original_route != expected_original_route:
-        raise BuildError("overhead smash PlayEvent Action does not preserve the original Event")
+    if silent_prime != expected_silent_prime:
+        raise BuildError(
+            "overhead smash silent-prime Action does not target the zero-Action Event"
+        )
+    if hirc.event_actions(OVERHEAD_SILENT_EVENT_ID) != ():
+        raise BuildError("overhead smash silent-prime target Event is not empty")
+    if OBSOLETE_OVERHEAD_ORIGINAL_ROUTE_ACTION_ID in hirc.object_ids:
+        raise BuildError("overhead smash obsolete mechanical PlayEvent Action still exists")
     if hirc.event_actions(OVERHEAD_ORIGINAL_EVENT_ID) != (
         OVERHEAD_ORIGINAL_EVENT_ACTION_ID,
     ):
@@ -292,11 +400,12 @@ def validate_overhead_smash(staged: Mapping[Path, Path]) -> None:
         for index, item in enumerate(hirc.objects())
     }
     if not (
-        positions[
-            (soundbank_editor.HIRC_ACTION, OVERHEAD_ORIGINAL_ROUTE_ACTION_ID)
+        positions[(soundbank_editor.HIRC_SOUND, OVERHEAD_VOICE_SOUND_ID)]
+        < positions[(soundbank_editor.HIRC_ACTION, OVERHEAD_VOICE_ACTION_ID)]
+        < positions[
+            (soundbank_editor.HIRC_ACTION, OVERHEAD_SILENT_PRIME_ACTION_ID)
         ]
-        < positions[(soundbank_editor.HIRC_EVENT, OVERHEAD_VOICE_EVENT_ID)]
-        and positions[(soundbank_editor.HIRC_ACTION, OVERHEAD_VOICE_ACTION_ID)]
+        < positions[(soundbank_editor.HIRC_EVENT, OVERHEAD_SILENT_EVENT_ID)]
         < positions[(soundbank_editor.HIRC_EVENT, OVERHEAD_VOICE_EVENT_ID)]
         < positions[(soundbank_editor.HIRC_EVENT, OVERHEAD_ORIGINAL_EVENT_ID)]
     ):

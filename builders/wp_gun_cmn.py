@@ -1,4 +1,4 @@
-"""Build stationary-draw, overhead-smash, and reload voice routes."""
+"""Build stationary-draw, overhead-smash replacement, and reload voice routes."""
 
 from __future__ import annotations
 
@@ -27,8 +27,10 @@ POSITIONING_VECTOR_OFFSET = 0x2A
 
 OVERHEAD_VOICE_MEDIA_ID = 1_280_643_898
 OVERHEAD_VOICE_SOUND_ID = 1_643_477_631
-OVERHEAD_ORIGINAL_ROUTE_ACTION_ID = 2_557_911_997
+OBSOLETE_OVERHEAD_ORIGINAL_ROUTE_ACTION_ID = 2_557_911_997
 OVERHEAD_VOICE_ACTION_ID = 3_750_542_142
+OVERHEAD_SILENT_PRIME_ACTION_ID = 2_176_868_439
+OVERHEAD_SILENT_EVENT_ID = 971_912_882
 OVERHEAD_VOICE_EVENT_ID = 2_866_569_635
 
 OVERHEAD_ORIGINAL_EVENT_ID = 1_129_041_389
@@ -171,16 +173,6 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
         label="insert standard overhead-smash custom-voice Sound",
     )
 
-    overhead_original_route = editor.create_play_event_action(
-        OVERHEAD_ORIGINAL_ROUTE_ACTION_ID, OVERHEAD_ORIGINAL_EVENT_ID
-    )
-    editor.insert_object(
-        soundbank_editor.HIRC_ACTION,
-        OVERHEAD_ORIGINAL_ROUTE_ACTION_ID,
-        overhead_original_route[4:],
-        before=(soundbank_editor.HIRC_EVENT, OVERHEAD_ORIGINAL_EVENT_ID),
-        label="add overhead-smash PlayEvent Action for the original route",
-    )
     overhead_voice = editor.create_play_action(
         OVERHEAD_VOICE_ACTION_ID, OVERHEAD_VOICE_SOUND_ID, bank.bank_id
     )
@@ -191,17 +183,35 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
         before=(soundbank_editor.HIRC_EVENT, OVERHEAD_ORIGINAL_EVENT_ID),
         label="add overhead-smash Accel Play Action",
     )
+
+    silent_prime = editor.create_play_event_action(
+        OVERHEAD_SILENT_PRIME_ACTION_ID, OVERHEAD_SILENT_EVENT_ID
+    )
+    editor.insert_object(
+        soundbank_editor.HIRC_ACTION,
+        OVERHEAD_SILENT_PRIME_ACTION_ID,
+        silent_prime[4:],
+        before=(soundbank_editor.HIRC_EVENT, OVERHEAD_ORIGINAL_EVENT_ID),
+        label="add overhead-smash silent-prime PlayEvent Action",
+    )
+    editor.insert_object(
+        soundbank_editor.HIRC_EVENT,
+        OVERHEAD_SILENT_EVENT_ID,
+        struct.pack("<I", 0),
+        before=(soundbank_editor.HIRC_EVENT, OVERHEAD_ORIGINAL_EVENT_ID),
+        label="add overhead-smash zero-Action silent Event",
+    )
     editor.insert_object(
         soundbank_editor.HIRC_EVENT,
         OVERHEAD_VOICE_EVENT_ID,
         struct.pack(
             "<III",
             2,
-            OVERHEAD_ORIGINAL_ROUTE_ACTION_ID,
+            OVERHEAD_SILENT_PRIME_ACTION_ID,
             OVERHEAD_VOICE_ACTION_ID,
         ),
         before=(soundbank_editor.HIRC_EVENT, OVERHEAD_ORIGINAL_EVENT_ID),
-        label="add isolated overhead-smash Event",
+        label="add overhead-smash character-voice replacement Event",
     )
 
     bank.media_entry(media_id=RELOAD_VOICE_MEDIA_ID)
@@ -301,8 +311,9 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (soundbank_editor.HIRC_ACTION, VOICE_ACTION_ID),
         (soundbank_editor.HIRC_EVENT, VOICE_EVENT_ID),
         (soundbank_editor.HIRC_SOUND, OVERHEAD_VOICE_SOUND_ID),
-        (soundbank_editor.HIRC_ACTION, OVERHEAD_ORIGINAL_ROUTE_ACTION_ID),
         (soundbank_editor.HIRC_ACTION, OVERHEAD_VOICE_ACTION_ID),
+        (soundbank_editor.HIRC_ACTION, OVERHEAD_SILENT_PRIME_ACTION_ID),
+        (soundbank_editor.HIRC_EVENT, OVERHEAD_SILENT_EVENT_ID),
         (soundbank_editor.HIRC_EVENT, OVERHEAD_VOICE_EVENT_ID),
         (soundbank_editor.HIRC_SOUND, RELOAD_VOICE_SOUND_ID),
         (soundbank_editor.HIRC_ACTION, RELOAD_VOICE_ACTION_ID),
@@ -310,7 +321,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
     resized_hirc_objects=(
         (soundbank_editor.HIRC_EVENT, RELOAD_EVENT_ID, 12, 16),
     ),
-    hirc_size_delta=304,
+    hirc_size_delta=317,
 )
 
 
