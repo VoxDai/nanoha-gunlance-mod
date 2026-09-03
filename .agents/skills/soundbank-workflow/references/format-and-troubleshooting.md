@@ -1,127 +1,140 @@
 # NBNK, LMT, and WWEV Format and Troubleshooting
 
-## WEM
+This reference describes binary structure and analysis. Concrete calls are in
+the [Library README](../../../../tools/soundbank_editor/README.md); exact
+contracts are in the public API docstrings.
 
-- A `.wem` is Wwise media; renaming a WAV does not create a valid
-  replacement.
-- The verified project PCM WEM layout uses RIFF/WAVE, format tag `0xFFFE`,
-  48 kHz, 16-bit stereo audio, a six-byte Wwise channel extension, and a
-  four-byte `JUNK` chunk.
-- A normal PCM WAV commonly uses format tag `0x0001` and must be converted
-  with the project tool before embedding.
-- Original media often uses Wwise Custom Vorbis. The verified PCM wrapper is
-  larger but avoids depending on an unavailable matching Wwise encoder.
+## WEM Encoding
 
-## NBNK
+A `.wem` is Wwise media; renaming a WAV does not create a valid replacement.
+The verified project PCM wrapper uses RIFF/WAVE, format tag `0xFFFE`, 48 kHz,
+16-bit stereo audio, a six-byte Wwise channel extension, and a four-byte `JUNK`
+chunk. Ordinary PCM WAV commonly uses format tag `0x0001` and needs conversion.
+Original media often uses Wwise Custom Vorbis. PCM is larger but avoids
+depending on an unavailable matching Wwise encoder.
 
-- `BKHD` stores the Bank header and ID.
-- `DIDX` stores one little-endian `(Media ID, DATA offset, size)` record per
-  embedded WEM.
-- `DATA` stores WEM payloads. Rebuilt media starts are aligned to 16 bytes.
-- `HIRC` stores Events, Actions, Sounds, Containers, properties, and Media ID
-  references.
+The Library's WEM check is a limited RIFF/fmt check, not a complete decoder or
+proof of this exact PCM layout. Inspect and decode the embedded result with
+pyvgmstream; use the conversion commands in the skill when preparing media.
+
+## NBNK Structure and Preservation
+
+NBNK consists of tagged chunks with an eight-byte header: four-byte tag and
+little-endian unsigned payload length. Preserve unknown chunks and ordering.
+
+| Chunk | Contents |
+|---|---|
+| BKHD | Wwise version and Bank ID at the start of the Bank header |
+| DIDX | Twelve-byte records: unsigned Media ID, DATA-relative offset, and size |
+| DATA | Embedded WEM payloads; rebuilt media starts use 16-byte alignment |
+| HIRC | Typed object records for playback routes and node settings |
 
 DIDX order is independent of Media ID order. Community labels such as “WEM
-#22” usually mean the 22nd DIDX entry, so always inspect both values.
+#22” usually mean the 22nd DIDX entry. Always verify both identifiers. DATA
+offsets and whole-file offsets move after rebuilding and are not stable guards.
 
-For a media-only rebuild:
+For media replacement, preserve entry order and IDs, change only selected
+payloads, rebuild DATA and DIDX offsets/sizes, and preserve BKHD, HIRC, and
+unknown chunks. For addition, append explicit media identities and verify their
+new HIRC users while retaining original payloads. See the
+[media APIs](../../../../tools/soundbank_editor/README.md#nbnk-and-media).
 
-1. preserve DIDX order and every Media ID;
-2. replace only the selected payload;
-3. rebuild DATA with 16-byte alignment;
-4. update DIDX offsets and sizes;
-5. preserve BKHD, HIRC, and unknown chunks byte-for-byte.
+HIRC changes are anchored by object type and ID. Preserve undeclared bytes and
+guard inspected old fields or whole donor bodies. The
+[HIRC reference](hirc-routing-and-settings.md) explains graph topology and
+serialization order. Known working MHW replacement Banks retain original
+Source and memory-size fields with the verified PCM WEM; this observation is
+not a guarantee for other games or Wwise versions.
 
-`SoundBankEditor.append_media()` adds one explicit Media ID at the end while
-preserving existing records. `replace_media()` requires the 1-based index and
-expected Media ID. HIRC changes must identify objects by type and ID, guard
-every old value, and preserve undeclared fields. Absolute Bank offsets are not
-stable after DATA or HIRC rebuilding.
+## LMT v95 and Embedded TIML
 
-Known working MHW replacement Banks retain original HIRC Source and memory-size
-fields when embedding the verified PCM WEM. Do not generalize this observation
-to other games or Wwise versions.
+The LMT header contains magic, version, and entry count, followed by a table of
+64-bit Motion-header offsets. Zero offsets represent empty entries; a Motion ID
+is its zero-based table position, not its rank among populated entries. Each
+supported Motion header is 96 bytes, with animation metadata and an embedded
+TIML pointer. Multiple Motions can point to the same TIML.
 
-## LMT v95 and TIML
+Embedded TIML links timeline types to transforms and typed keyframes. The
+reader follows absolute offsets within the LMT; this is inspection metadata,
+not a license to patch file offsets. EventGroup00–10 identify audio timeline
+groups. Each group's ReqNo transforms assign slots A–H, while the low eight
+bits of `mTrigger` activate those slots at a trigger frame. A slot uses the
+latest assignment at or before that frame. Assignment time and playback
+trigger time are separate facts.
 
-An LMT action entry may reference embedded TIML data. The supported reader
-retains every action header and exposes EventGroup00–10 transforms, ReqNo A–H
-assignments, keyframes, and the low eight bits of `mTrigger`.
-
-`LmtEditor.replace_request()` changes only one guarded four-byte request value
-and requires:
-
-- one Motion and one unshared TIML;
-- one EventGroup and typed slot transform;
-- one matching assignment keyframe;
-- the exact old/new positive signed-16 ReqNo values;
-- the exact trigger-frame set.
-
-It rejects shared TIML, multiple matches, invalid keyframes, range errors, and
-overlapping edits. A successful write remains the same length and may differ
-only in declared request fields.
+Querying must preserve the complete Motion context and all WWEV expansions.
+Shared TIML means a timeline change can affect more than the selected Motion.
+The supported modification therefore requires an unshared timeline, one typed
+request transform and assignment, and the reviewed trigger-frame set. It
+changes one four-byte assignment, preserves file length and metadata, and uses
+positive signed-16 ReqNo values compatible with WWEV. It does not add/remove
+Motions, timelines, or keyframes. See the
+[LMT APIs](../../../../tools/soundbank_editor/README.md#lmt-and-wwev).
 
 When a request does not trigger:
 
-1. confirm the Motion identity in game rather than inferring from length;
-2. inspect the assignment frame separately from the trigger frame;
-3. verify the slot bit in the trigger mask;
-4. check whether TIML is shared by another Motion;
-5. resolve all matching WWEV records rather than assuming one Event.
+1. Confirm the Motion identity in game rather than inferring it from length.
+2. Inspect assignment and trigger frames separately.
+3. Verify the slot bit in the trigger mask and the assignment active at that time.
+4. Check all Motions sharing the TIML pointer.
+5. Resolve every matching WWEV record instead of assuming one Event.
 
-## WWEV v19
+## WWEV v19 Structure and Preservation
 
-WWEV stores a versioned header, four dependency strings, and variable-length
-request records. Each complete `WwevRecord.sha256` covers ReqNo, mode, Event
-ID, command data, the 116-byte unknown region, WWPC, and terminators.
+The 16-byte header stores `WWEV` magic, version, record count, and an unknown
+word. Four NUL-terminated UTF-8 dependency strings follow. Each variable-length
+record has signed-16 ReqNo and mode, unsigned-32 Event ID and command hash,
+116 unknown bytes, and a NUL-terminated UTF-8 WWPC string. The supported parser
+requires complete records with no trailing data.
 
-`WwevEditor.append_cloned_record()` preserves dependencies and all original
-records, increments the count, clones the full guarded donor, and changes only
-the new ReqNo and Event ID. It rejects ambiguous donors, wrong mode/Event/hash,
-ReqNo or Event collisions, invalid ranges, bad strings, and trailing data.
+ReqNo is not necessarily unique: a query can resolve several records with
+different modes or Events. Retain each expansion and its original record
+position. The unknown bytes and string terminator are part of the record, not
+padding to discard.
+
+For supported additions, select one unambiguous donor and record the hash of
+its complete serialized record, including ReqNo, mode, Event ID, command data,
+unknown bytes, WWPC, and terminator. Clone the full record, changing only its
+new ReqNo and Event ID. Keep dependencies and original records byte-exact;
+only the header count and appended bytes change. Original-record mutation and
+deletion are not provided. See the
+[WWEV APIs](../../../../tools/soundbank_editor/README.md#lmt-and-wwev).
 
 When a request resolves incorrectly:
 
-1. expand every record for the ReqNo and inspect mode and Event ID;
-2. guard the complete donor hash, not a fixed prefix;
-3. confirm the new ReqNo is unused in the relevant collision scope;
-4. reparse the output and require unchanged dependencies and original records;
-5. resolve the rebuilt LMT route through the rebuilt WWEV.
+1. Expand every record for the ReqNo and inspect mode and Event ID.
+2. Verify the complete donor hash rather than a fixed prefix.
+3. Check new identities in the current WWEV and the relevant project route scope.
+4. Reparse and compare dependencies, original records, and the appended record.
+5. Resolve the rebuilt LMT through the rebuilt WWEV and compare affected routes.
 
 ## Silence and Route Troubleshooting
 
-1. Confirm the installed filename and nativePC path match the original game
-   artifact.
-2. For NBNK, inspect the 1-based DIDX index and Media ID, then re-extract and
-   decode the rebuilt entry with `tools/utils/pyvgmstream.py`.
-3. Parse the rebuilt Bank with
-   `tools/wwiser/wwiser.py -d none`.
-4. For added Wwise v120 HIRC graphs, inspect serialized object positions as
-   well as references. Child Sounds/Containers must precede their parent
-   Containers, and Actions must precede their Event; a layered route commonly
-   follows `Sound → Random → Switch → Action → Event`. A Bank can parse in
-   wwiser yet be rejected by MHW when a new parent Switch precedes its child
-   Random. This exact ordering fault was isolated by moving only the Switch
-   record after its child, which restored both the original and added sounds in
-   game.
-5. Trace every Event → Action → Container → Sound → Media path. Inspect
-   inherited volume, pitch, positioning, Aux, parents, and paired channels.
-6. For appended audio, confirm original media remains byte-exact and the new
-   Media ID has exactly the intended route.
-7. For animation-driven Events, verify the complete LMT → ReqNo → WWEV Event
-   chain and require the intended route count.
-8. Check Stop behavior, action interruption, duration, and playback limits.
-9. Remove conflicting Mods that provide any of the same NBNK, LMT, or WWEV
-   files.
-10. Restore originals to verify the game environment, then compare with a
-   known-working test artifact.
+1. Confirm the installed filename and nativePC path match the game artifact.
+2. Verify the 1-based DIDX index and Media ID, then re-extract and decode the
+   rebuilt entry with `tools/utils/pyvgmstream.py`.
+3. Parse the rebuilt Bank with `tools/wwiser/wwiser.py -d none`.
+4. Inspect HIRC references and serialized positions: child Sounds/Containers
+   precede parent Containers, and Actions precede their Events. A layered route
+   commonly serializes as `Sound → Random → Switch → Action → Event`. A Bank
+   can parse in wwiser yet fail in MHW if a new parent precedes its child.
+5. Trace every Event → Action → Container → Sound → Media path, including
+   inherited volume, Pitch, positioning, Aux, and paired spatial paths.
+6. Confirm original media remains byte-exact and added media has only the
+   intended users.
+7. For animation-driven Events, inspect the complete LMT → ReqNo → WWEV Event
+   chain and the number of expanded routes.
+8. Check Stop behavior, interruption, duration, and playback limits.
+9. Remove conflicting Mods supplying any of the same NBNK, LMT, or WWEV files.
+10. Restore originals to verify the environment, then compare a known-working
+    test artifact in a recoverable game installation.
 
-## Validation Boundaries
+## What Validation Proves
 
 - pyvgmstream verifies media decoding, not Event references or Wwise mixing.
 - wwiser verifies Bank/HIRC parsing, not MHW runtime acceptance.
-- LMT/WWEV reparsing and hashes prove structural preservation, not that the
-  chosen Motion or Event matches the intended action.
-- Byte comparisons prove preservation, not loudness or subjective quality.
-- In-game trigger, timing, mix, positioning, interruption, and Mod-conflict
-  testing remain final acceptance.
+- LMT/WWEV reparsing and hashes establish structural preservation, not that
+  the chosen Motion or Event matches the intended action.
+- Byte comparisons establish preservation, not loudness or subjective quality.
+- Game testing establishes trigger, timing, mix, positioning, interruption,
+  and conflict behavior for the scenarios actually exercised.

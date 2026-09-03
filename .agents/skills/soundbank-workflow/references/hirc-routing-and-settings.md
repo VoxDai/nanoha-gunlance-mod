@@ -1,130 +1,127 @@
 # HIRC Routing and Node Settings
 
-Read this reference when a task requires more than extracting or replacing
-embedded media: tracing a game Event, identifying every Sound path that uses a
-Media ID, or changing volume, pitch, positioning, parent, Container, or Aux
-behavior.
+Use this reference for Event analysis, shared media paths, node inheritance,
+Container topology, and interruption. Concrete Python operations are in the
+[HIRC API guide](../../../../tools/soundbank_editor/README.md#hirc); parameter
+and return-value contracts are in public docstrings.
 
 ## Object and Route Model
 
-The HIRC chunk begins with an object count. Each record contains a one-byte
-type, a little-endian body size, and a body whose first four bytes are the
-object ID. Common object types in these MHW Wwise v120 Banks are:
+The HIRC payload begins with an unsigned object count. Each record contains a
+one-byte type, a little-endian body size, and a body starting with a four-byte
+object ID. Object-relative offsets include those ID bytes at offset zero.
 
-- `0x02`: Sound
-- `0x03`: Action
-- `0x04`: Event
-- `0x05`: Random/Sequence Container
-
-A typical route is:
+| Type | Role |
+|---|---|
+| `0x02` Sound | Source media and local playback settings |
+| `0x03` Action | Play, PlayEvent, Stop, and other Event commands |
+| `0x04` Event | Ordered Action references |
+| `0x05` Random/Sequence Container | Children, weighted playlist, and selection behavior |
+| `0x06` Switch Container | Switch/State group, value-to-child packages, and child behavior |
+| `0x07` Actor-Mixer | Shared parent settings inherited by descendants |
 
 ```text
 Event ulActionID
-  -> Action idExt
-  -> Sound or Container
-  -> Container children, possibly through more parents
-  -> Sound sourceID
-  -> DIDX Media ID
+  → Action idExt
+  → Sound or Container (possibly nested)
+  → Sound sourceID
+  → DIDX Media ID
 ```
 
-A Media ID is not a unique playback route. The same media may appear in several
-Sounds, Events, or Containers with different inherited pitch, volume,
-positioning, Aux, or parent settings. Trace every path before selecting a
-donor or edit target.
+PlayEvent invokes another Event, while Stop targets a playback object. A
+Media ID is not a unique playback route: multiple Sounds, Events, or Containers
+can use the same media with different inherited settings. Trace all users
+before selecting a donor or target.
 
-## Trace a Route
+## Trace and Bound the Change
 
-Create the dump in the task's `/tmp` workspace:
+Create a wwiser dump in the task's temporary directory using the main skill's
+commands. Start from a known Event, HIRC object, or Media ID and record:
 
-```sh
-conda run -n nanoha-gunlance-mod python tools/wwiser/wwiser.py \
-  -d txt -dn "$temp_dir/bank-hirc" input.nbnk
-```
+- Every Event Action and its order; Action type, target, and Bank when relevant.
+- Container children, playlist weights, Random/Sequence mode, avoid-repeat
+  behavior, Switch packages, default value, and child transition parameters.
+- Sound source, DirectParentID, output, positioning, Aux, and inherited settings.
+- Sibling or paired spatial paths and all descendants of a shared parent.
+- Original serialized positions, which are distinct from parent references.
 
-Start from a known Event ID, HIRC object ID, or DIDX Media ID. Record the full
-Event → Action → Container → Sound → Media route, including:
+Object IDs are stable anchors; file offsets move when DATA or HIRC is rebuilt.
+Preserve undeclared fields and compare the intended graph with both the rebuilt
+graph and its serialization order.
 
-- every Event Action and its order;
-- Action type, target ID, and Bank ID when relevant;
-- Container children, playlist weights, random/sequence mode, and
-  avoid-repeat count;
-- Sound source ID, DirectParentID, output, positioning, and Aux inheritance;
-- sibling or paired spatial paths that reach the same audible event;
-- original object serialization positions.
+## Node Properties and Inheritance
 
-Use object IDs as stable anchors. File offsets are diagnostic only and move
-when DATA or HIRC is rebuilt.
+`NodeInitialParams` stores property IDs and corresponding values, including
+Volume (`0x00`, float dB), Pitch (`0x02`, float cents), CenterPCT (`0x0E`, float
+percentage), and GameAuxSendVolume (`0x17`, float dB). Random property ranges
+contribute alongside base values. Optional fields change later offsets, so
+never reuse an offset or flag pattern across nodes without inspecting it.
 
-## Common Node Properties
-
-`NodeInitialParams` contains a property count, property IDs, and corresponding
-values. Properties observed in this project include:
-
-- `0x00` Volume, stored as a float in dB.
-- `0x02` Pitch, stored as a float in cents.
-- `0x0E` CenterPCT, stored as a float percentage.
-- `0x17` GameAuxSendVolume, stored as a float in dB.
+Pitch uses 100 cents per semitone. Node-local base Pitch and random offsets
+accumulate with parent contributions; RTPC, State, and Action changes can also
+affect playback. A Sound with no local random property may inherit a range
+from a Container or Actor-Mixer. An explicit local zero does not cancel an
+ancestor's contribution. Changing a shared Actor-Mixer can affect all of its
+inheriting descendants. Identify the owner of each contribution before editing.
 
 `AuxParams` contains a version-specific bit vector and optional Aux Bus IDs.
-Use wwiser to interpret the exact object. Optional fields change later body
-offsets, so never reuse an offset or flag pattern across objects or Banks
-without inspecting and guarding the target.
+Interpret output, positioning, and Aux with wwiser on the exact target. Paired
+or layered paths generally need corresponding changes unless asymmetry is the
+reviewed intent. See the [Pitch API](../../../../tools/soundbank_editor/README.md#pitch)
+for absence/zero semantics and guarded property insertion.
 
-## Guarded Prototype Changes
+## Guarded Changes and New Routes
 
-1. Parse the original through `SoundBank.from_file()` and create a
-   `SoundBankEditor`; never edit the source file.
-2. Locate every target by HIRC type and object ID.
-3. Patch object-relative fields only, supplying the exact expected old value.
-   Use `patch_u8()`, `patch_u16()`, `patch_u32()`,
-   `patch_float()`, or `patch_bytes()` as appropriate.
-4. For structural changes, use `clone_sound()`, `insert_object()`,
-   `append_event_action()`, `create_play_action()`,
-   `create_play_event_action()`, or
-   `clone_random_sequence_container()`. These APIs rebuild sizes and reject
-   collisions.
-5. In the original v120 Banks, every Action referenced by an Event is
-   serialized before that Event. Preserve this order and validate references
-   after rebuilding.
-6. Adjust paired or layered paths symmetrically unless the intended behavior is
-   explicitly asymmetric.
-7. Call `validate()`, compare the exact summary and HIRC semantic diff,
-   re-extract changed media, and write only to a new temporary or
-   user-authorized output path.
+For a field change, identify the type and object ID, inspect its object-relative
+location, and preserve its exact old value as a guard. For a structural change,
+inspect the entire donor and every incoming/outgoing reference, then record
+the required donor topology or body guard. Unknown object types can be retained
+as bytes without being safe semantic authoring targets.
 
-Unknown HIRC types remain raw bodies and are not safe structural authoring
-targets. Arbitrary object deletion is unsupported.
+Clone Sounds from reviewed embedded donors. Preserve all fields other than the
+explicit new identities and reviewed property changes; verify parent, output,
+positioning, Aux, and memory-size fields. Add the media before validating its
+new Sound. Parenting and inserting a Container child are separate operations:
+confirm DirectParentID as well as the Container's child list.
 
-## Cloned Sounds and Custom Routes
+Create children before their parent Container and Actions before their Event.
+For v120, preserve this same order in the serialized HIRC. Matching IDs alone
+does not establish a usable graph. Low-level insertion requires choosing an
+appropriate anchor; high-level clones handle their documented placement rules.
 
-Clone only a reviewed donor Sound. Preserve all donor fields except explicitly
-reviewed new object/source IDs and guarded property changes. Confirm the new
-Sound's parent, output, positioning, Aux, and memory-size fields are correct.
+For Random routes, review the playlist, positive weights, selection mode, and
+avoid-repeat count. Equal weights with no avoid-repeat restriction yield
+independent uniform choices; two children with an avoid-repeat count of one
+alternate after the initial choice. Preserve unmodeled donor settings, and
+verify the new child/playlist tail and parent links.
 
-Create and insert each new Action before its Event, then append or construct the
-guarded Event Action list. When preserving an original sound through a new
-Event, verify the PlayEvent Action targets the complete original Event rather
-than only one descendant Sound.
+For Switch routes, review the Switch/State group, default value, ordered
+packages, and per-child transition/fade data. Filtering a clone removes branches
+only from that new topology, retains a valid default package, and leaves
+original objects intact. An explicitly rebuilt topology can assign packages
+independently of the donor's shared children. Validate child coverage and load
+order for either approach; no general original-object deletion is provided.
 
-For a random route, create and parent every child first, then use
-`clone_random_sequence_container()` with the donor's exact playlist and
-avoid-repeat count. The API preserves unmodeled donor fields and rebuilds only
-`Children` and `CAkPlayList`. Child IDs must already exist and be unique;
-weights must be positive signed 32-bit values. Equal weights with
-`avoid_repeat_count=0` give independent uniform selection; with two children,
-an avoid-repeat value of `1` alternates after the initial choice.
+When preserving original playback behind a new Event, route to the complete
+original Event rather than accidentally selecting one descendant Sound. For
+interruption, trace the native Stop route and clone its reviewed behavior to
+the new playback object, preserving scope, transitions, and unknown fields.
+Verify the new Action is attached to the correct Event and exercise the
+interruption in game.
 
-## Project Handoff Facts
+## Validation and Handoff Evidence
 
-For a persistent feature, supply `audio-design` with the audible behavior and
-all verified implementation facts:
+Compare exact summaries, semantic differences, references, and preservation;
+reparse with the Library and wwiser, then re-extract changed media. These checks
+do not replace game acceptance. For a persistent feature, provide `audio-design`
+with:
 
-- original Bank path, SHA-256, version, Bank ID, DIDX index, and Media ID;
-- complete original and proposed routes, Action ordering, donor IDs, parents,
-  paired paths, and collision checks;
-- object-relative offsets with exact old/new values;
-- allowed media/HIRC changes and expected summary;
-- positive and negative in-game acceptance cases.
+- Original Bank path, SHA-256, version, Bank ID, DIDX index, and Media ID.
+- Original and proposed routes, serialization order, donors, parents, paired
+  paths, collision checks, and Stop/interruption behavior.
+- Reviewed old/new fields and body/topology guards, allowed changes, and
+  expected summary.
+- Positive and negative game acceptance cases.
 
-`design-implement` encodes the resulting design in artifact builders and
-tests. Do not edit those layers as an implicit part of HIRC analysis.
+`design-implement` handles the resulting design's builders and tests. HIRC
+analysis does not implicitly include implementation or release publication.

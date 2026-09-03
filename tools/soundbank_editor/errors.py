@@ -1,17 +1,23 @@
-"""Public exception hierarchy for binary format editors."""
+"""Public exception hierarchy for format parsing, guards, and validation.
+
+Notes:
+    Catch EditorError to handle Library-defined failures across formats.
+    This hierarchy does not wrap ordinary filesystem OSError exceptions or
+    every invalid Python argument type accepted by an unvalidated code path.
+"""
 
 
 class EditorError(Exception):
-    """Base class for user-actionable parsing and editing failures."""
+    """Base exception for Library-defined parsing and editing failures."""
 
 
 class SoundBankError(EditorError):
-    """A SoundBank parsing or editing failure."""
+    """NBNK, HIRC, WEM, or Wwise ID validation failure."""
 
 
 class LmtError(EditorError):
-    """An LMT/TIML parsing or editing failure."""
+    """LMT/TIML parsing, request guard, or read-back validation failure."""
 
 
 class WwevError(EditorError):
-    """A WWEV parsing or editing failure."""
+    """WWEV parsing, record guard, or read-back validation failure."""

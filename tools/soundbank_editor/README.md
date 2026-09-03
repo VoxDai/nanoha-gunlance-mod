@@ -1,395 +1,302 @@
 # soundbank_editor
 
 `tools.soundbank_editor` is the project-local Python Library for lossless NBNK,
-LMT v95/TIML, and WWEV v19 parsing. It provides embedded WEM extraction,
-DIDX/DATA rebuilding, guarded HIRC edits and Container cloning, Motion-scoped
-request substitution, and guarded WWEV record cloning. It has no command-line
-or JSON-plan interface.
-Import its public API with `from tools import soundbank_editor`; the internal
-modules are split by binary format.
+LMT v95/TIML, and WWEV v19 parsing and guarded editing. It has no CLI or
+JSON-plan interface.
 
-## Parse and extract
+This README owns **API navigation and examples**. Public docstrings own exact
+parameters, return values, guards, exceptions, and side effects. For binary
+structure, route analysis, editing workflow, external validation tools, and
+project handoff, read the
+[soundbank-workflow skill](../../.agents/skills/soundbank-workflow/SKILL.md).
+
+## Public entry point
 
 ```python
 from pathlib import Path
-from tools import soundbank_editor
-
-bank = soundbank_editor.SoundBank.from_file(
-    Path("original/nbnk/wp_gun_cmn.nbnk")
-)
-print(bank.version, bank.bank_id, len(bank.entries))
-
-entry = bank.media_entry(index=22)  # DIDX indices are 1-based
-Path("/tmp/22.wem").write_bytes(bank.extract_media(index=22))
+from tools import soundbank_editor as se
 ```
 
-`SoundBank.to_bytes()` is lossless. A parsed Bank with no edits must serialize
-byte-for-byte identically, including unknown chunks and HIRC object bodies.
+Import public names from this package. Its `__all__` is the public API list;
+`editor.py` retains legacy imports, and `EditSummary` aliases
+`SoundBankEditSummary`. Neither introduces a separate implementation. Use
+`help(se.SoundBankEditor.replace_media)`, for example, to inspect a contract.
 
-## Guarded media and HIRC edits
+| API family | Public entry points and source docstrings |
+|---|---|
+| NBNK | [SoundBank, SoundBankEditor, Chunk, MediaEntry, SoundBankEditSummary, SoundBankDiff, validate_wem, wwise_fnv1](soundbank.py) |
+| HIRC | [HircEditor, HircObject, SwitchContainerTopology, SwitchNodeParams](hirc.py); [HircPitchSettings](_pitch.py) |
+| LMT/TIML | [LmtFile, LmtEditor, LmtAction, TimlType, TimlTransform, TimlKeyframe, TriggeredRequest, LmtRequestEdit, LmtEditSummary](lmt.py) |
+| WWEV | [WwevFile, WwevEditor, WwevRecord, WwevRecordEdit, WwevEditSummary](wwev.py) |
+| Errors | [EditorError, SoundBankError, LmtError, WwevError](errors.py) |
+| Constants and compatibility | [Package docstring and exports](__init__.py); [legacy imports](editor.py) |
+
+`from_file()` records the resolved input path; `from_bytes()` has no source-path
+identity. Parsed files serialize losslessly with `to_bytes()`. Editors keep
+changes in memory until explicitly written. The examples below run from the
+project root and share the imports above; no example writes into `original/`.
+
+## NBNK and media
+
+| Task | API |
+|---|---|
+| Parse, inspect, serialize | `SoundBank.from_file()`, `from_bytes()`, `chunk()`, `hirc_payload`, `to_bytes()` |
+| Select or extract media | `media_entry()`, `extract_media()`, `extract_all_media()` on parsed Bank or editor |
+| Compare parsed Banks | `SoundBank.diff(other)` → `SoundBankDiff` |
+| Replace or append | `SoundBankEditor.replace_media()`, `append_media()` |
+| Add a route | `add_custom_sound_action()`, `add_play_event_action()` |
+| Check a WEM or derive an ID | `validate_wem()`, `wwise_fnv1()` |
+
+Select media by exactly one of the 1-based DIDX `index` or the unique
+`media_id`. `extract_all_media()` maps **DIDX indices**, not Media IDs, to bytes.
+Editor queries include pending replacements and additions; parsed Bank queries
+remain unchanged.
 
 ```python
-editor = soundbank_editor.SoundBankEditor(bank)
-editor.replace_media(
-    Path("/tmp/replacement.wem"),
-    index=22,
-    expected_media_id=entry.media_id,
-)
-editor.hirc.patch_float(
-    soundbank_editor.HIRC_SOUND,
-    123456,
-    0x20,
-    -5.0,
-    -6.5,
-    label="lower reviewed Sound route",
-)
-rebuilt = editor.validate()
-payload = editor.build()
+bank = se.SoundBank.from_file("original/nbnk/wp_gun_cmn.nbnk")
+entry = bank.media_entry(index=22)
+assert entry.media_id == 723639573
+wem_bytes = bank.extract_media(index=22)
+assert bank.to_bytes() == Path("original/nbnk/wp_gun_cmn.nbnk").read_bytes()
 ```
 
-Field patches are object-relative and require the exact old value. Media edits
-rebuild DIDX/DATA with 16-byte alignment. `validate()` reparses the result and
-rejects undeclared HIRC changes, broken Event/Action references, and invalid new
-Sound-to-Media references. For Wwise v120, Container children must be serialized
-before their parent Container, and every Action referenced by an Event must be
-serialized before that Event. The high-level Container and Action APIs preserve
-these load-order requirements automatically.
+To save an extracted WEM for inspection, write the returned bytes inside the
+task's temporary directory. Conversion, pyvgmstream, and wwiser commands are
+in the skill. `validate_wem()` only checks enough RIFF/fmt structure to reject
+obvious invalid input and ordinary PCM WAV; it does not decode audio or certify
+the project's complete Wwise PCM layout.
 
-## Read and set node pitch
-
-`HircEditor.pitch_settings()` and `set_pitch()` support Wwise v120 Sounds, Random/Sequence Containers, Switch
-Containers, and Actor-Mixers (`HIRC_ACTOR_MIXER`). Both base Pitch and its random offsets are in **cents**
-(100 cents = one semitone). The API locates the property tables structurally; callers do not supply byte offsets.
+This callable recipe accepts a converted WEM, guards the reviewed original
+media identity, and returns a validated editor without writing a file:
 
 ```python
-bank = soundbank_editor.SoundBank.from_file(
-    Path("original/nbnk/wp07_gun_epvsp_shell.nbnk")
-)
-editor = soundbank_editor.SoundBankEditor(bank)
+def replace_reviewed_media(wem: bytes | Path) -> se.SoundBankEditor:
+    editor = se.SoundBankEditor.from_file("original/nbnk/wp_gun_cmn.nbnk")
+    editor.replace_media(wem, index=22, expected_media_id=723639573)
+    editor.validate()
+    return editor
+```
 
-settings = editor.hirc.pitch_settings(
-    soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, 145848034
-)
-# HircPitchSettings(base_cents=None, random_range_cents=(-50.0, 50.0))
+`expected_media_id` and `expected_sha256` are optional in the API. The project
+workflow requires reviewed identity guards; persistent guards should be fixed
+from original evidence. Replacing media is not restricted to v120 by the method,
+whereas adding media and high-level structural authoring require v120. Exact
+support and checks are documented per method, not implied for all versions.
 
-# Add a fixed offset and change the existing random range in one guarded edit.
-updated = editor.hirc.set_pitch(
-    soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+## HIRC
+
+Access the Bank editor's `hirc` attribute; a standalone `HircEditor` instead
+accepts a HIRC chunk payload and explicit version/reserved IDs.
+
+| Task | API |
+|---|---|
+| Inspect | `objects()`, `object()`, `object_body()`, `object_ids`, `event_actions()`, `switch_container_topology()` |
+| Reserve new media IDs | `reserve_id()`; normally coordinated by `SoundBankEditor.append_media()` |
+| Patch a field | `patch_bytes()`, `patch_u8()`, `patch_u16()`, `patch_u32()`, `patch_float()` |
+| Replace/insert a body | `replace_object_body()`, `insert_object()` |
+| Assemble Actions | `create_play_action()`, `create_play_event_action()`, `append_event_action()` |
+| Clone | `clone_sound()`, `clone_stop_action()`, `clone_random_sequence_container()`, `clone_switch_container()`, `clone_switch_container_with_topology()` |
+| Inspect changes | `changed_byte_count`, `added_objects`, `patched_objects`, `rebuilt_objects`, `resized_objects`, `build()` |
+
+`objects()` and `object()` return detached copies, and `object_body()` returns
+immutable bytes. Editing these results does not edit the Bank. HIRC indices are
+zero-based serialized positions. Field offsets are relative to the body,
+including the leading four-byte object ID; field patches cannot alter that ID.
+Use inspected offsets and expected old bytes, not offsets copied from a different
+node. Exact patch/rebuild composition rules are in the method docstrings.
+
+`create_play_action()` and `create_play_event_action()` return complete bodies,
+including the ID, without inserting or reserving anything. `insert_object()`
+accepts the body **after** those four ID bytes. Attaching an Action to an Event
+is another operation. The Bank-level convenience methods compose these steps.
+
+### Pitch
+
+Pitch methods support v120 Sound, Random/Sequence Container, Switch Container,
+and Actor-Mixer nodes. This example uses reviewed literal settings from the
+original shell Bank:
+
+```python
+pitch_editor = se.SoundBankEditor.from_file(
+    "original/nbnk/wp07_gun_epvsp_shell.nbnk"
+)
+updated = pitch_editor.hirc.set_pitch(
+    se.HIRC_RANDOM_SEQUENCE_CONTAINER,
     145848034,
-    expected=soundbank_editor.HircPitchSettings(
-        base_cents=None, random_range_cents=(-50.0, 50.0)
-    ),
+    expected=se.HircPitchSettings(None, (-50.0, 50.0)),
     base_cents=-100.0,
     random_range_cents=(-25.0, 25.0),
 )
-# This container now contributes between -125 and -75 cents.
-rebuilt = editor.validate()
+assert updated == se.HircPitchSettings(-100.0, (-25.0, 25.0))
+pitch_editor.validate()
 ```
 
-`HircPitchSettings` is frozen. A `None` field in the inspected/expected settings means that the property **does not
-exist**, which differs from an explicit zero. `expected` must match both fields, including absence; numerical guards
-compare float32 encodings, including the sign of zero. Persistent builders should supply reviewed literal settings
-rather than deriving the guard from the live target during a build.
+`pitch_settings()` reads local settings. In `expected`, `None` means the
+property is absent; replacement `None` retains the existing property. Expected
+values compare float32 encodings, including signed zero. Values must be finite
+float32 numbers; ranges are ordered `(min, max)` tuples. Zero inserts or retains
+an explicit property rather than removing it. Same-value updates validate the
+guard but do not add edit bookkeeping. See `set_pitch()` for insertion and
+patch conflicts, and the
+[HIRC reference](../../.agents/skills/soundbank-workflow/references/hirc-routing-and-settings.md#node-properties-and-inheritance)
+for inheritance and audible interpretation.
 
-In `set_pitch()` replacement arguments, omitted values or `None` retain the current setting. At least one setting is
-required. Missing properties are inserted in ID order, even when the requested value is zero. The returned settings
-contain the stored float32 values. Same-value requests are no-ops after guard validation and leave the body and edit
-summary unchanged.
+### Clone and compose routes
 
-For example, on a fresh editor for the same original Bank, disable just the container's random contribution while
-retaining its absent base Pitch:
-
-```python
-editor = soundbank_editor.SoundBankEditor(bank)
-editor.hirc.set_pitch(
-    soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
-    145848034,
-    expected=soundbank_editor.HircPitchSettings(None, (-50.0, 50.0)),
-    random_range_cents=(0.0, 0.0),
-)
-```
-
-To add a fixed local offset directly to its Sound, whose own Pitch properties are absent:
+The following recipe is parameterized: all IDs and guards must come from the
+reviewed route. It adds media, clones an embedded Sound, and attaches a new Play
+Action to an existing Event. It does not choose a donor or output path:
 
 ```python
-editor.hirc.set_pitch(
-    soundbank_editor.HIRC_SOUND,
-    535190438,
-    expected=soundbank_editor.HircPitchSettings(None, None),
-    base_cents=100.0,
-)
-```
-
-These methods read/edit **local node contributions**. Parent Pitch settings still accumulate, and RTPC/State/Action
-changes may also affect playback. A Sound with no local random property can inherit a random range from its Container or
-Actor-Mixer. Setting a child's local base or range to zero does not cancel an ancestor's contribution. Editing a shared
-Actor-Mixer affects all descendants that inherit its settings.
-
-Base values and range endpoints must be Python `int`/`float` numbers encodable as finite float32, excluding booleans,
-NaN, infinity and overflow. Random ranges are two-element `(min, max)` tuples with `min <= max`; asymmetric ranges are
-allowed. Property removal is not provided; `(0.0, 0.0)` leaves an explicit zero range. Unsupported object types/versions
-and malformed property tables raise `SoundBankError`.
-
-Edits are preflighted as a unit: a bad guard, invalid input, count overflow or edit conflict leaves the object and edit
-bookkeeping unchanged. Existing Pitch values use the normal field-patch bookkeeping, while insertion rebuilds the object
-and updates its size. Other property bytes, node routing, FX/source parameters, and the remaining object body are
-preserved.
-
-The existing composition rules still apply:
-
-- Equal-length Pitch edits can coexist with non-overlapping field patches; rewriting an already patched Pitch field is
-  rejected, except for a no-op.
-- Inserting a property cannot follow any field patch on that same object. After an object rebuild, field patches
-  (including equal-length Pitch edits)
-  are rejected. Combine required base/range changes in one call when inserting properties, and use the existing guarded
-  whole-body replacement workflow when combining a structural change with other edits on the same object.
-
-## Add a custom one-shot Sound
-
-```python
-editor.add_custom_sound_action(
-    event_id=1665664746,
-    action_id=4294967003,
-    sound_id=4294967002,
-    media_id=4294967001,
-    donor_sound_id=330120372,
-    wem=Path("/tmp/custom.wem"),
-    expected_actions=(325918653, 744297877),
-    expected_donor_source_id=321677221,
-)
-```
-
-This v120-only operation appends the WEM, clones a reviewed embedded Sound,
-creates a Play Action, and appends it to the guarded Event action list. The
-donor Sound's node, output, positioning, Aux, and memory-size data are retained.
-The new Action is inserted immediately before its owning Event rather than at
-the end of the Action objects, matching the ordering used by the original Banks.
-Use distinct explicit IDs; `wwise_fnv1(name)` is available when a deterministic
-Wwise-style ID is wanted.
-
-## Clone a native Stop Action
-
-When a custom playback object must follow an existing Event's interruption
-behavior, clone the reviewed native Stop Action instead of reconstructing its
-version-specific fields:
-
-```python
-editor.hirc.clone_stop_action(
-    donor_action_id=743936681,
-    new_action_id=2987046856,
-    new_target_id=4149261730,
-    expected_target_id=60034062,
-    expected_body_sha256=(
-        "137f38d973a5e3b84d35d84146d2b562e21e575abbfee532"
-        "b8531d3583ae0ebd"
-    ),
-    before_event_id=461444626,
-)
-editor.hirc.append_event_action(
-    461444626,
-    2987046856,
-    expected_actions=(743936681,),
-)
-```
-
-This v120-only API requires an exact donor target and full body hash, verifies
-that the new target and serialization anchor exist, and rejects ID collisions.
-It preserves every donor field except the Action ID and target ID, including
-scope, properties, transition, fade curve, exception data, and unknown bytes.
-The clone is serialized before the selected Event; attach it separately with
-the guarded `append_event_action()` API. `SoundBankEditor.validate()` reparses
-Stop Action targets and rejects missing references.
-
-## Clone a random Container
-
-Create every child object first, then clone a reviewed v120 Random/Sequence
-Container with a guarded replacement playlist:
-
-```python
-editor.hirc.clone_random_sequence_container(
-    donor_container_id=145848034,
-    new_container_id=1771233315,
-    playlist=((3336168856, 50000), (173193142, 50000)),
-    expected_playlist=((535190438, 50000),),
-    expected_avoid_repeat_count=1,
-    avoid_repeat_count=0,
-)
-```
-
-The operation locates the donor's terminal `Children` and `CAkPlayList`
-structures, requires an exact expected playlist and avoid-repeat value, and
-rebuilds only that tail. The donor's node, output, positioning, Aux, loop, and
-other unmodeled fields remain byte-exact. Child IDs must already exist and be
-unique; weights must be positive signed 32-bit values. The donor must be in
-Random mode. The clone retains stable type-group placement while ensuring that
-it is serialized after every playlist child. Setting `avoid_repeat_count=0`
-allows independent selections; omitting it preserves the donor value.
-
-When cloned Sounds become children of the new Container, separately patch each
-reviewed `DirectParentID` field with `patch_u32()`. Any positioning override
-must likewise use its inspected object-relative offset and expected old byte.
-`SoundBankEditor.validate()` reparses added Containers and rejects missing child
-references or malformed child/playlist topology.
-
-## Clone and filter a Switch Container
-
-Inspect a Wwise v120 donor once, persist the reviewed topology and body hash as
-guards, create the replacement child objects, then clone the Switch Container
-with an explicit mapping for every donor child:
-
-```python
-reviewed = soundbank_editor.SwitchContainerTopology(
-    group_type=0,
-    group_id=3251135135,
-    default_switch=3396333570,
-    continuous_validation=0,
-    children=(101900622, 125400496, 127521149, 133098601, 438972177),
-    switch_packages=reviewed_packages,
-    node_params=reviewed_node_params,
-)
-
-editor.hirc.clone_switch_container(
-    donor_container_id=368774789,
-    new_container_id=4010844647,
-    child_map={
-        101900622: None,
-        125400496: None,
-        127521149: 3163089818,
-        133098601: None,
-        438972177: None,
-    },
-    expected_topology=reviewed,
-    expected_body_sha256=(
-        "a6df54f2d29b79482420ff8a17420b0952cbb64589e03dde"
-        "1358c02ab99043bb"
-    ),
-)
-```
-
-`switch_container_topology()` returns the parsed Group, default value,
-Children, ordered Switch packages, and ordered `SwitchNodeParams` records for
-inspection. Persistent edits must use a reviewed literal rather than deriving
-their guard from the live donor during the build.
-
-The clone preserves the donor prefix and property bytes, package order, and
-per-child behavior/transition/fade parameters. Each donor child must map
-exactly once to an existing unique HIRC object or `None`; packages emptied by
-deletion are omitted. The default Switch package must survive. Ambiguous or
-malformed tails, internal package/parameter references that do not exactly
-cover the retained Children, body-hash/topology drift, ID collisions, and
-non-v120 Banks are rejected. The clone retains stable type-group placement
-unless a retained child is later, in which case it is placed after that child.
-`SoundBankEditor.validate()` repeats the topology parse after serialization and
-also rejects missing or parent-before-child references.
-
-When a reviewed route must assign packages independently of the donor's shared children, use
-`clone_switch_container_with_topology()`. It accepts a complete replacement `SwitchContainerTopology`, while retaining
-the donor prefix and requiring the same exact donor topology and body SHA-256 guards. Every replacement child must
-already exist; default-package coverage, unique IDs, package-to-child coverage, serialization order, and v120
-compatibility are validated identically to the filtered clone API.
-
-For persistent project work, call these APIs from the guarded `apply_edits()`
-callback of an explicit plan under `builders/`. `SoundBankBuildPlan` declares
-each `MediaReplacement` or `MediaAddition` directly, including its 1-based DIDX
-index, Media ID, project WAV path, original Bank identity and exact expected
-`SoundBankEditSummary`. The builder converts WAVs, runs wwiser and pyvgmstream
-validation, rejects callback media edits not declared in the plan, and publishes
-only after read-back succeeds. `docs/mapping/` is
-research documentation and is never parsed at build time.
-
-LMT and WWEV routes use the same pattern through `LmtBuildPlan` and
-`WwevBuildPlan`, with fixed source hashes, exact editor summaries and fixed
-output hashes. `ModBuildPlan` groups every target and runs cross-file validators
-before replacing the complete `release/nativePC/` tree. These project plan
-types are orchestration around the Library; the Library itself remains free of
-CLI and project-specific route data.
-
-## Trace LMT requests through WWEV
-
-```python
-from pathlib import Path
-from tools import soundbank_editor
-
-lmt = soundbank_editor.LmtFile.from_file(Path("input.lmt"))
-wwev = soundbank_editor.WwevFile.from_file(Path("input.wwev"))
-
-for route in lmt.triggered_requests(wwev):
-    print(
-        route.motion_id,
-        route.trigger_frame,
-        route.event_group,
-        route.slot,
-        route.request_no,
-        route.event_id,
+def add_reviewed_one_shot(
+    editor, *, wem, event_id, action_id, sound_id, media_id,
+    donor_sound_id, expected_actions, expected_donor_source_id,
+):
+    editor.add_custom_sound_action(
+        event_id=event_id,
+        action_id=action_id,
+        sound_id=sound_id,
+        media_id=media_id,
+        donor_sound_id=donor_sound_id,
+        wem=wem,
+        expected_actions=expected_actions,
+        expected_donor_source_id=expected_donor_source_id,
     )
+    return editor.validate()
 ```
 
-`LmtFile` preserves the complete input and exposes populated Motion headers and
-embedded TIML types, transforms, and keyframes. Request reports map the low
-eight `mTrigger` bits to ReqNo slots A through H. Repeated WWEV records are
-expanded rather than silently collapsed, and shared TIML offsets list every
-affected Motion.
+For other compositions, use the following entry points and their docstrings:
 
-## Guarded LMT request substitution
+- `add_play_event_action()` attaches a new PlayEvent Action to an existing
+  Event. `clone_stop_action()` inserts a guarded Stop clone before the selected
+  Event; attach it separately with `append_event_action()`.
+- `clone_random_sequence_container()` requires an exact donor playlist and
+  avoid-repeat guard, existing unique replacement children, and a Random-mode
+  donor. It does not update the children's DirectParentID.
+- `clone_switch_container()` accepts a complete donor-child map: replacement
+  IDs or `None` to omit that branch from the clone. It requires the reviewed
+  `SwitchContainerTopology` and full donor-body SHA-256. The default package
+  must survive. Original objects are not deleted.
+- `clone_switch_container_with_topology()` takes a complete replacement
+  topology instead of a child map, with the same donor guards. It supports
+  independent package assignment while preserving the donor prefix.
+
+Inspect topology and body hashes during review, then persist those values for
+reproducible edits. Do not compute a persistent expected guard from the live
+donor during the build. New IDs must be explicit; `wwise_fnv1(name)` computes a
+deterministic ID but does not reserve it or guarantee collision freedom.
+
+## LMT and WWEV
+
+| Task | API |
+|---|---|
+| Inspect a Motion/TIML | `LmtFile.action()`, `timl_for_motion()`, `actions`, `entry_count` |
+| Expand trigger routes | `LmtFile.triggered_requests(wwev=None)` → tuple of `TriggeredRequest` |
+| Replace one assignment | `LmtEditor.replace_request()` → `LmtRequestEdit` |
+| Query every matching record | `WwevFile.records_for_request()`, `WwevEditor.records_for_request()` |
+| Require one matching record | `WwevFile.record()` → `WwevRecord` |
+| Inspect a record guard | `WwevRecord.raw`, `size`, `sha256` |
+| Append a full donor clone | `WwevEditor.append_cloned_record()` → appended `WwevRecord` |
 
 ```python
-editor = soundbank_editor.LmtEditor(lmt)
-edit = editor.replace_request(
+lmt = se.LmtFile.from_file("original/lmt/w07_00.lmt")
+wwev = se.WwevFile.from_file("original/wwev/hm_wp07_snd_ev.wwev")
+rows = lmt.triggered_requests(wwev)
+selected = [row for row in rows if row.motion_id == 2 and row.slot == "B"]
+assert len(selected) == 1
+assert (selected[0].request_no, selected[0].event_id) == (6470, 3567942167)
+```
+
+Repeated WWEV records produce separate rows; unresolved requests retain a row
+with `None` WWEV fields. Shared TIML reports all affected Motion IDs. Motion IDs
+are zero-based; WWEV record indices are one-based. `record()` rejects both zero
+matches and ambiguous matches, whereas `records_for_request()` returns all
+matches, including an empty tuple.
+
+The following continues the example in memory using guards verified against
+these original artifacts. The new Event ID must separately exist in the target
+Bank for a playable combined Mod; LMT/WWEV validation does not check the Bank.
+
+```python
+lmt_editor = se.LmtEditor(lmt)
+lmt_editor.replace_request(
     motion_id=2,
     event_group="EventGroup06",
     slot="B",
     request_keyframe_frame=0.0,
-    expected_request=100,
-    replacement_request=101,
+    expected_request=6470,
+    replacement_request=6592,
     expected_trigger_frames=(9.0,),
 )
-rebuilt_lmt = editor.validate()
+wwev_editor = se.WwevEditor(wwev)
+wwev_editor.append_cloned_record(
+    donor_request=6470,
+    expected_donor_event_id=3567942167,
+    expected_donor_mode=2,
+    expected_donor_sha256=(
+        "1c6fd120501ce70925b00d8ab0166a38b132"
+        "934e220a1095506424024a33e53f"
+    ),
+    new_request=6592,
+    new_event_id=3176129810,
+)
+rebuilt_lmt = lmt_editor.validate()
+rebuilt_wwev = wwev_editor.validate()
+changed = [
+    row for row in rebuilt_lmt.triggered_requests(rebuilt_wwev)
+    if row.motion_id == 2 and row.slot == "B"
+]
+assert len(changed) == 1
+assert (changed[0].trigger_frame, changed[0].request_no, changed[0].event_id) == (
+    9.0, 6592, 3176129810,
+)
 ```
 
-The editor requires one unshared Motion TIML, one typed request transform, one
-matching assignment keyframe, and the exact trigger-frame set. It changes only
-the keyframe's four-byte value and rejects overlapping edits. ReqNo values use
-the positive signed-16 range shared with WWEV.
+Request edits require positive signed-16 ReqNo values, an unshared Motion TIML,
+one matching typed assignment, and the exact trigger-frame set. Frame guards
+use an absolute tolerance of `1e-5`. WWEV additions reject existing new ReqNo
+or Event IDs within that editor. The donor hash covers the complete record;
+original records and dependencies are preserved.
 
-## Guarded WWEV record cloning
+## Validation and writing
+
+All three file editors expose the following; `summary` is a property:
+
+| Member | Contract |
+|---|---|
+| `build()` | Return current bytes; no disk write and no full validation pass |
+| `validate()` | Build and reparse, check format-specific invariants, return a parsed file |
+| `summary` | Return an immutable change report without validating |
+| `write_atomic(output, overwrite=False)` | Validate, stage beside the output, then replace that output path |
+
+`SoundBankEditor.diff()` validates and returns a `SoundBankDiff`; the other
+editors expose summaries and byte-preservation checks instead. A standalone
+`HircEditor.build()` returns only the HIRC payload and does not perform Bank-level
+validation. SoundBank validation checks declared HIRC changes, v120 Event/Action
+references and order, and newly added Sound/Container references. It does not
+semantically validate every unknown field or every existing Container.
+
+Here is an optional temporary-file round trip using the `lmt_editor` above:
 
 ```python
-donor = wwev.record(100)
-editor = soundbank_editor.WwevEditor(wwev)
-editor.append_cloned_record(
-    donor_request=100,
-    expected_donor_event_id=123456,
-    expected_donor_mode=2,
-    expected_donor_sha256="0123456789abcdef" * 4,
-    new_request=101,
-    new_event_id=654321,
-)
-rebuilt_wwev = editor.validate()
+from tempfile import TemporaryDirectory
+
+with TemporaryDirectory(prefix="soundbank-api.", dir="/tmp") as temp_dir:
+    output = lmt_editor.write_atomic(Path(temp_dir) / "edited.lmt")
+    assert se.LmtFile.from_file(output).to_bytes() == lmt_editor.build()
 ```
 
-Record SHA-256 covers the entire variable-length donor, including mode,
-command hash, the 116-byte unknown region, WWPC, and its terminator. The editor
-preserves dependencies and every original record byte-for-byte, updates only
-the record count, and appends verified clones. Inspect and record the donor hash
-before writing a persistent edit plan; do not derive a guard from an unreviewed
-input at edit time.
+`overwrite=True` permits replacing an existing output. It never permits
+replacing a recorded input path, compared after path resolution. An editor
+created from bytes has no input path to protect. The existence check is not
+concurrency-safe exclusive creation; coordinate competing writers externally.
+The atomic file replacement is not a multi-file release transaction.
 
-`SoundBankEditor`, `LmtEditor`, and `WwevEditor` all provide `build()`,
-`validate()`, summaries, and `write_atomic()`. Atomic writes reject input-path
-overwrites and existing outputs unless `overwrite=True` is explicit. Catch
-`EditorError` for every format or the format-specific `SoundBankError`,
-`LmtError`, and `WwevError` subclasses.
-
-## Boundaries
-
-- Structural authoring supports MHW Wwise v120. Other versions are read-only.
-- LMT/TIML parsing and editing supports MHW LMT v95 only.
-- WWEV parsing and append-only editing supports MHW WWEV v19 only.
-- Unknown HIRC types are preserved, not semantically decoded.
-- Unknown WWEV record bytes are retained and included in donor guards.
-- Arbitrary HIRC object deletion is intentionally unsupported.
-- Project builders fix original NBNK/LMT/WWEV SHA-256 values, but intentionally
-  do not fix WAV hashes so a reviewed mix can be adjusted at the same declared
-  path and rebuilt without changing routing code.
-- A successful parse is not proof of game-runtime acceptance; complete trigger,
-  mix, spatial, loop/Stop, and mod-conflict testing in game.
+Catch `EditorError` for Library parsing/editing failures or use its
+format-specific subclasses. Ordinary filesystem failures may propagate as
+`OSError`; this hierarchy does not wrap every Python exception. No generic
+media, object, timeline, or record deletion API is provided. See the
+[workflow](../../.agents/skills/soundbank-workflow/SKILL.md#work-from-evidence-to-a-verified-artifact)
+for external decoding, preservation evidence, and game acceptance, and its
+[project handoff](../../.agents/skills/soundbank-workflow/SKILL.md#project-handoff)
+for design, builder, and complete-release work.

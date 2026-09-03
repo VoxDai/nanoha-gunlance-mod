@@ -1,6 +1,9 @@
-"""Backward-compatible imports for the former monolithic editor module.
+"""Compatibility imports for the former monolithic SoundBank editor module.
 
-New code should import public symbols from :mod:`tools.soundbank_editor`.
+Notes:
+    New code should import from ``tools.soundbank_editor``. These names
+    reference the same implementations and constants, including the
+    EditSummary alias; this module defines no separate editing behavior.
 """
 
 from .errors import SoundBankError

@@ -1,4 +1,10 @@
-"""Lossless parsing and guarded editing for MHW WWEV v19 event lists."""
+"""Lossless MHW WWEV v19 parsing and append-only guarded record cloning.
+
+Notes:
+    Public names are re-exported by tools.soundbank_editor. Record indices
+    are one-based and offsets are absolute file byte positions. See README.md
+    for API examples and soundbank-workflow for structure and route analysis.
+"""
 
 from __future__ import annotations
 
@@ -48,7 +54,19 @@ def _normalize_sha256(value: str, label: str) -> str:
 
 @dataclass(frozen=True)
 class WwevRecord:
-    """One complete variable-length WWEV request record."""
+    """Immutable complete variable-length WWEV request record.
+
+    Attributes:
+        index: 1-based serialized record position.
+        offset: Absolute byte offset of the record in the WWEV.
+        request_no: Stored signed-16 request number; not necessarily unique.
+        mode: Stored signed-16 mode.
+        event_id: Unsigned 32-bit Event ID.
+        command_hash: Unsigned 32-bit command hash.
+        unknown: Retained 116-byte unmodeled region.
+        wwpc: Decoded UTF-8 WWPC string, excluding its terminator.
+        raw: Complete serialized record, including the NUL string terminator.
+    """
 
     index: int
     offset: int
@@ -62,16 +80,37 @@ class WwevRecord:
 
     @property
     def size(self) -> int:
+        """Return the complete raw record length in bytes, including its terminator."""
+
         return len(self.raw)
 
     @property
     def sha256(self) -> str:
+        """Return the lowercase SHA-256 hex digest of the complete raw record.
+
+        Notes:
+            Covers ReqNo, mode, Event ID, command hash, unknown bytes, WWPC, and
+            terminator; neither file header/dependencies nor index/offset is included.
+        """
+
         return hashlib.sha256(self.raw).hexdigest()
 
 
 @dataclass(frozen=True)
 class WwevFile:
-    """An immutable, losslessly parsed WWEV v19 event list."""
+    """Immutable WWEV v19 event list; use from_file() or from_bytes() to parse.
+
+    Attributes:
+        version: Accepted WWEV version, 19.
+        unknown: Preserved unsigned header word.
+        dependencies: Four decoded UTF-8 dependency strings, in input order.
+        records: Complete request records in serialized order, including repeats.
+        source_path: Resolved input filename for from_file(), otherwise None.
+
+    Notes:
+        The original payload is retained byte-for-byte. Direct dataclass
+        construction bypasses parser validation.
+    """
 
     version: int
     unknown: int
@@ -82,6 +121,23 @@ class WwevFile:
 
     @classmethod
     def from_file(cls, path: Path | str) -> WwevFile:
+        """Read and parse a file, retaining its resolved path for output protection.
+
+        Args:
+            path: Path or string filename of the input artifact.
+
+        Returns:
+            Parsed WwevFile.
+
+        Raises:
+            WwevError: The path is not a file or format parsing fails.
+            OSError: Reading the file or resolving its path fails.
+
+        Notes:
+            Does not modify the input. Editors reject writing to this resolved
+            source_path even when output overwrite is enabled.
+        """
+
         source = Path(path)
         if not source.is_file():
             raise WwevError(f"WWEV does not exist: {source}")
@@ -97,6 +153,23 @@ class WwevFile:
 
     @classmethod
     def from_bytes(cls, payload: bytes) -> WwevFile:
+        """Parse immutable input bytes without recording a source filename.
+
+        Args:
+            payload: Complete file as bytes; bytearray/memoryview are not accepted
+                by the underlying parsed-file factory.
+
+        Returns:
+            Parsed WwevFile; source_path is None.
+
+        Raises:
+            WwevError: The input is not bytes or parsing checks fail.
+
+        Notes:
+            Checks WWEV v19 header, four UTF-8 dependencies, complete records, and absence of trailing data.
+            No file I/O occurs; source-path overwrite protection is unavailable.
+        """
+
         if not isinstance(payload, bytes):
             raise WwevError("WWEV input must be bytes")
         require_range(payload, 0, WWEV_HEADER.size, "WWEV header", WwevError)
@@ -165,14 +238,39 @@ class WwevFile:
         )
 
     def to_bytes(self) -> bytes:
+        """Return the complete original WWEV bytes without rebuilding, validation, or I/O."""
+
         return self._payload
 
     def records_for_request(self, request_no: int) -> tuple[WwevRecord, ...]:
+        """Select every matching request from the original records.
+
+        Args:
+            request_no: Request number compared for equality; lookup adds no
+                positive signed-16 range restriction.
+
+        Returns:
+            Immutable record tuple in serialization order; empty if absent.
+            Repeated matches are retained rather than treated as an error.
+        """
+
         return tuple(
             record for record in self.records if record.request_no == request_no
         )
 
     def record(self, request_no: int) -> WwevRecord:
+        """Require a single original record for a request number.
+
+        Args:
+            request_no: Request number to look up, as for records_for_request().
+
+        Returns:
+            The matching immutable WwevRecord.
+
+        Raises:
+            WwevError: There are zero matches or multiple matches.
+        """
+
         matches = self.records_for_request(request_no)
         if len(matches) != 1:
             raise WwevError(
@@ -183,7 +281,17 @@ class WwevFile:
 
 @dataclass(frozen=True)
 class WwevRecordEdit:
-    """One declared donor-to-appended-record edit."""
+    """Immutable bookkeeping for one donor-to-appended-record operation.
+
+    Attributes:
+        donor_record_index: 1-based donor position in the working WWEV.
+        donor_request: Donor's request number.
+        donor_event_id: Donor's Event ID.
+        added_record_index: 1-based position of the appended record.
+        new_request: Appended record's positive signed-16 request number.
+        new_event_id: Appended record's unsigned-32 Event ID.
+        appended_size: Complete appended byte length, including WWPC terminator.
+    """
 
     donor_record_index: int
     donor_request: int
@@ -196,7 +304,14 @@ class WwevRecordEdit:
 
 @dataclass(frozen=True)
 class WwevEditSummary:
-    """Observable changes made by a WwevEditor."""
+    """Immutable append-only WWEV change report.
+
+    Attributes:
+        record_count_before: Original record count.
+        record_count_after: Working count including pending clones.
+        appended_size: Total serialized bytes appended, excluding header changes.
+        edits: WwevRecordEdit records in append order.
+    """
 
     record_count_before: int
     record_count_after: int
@@ -205,9 +320,23 @@ class WwevEditSummary:
 
 
 class WwevEditor:
-    """A transactional, append-only editor for one WWEV v19 file."""
+    """In-memory, append-only editor for one parsed WWEV v19 file.
+
+    Attributes:
+        original: Immutable WwevFile retained for preservation/source-path checks.
+
+    Notes:
+        Existing records and dependencies are not editable through this API.
+        Pending clones participate in subsequent lookups and collision checks.
+    """
 
     def __init__(self, wwev: WwevFile):
+        """Initialize working record and append lists without modifying the parsed file.
+
+        Args:
+            wwev: Parsed original WwevFile, retaining its source_path for write protection.
+        """
+
         self.original = wwev
         self._appended: list[bytes] = []
         self._records: list[WwevRecord] = list(wwev.records)
@@ -215,13 +344,58 @@ class WwevEditor:
 
     @classmethod
     def from_file(cls, path: Path | str) -> WwevEditor:
+        """Read and parse a file, retaining its resolved path for output protection.
+
+        Args:
+            path: Path or string filename of the input artifact.
+
+        Returns:
+            New WwevEditor containing a parsed original and independent working state.
+
+        Raises:
+            WwevError: The path is not a file or format parsing fails.
+            OSError: Reading the file or resolving its path fails.
+
+        Notes:
+            Does not modify the input. Editors reject writing to this resolved
+            source_path even when output overwrite is enabled.
+        """
+
         return cls(WwevFile.from_file(path))
 
     @classmethod
     def from_bytes(cls, payload: bytes) -> WwevEditor:
+        """Parse immutable input bytes without recording a source filename.
+
+        Args:
+            payload: Complete file as bytes; bytearray/memoryview are not accepted
+                by the underlying parsed-file factory.
+
+        Returns:
+            New WwevEditor containing a parsed original and independent working state; source_path is None.
+
+        Raises:
+            WwevError: The input is not bytes or parsing checks fail.
+
+        Notes:
+            Checks WWEV v19 header, four UTF-8 dependencies, complete records, and absence of trailing data.
+            No file I/O occurs; source-path overwrite protection is unavailable.
+        """
+
         return cls(WwevFile.from_bytes(payload))
 
     def records_for_request(self, request_no: int) -> tuple[WwevRecord, ...]:
+        """Select every matching request from the current records, including pending clones.
+
+        Args:
+            request_no: Request number compared for equality; lookup adds no
+                positive signed-16 range restriction.
+
+        Returns:
+            Immutable record tuple in serialization order; empty if absent.
+            Repeated matches are retained rather than treated as an error.
+        """
+
         return tuple(
             record for record in self._records if record.request_no == request_no
         )
@@ -236,7 +410,31 @@ class WwevEditor:
         new_request: int,
         new_event_id: int,
     ) -> WwevRecord:
-        """Append an exact donor clone with guarded request and Event changes."""
+        """Append a complete donor clone with guarded ReqNo and Event substitutions.
+
+        Args:
+            donor_request: Positive signed-16 ReqNo (1..32767) resolving to exactly
+                one working record; previously appended records may be donors.
+            expected_donor_event_id: Exact unsigned-32 donor Event ID.
+            expected_donor_mode: Exact signed-16 donor mode.
+            expected_donor_sha256: 64-character hexadecimal digest of the full donor
+                raw record; digest comparison normalizes case.
+            new_request: Positive signed-16 ReqNo unused by all working records.
+            new_event_id: Unsigned-32 Event ID unused by all working records.
+
+        Returns:
+            Appended WwevRecord with its new 1-based index and absolute offset.
+
+        Raises:
+            WwevError: Ranges/hash/guards fail, the donor is missing or ambiguous,
+                a new identity collides, or candidate parsing/preservation checks fail.
+
+        Notes:
+            Candidate checks precede committing this operation. Copies every donor
+            byte except ReqNo and Event ID, updates the header count, and retains all
+            prior bytes outside that count. Collision scope is this editor only;
+            no NBNK Event existence or LMT trigger validation is performed.
+        """
 
         donor_request = check_positive_i16(
             donor_request, "donor request", WwevError
@@ -324,9 +522,28 @@ class WwevEditor:
         return bytes(output)
 
     def build(self) -> bytes:
+        """Return current WWEV bytes with the updated record count and appended clones.
+
+        Notes:
+            Does not reparse, run a full validation pass, or write files.
+        """
+
         return self._build(self._appended)
 
     def validate(self) -> WwevFile:
+        """Build, reparse, and verify append-only preservation.
+
+        Returns:
+            Parsed working WwevFile with no source_path.
+
+        Raises:
+            WwevError: Parsing fails, header metadata/dependencies/records drift,
+                or original bytes outside the record count differ.
+
+        Notes:
+            Does not mutate the editor, write files, or validate target NBNK Events.
+        """
+
         payload = self.build()
         rebuilt = WwevFile.from_bytes(payload)
         if (
@@ -346,6 +563,12 @@ class WwevEditor:
 
     @property
     def summary(self) -> WwevEditSummary:
+        """Return an immutable WwevEditSummary of counts, append sizes, and edit records.
+
+        Notes:
+            No validation, serialization, or disk I/O occurs.
+        """
+
         return WwevEditSummary(
             record_count_before=len(self.original.records),
             record_count_after=len(self._records),
@@ -354,6 +577,29 @@ class WwevEditor:
         )
 
     def write_atomic(self, output: Path | str, *, overwrite: bool = False) -> Path:
+        """Validate and write one artifact using a temporary file beside the output.
+
+        Args:
+            output: Path or string filename; missing parent directories are created.
+            overwrite: Permit replacing an existing output when True. Never permits
+                replacing the original's recorded resolved source_path.
+
+        Returns:
+            Path of the written output, retaining the caller's relative/absolute form.
+
+        Raises:
+            WwevError: Validation fails, output resolves to the recorded input, or
+                output already exists and overwrite is False.
+            OSError: Directory creation, staging, fsync, or replacement fails.
+
+        Notes:
+            Calls build() and validate(), stages/fsyncs bytes, then uses os.replace().
+            Cleans up the staged file and leaves editor state unchanged. from_bytes()
+            has no source path to protect. The preflight existence check is not
+            concurrency-safe exclusive creation; this is not a multi-file transaction
+            or an on-disk read-back verification pass.
+        """
+
         payload = self.build()
         self.validate()
         return _write_atomic(

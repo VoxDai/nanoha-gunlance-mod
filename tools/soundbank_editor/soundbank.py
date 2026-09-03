@@ -1,4 +1,11 @@
-"""Lossless NBNK parsing and guarded Wwise v120 editing."""
+"""Lossless NBNK parsing, media operations, and guarded Bank-level editing.
+
+Notes:
+    Public names are re-exported by tools.soundbank_editor. ALIGNMENT is the
+    16-byte DATA alignment used when rebuilding media. EditSummary is a
+    compatibility alias for SoundBankEditSummary. README.md contains usage;
+    format structure and external verification belong to soundbank-workflow.
+"""
 
 from __future__ import annotations
 
@@ -31,7 +38,14 @@ ALIGNMENT = 16
 
 @dataclass(frozen=True)
 class Chunk:
-    """One SoundBank chunk, including its original serialized bytes."""
+    """Immutable parsed chunk, retaining its original serialization.
+
+    Attributes:
+        tag: Four-byte chunk tag.
+        offset: Absolute byte offset of the chunk header in the input Bank.
+        payload: Chunk bytes after its eight-byte header.
+        raw: Complete original header and payload, used for lossless output.
+    """
 
     tag: bytes
     offset: int
@@ -41,7 +55,15 @@ class Chunk:
 
 @dataclass(frozen=True)
 class MediaEntry:
-    """One embedded DIDX/DATA media record."""
+    """Immutable DIDX media record with its extracted DATA payload.
+
+    Attributes:
+        media_id: Unsigned 32-bit Wwise media identity, independent of index.
+        offset: Byte offset relative to DATA. Pending editor replacements and
+            additions use zero until the Bank is rebuilt and reparsed.
+        size: Payload length in bytes.
+        payload: Embedded WEM bytes.
+    """
 
     media_id: int
     offset: int
@@ -51,7 +73,22 @@ class MediaEntry:
 
 @dataclass(frozen=True)
 class SoundBankEditSummary:
-    """Observable changes made by a SoundBankEditor."""
+    """Immutable report of edits declared through a SoundBankEditor.
+
+    Attributes:
+        replaced_media: Sorted (1-based DIDX index, Media ID) replacement pairs.
+        added_media: Appended (1-based DIDX index, Media ID) pairs in edit order.
+        hirc_changed_bytes: Cumulative changed-byte count reported by HircEditor;
+            excludes inserted objects and size-only differences.
+        added_hirc_objects: Added (object type, object ID) pairs in edit order.
+        resized_hirc_objects: Original (type, ID, old body size, new body size)
+            records whose current size differs; sizes include object ID bytes.
+        hirc_size_delta: Current minus original serialized HIRC payload length.
+
+    Notes:
+        This is bookkeeping, not proof of validation or net semantic equality.
+        EditSummary is an alias of this type.
+    """
 
     replaced_media: tuple[tuple[int, int], ...]
     added_media: tuple[tuple[int, int], ...]
@@ -67,7 +104,25 @@ EditSummary = SoundBankEditSummary
 
 @dataclass(frozen=True)
 class SoundBankDiff:
-    """Object-level differences between two parsed SoundBanks."""
+    """Immutable directional comparison from an original Bank to another Bank.
+
+    Attributes:
+        changed_chunks: Distinct changed tags in encounter order; chunk position,
+            tag, and payload participate in comparison.
+        replaced_media: (1-based index, new Media ID) pairs where corresponding
+            DIDX positions differ in media identity or payload.
+        added_media: (1-based index, Media ID) pairs beyond the original length.
+        removed_media: Original (1-based index, Media ID) trailing pairs beyond
+            the new length. This report does not provide a deletion operation.
+        changed_hirc_objects: Sorted (type, ID) pairs present in both Banks with
+            different body bytes.
+        added_hirc_objects: Sorted (type, ID) pairs only in the new Bank.
+        removed_hirc_objects: Sorted (type, ID) pairs only in the original Bank.
+
+    Notes:
+        Media comparison is positional, not an ID-based sequence alignment.
+        Object order changes are visible at chunk level, not as body changes.
+    """
 
     changed_chunks: tuple[bytes, ...]
     replaced_media: tuple[tuple[int, int], ...]
@@ -83,7 +138,20 @@ def _check_u32(value: int, label: str) -> int:
 
 
 def wwise_fnv1(name: str) -> int:
-    """Return Wwise's lowercase 32-bit FNV-1 object-name hash."""
+    """Compute the lowercase UTF-8, unsigned 32-bit Wwise FNV-1 name hash.
+
+    Args:
+        name: Nonempty name; lowercased with Python's Unicode lower operation.
+
+    Returns:
+        Deterministic unsigned object-name hash.
+
+    Raises:
+        SoundBankError: The name is not a nonempty string.
+
+    Notes:
+        This neither reserves the result nor checks collisions in any Bank.
+    """
 
     if not isinstance(name, str) or not name:
         raise SoundBankError("Wwise hash name must be a non-empty string")
@@ -94,7 +162,26 @@ def wwise_fnv1(name: str) -> int:
 
 
 def validate_wem(value: Payload) -> bytes:
-    """Read and validate a Wwise RIFF/WAVE media payload."""
+    """Read a payload and perform the Library's limited RIFF/WAVE format check.
+
+    Args:
+        value: Bytes, bytearray, memoryview, or a Path/string naming a WEM file.
+
+    Returns:
+        Immutable input bytes after finding a non-ordinary-PCM fmt chunk.
+
+    Raises:
+        SoundBankError: The payload/path is invalid, the RIFF/WAVE header is
+            missing, an inspected chunk exceeds bounds, fmt is missing/short,
+            or the fmt tag is ordinary PCM WAV (0x0001).
+        OSError: Reading the file fails.
+
+    Notes:
+        Checking stops at the first accepted fmt chunk. This does not decode
+        audio, validate the RIFF declared total length or remaining chunks, or
+        certify sample rate, channel count, codec support, or the project's
+        exact PCM WEM layout. Use external inspection/decoding for those checks.
+    """
 
     payload = coerce_payload(value, "WEM", SoundBankError)
     if len(payload) < 12 or payload[:4] != b"RIFF" or payload[8:12] != b"WAVE":
@@ -122,7 +209,20 @@ def validate_wem(value: Payload) -> bytes:
 
 @dataclass(frozen=True)
 class SoundBank:
-    """An immutable, losslessly parsed SoundBank."""
+    """Immutable parsed NBNK; construct with from_file() or from_bytes().
+
+    Attributes:
+        chunks: Chunks in input serialization order, including unknown tags.
+        entries: Embedded media in DIDX order; public selectors use 1-based indices.
+        version: Wwise version from BKHD; parsing is not restricted to v120.
+        bank_id: Unsigned Bank identity from BKHD.
+        source_path: Resolved input path for from_file(), otherwise None.
+
+    Notes:
+        Factories validate chunk boundaries, required chunks, DIDX ranges, and
+        HIRC framing/identities, not every HIRC body's semantics. Direct dataclass
+        construction bypasses these checks. to_bytes() retains original bytes.
+    """
 
     chunks: tuple[Chunk, ...]
     entries: tuple[MediaEntry, ...]
@@ -132,6 +232,23 @@ class SoundBank:
 
     @classmethod
     def from_file(cls, path: Path | str) -> SoundBank:
+        """Read and parse a file, retaining its resolved path for output protection.
+
+        Args:
+            path: Path or string filename of the input artifact.
+
+        Returns:
+            Parsed SoundBank.
+
+        Raises:
+            SoundBankError: The path is not a file or format parsing fails.
+            OSError: Reading the file or resolving its path fails.
+
+        Notes:
+            Does not modify the input. Editors reject writing to this resolved
+            source_path even when output overwrite is enabled.
+        """
+
         source = Path(path)
         if not source.is_file():
             raise SoundBankError(f"SoundBank does not exist: {source}")
@@ -140,6 +257,23 @@ class SoundBank:
 
     @classmethod
     def from_bytes(cls, data: bytes) -> SoundBank:
+        """Parse immutable input bytes without recording a source filename.
+
+        Args:
+            data: Complete file as bytes; bytearray/memoryview are not accepted
+                by the underlying parsed-file factory.
+
+        Returns:
+            Parsed SoundBank; source_path is None.
+
+        Raises:
+            SoundBankError: The input is not bytes or parsing checks fail.
+
+        Notes:
+            Checks required BKHD/DIDX/DATA/HIRC chunks, chunk bounds, DIDX ranges, and HIRC framing/IDs.
+            No file I/O occurs; source-path overwrite protection is unavailable.
+        """
+
         if not isinstance(data, bytes):
             raise SoundBankError("SoundBank input must be bytes")
         chunks: list[Chunk] = []
@@ -185,9 +319,27 @@ class SoundBank:
         return cls(tuple(chunks), tuple(entries), version, bank_id)
 
     def to_bytes(self) -> bytes:
+        """Return the original chunk serializations byte-for-byte without validation.
+
+        Returns:
+            Complete NBNK bytes; no disk I/O or rebuilding of media offsets occurs.
+        """
+
         return b"".join(chunk.raw for chunk in self.chunks)
 
     def chunk(self, tag: bytes) -> Chunk:
+        """Select exactly one chunk by its byte tag.
+
+        Args:
+            tag: Chunk tag such as b"BKHD".
+
+        Returns:
+            The immutable parsed Chunk.
+
+        Raises:
+            SoundBankError: No chunk or more than one chunk has that tag.
+        """
+
         matches = [chunk for chunk in self.chunks if chunk.tag == tag]
         if len(matches) != 1:
             raise SoundBankError(f"expected exactly one {tag!r} chunk, found {len(matches)}")
@@ -195,23 +347,79 @@ class SoundBank:
 
     @property
     def hirc_payload(self) -> bytes:
+        """Return immutable HIRC payload bytes, excluding the chunk header.
+
+        Raises:
+            SoundBankError: There is not exactly one HIRC chunk.
+        """
+
         return self.chunk(b"HIRC").payload
 
     def media_entry(
         self, *, index: int | None = None, media_id: int | None = None
     ) -> MediaEntry:
+        """Select one original parsed media entry without extracting to disk.
+
+        Args:
+            index: 1-based DIDX position; mutually exclusive with media_id.
+            media_id: Media identity that must resolve to exactly one entry.
+
+        Returns:
+            Immutable MediaEntry. Specify exactly one selector.
+
+        Raises:
+            SoundBankError: Both/neither selectors are supplied, the index is
+                out of range, or the Media ID does not resolve uniquely.
+        """
+
         selected = _resolve_media_index(self.entries, index=index, media_id=media_id)
         return self.entries[selected]
 
     def extract_media(
         self, *, index: int | None = None, media_id: int | None = None
     ) -> bytes:
+        """Return the original parsed WEM bytes selected by index or Media ID.
+
+        Args:
+            index: 1-based DIDX position; mutually exclusive with media_id.
+            media_id: Unique media identity, as for media_entry().
+
+        Returns:
+            Immutable embedded payload; no decoding or disk write occurs.
+
+        Raises:
+            SoundBankError: The selector is missing, conflicting, or not unique/in range.
+        """
+
         return self.media_entry(index=index, media_id=media_id).payload
 
     def extract_all_media(self) -> dict[int, bytes]:
+        """Return a new mapping of 1-based DIDX indices to original parsed WEM bytes.
+
+        Returns:
+            dict keyed by entry position, not Media ID. No files are written.
+        """
+
         return {index: entry.payload for index, entry in enumerate(self.entries, 1)}
 
     def diff(self, other: SoundBank) -> SoundBankDiff:
+        """Compare this Bank to another without mutating either input.
+
+        Args:
+            other: The new Bank to compare against this original Bank.
+
+        Returns:
+            SoundBankDiff with positional media differences and HIRC identity/body
+            differences. Offset-only media movement is not a media replacement.
+
+        Raises:
+            SoundBankError: Either HIRC payload cannot be parsed.
+
+        Notes:
+            This does not enforce an edit declaration or validate the resulting
+            graph. HIRC order changes affect changed_chunks, not object body lists.
+        """
+
         changed_chunk_tags: list[bytes] = []
         for before, after in zip(self.chunks, other.chunks):
             if before.tag != after.tag or before.payload != after.payload:
@@ -272,9 +480,28 @@ def _resolve_media_index(
 
 
 class SoundBankEditor:
-    """A transactional editor for one parsed SoundBank."""
+    """In-memory editor for one parsed Bank, leaving its original unchanged.
+
+    Attributes:
+        original: Immutable Bank supplied at construction.
+        hirc: HircEditor for the working HIRC payload, with media IDs reserved.
+
+    Notes:
+        build() serializes; validate() checks the rebuilt Bank; write_atomic()
+        validates and writes one file. A sequence of editing calls is not a
+        general rollback transaction. Individual methods document their checks.
+    """
 
     def __init__(self, bank: SoundBank):
+        """Create independent working media and HIRC state from a parsed Bank.
+
+        Args:
+            bank: Original SoundBank whose source_path is retained for write protection.
+
+        Raises:
+            SoundBankError: HIRC framing or reserved media identities are invalid.
+        """
+
         self.original = bank
         self._media = list(bank.entries)
         self._original_media_count = len(bank.entries)
@@ -288,18 +515,56 @@ class SoundBankEditor:
 
     @classmethod
     def from_file(cls, path: Path | str) -> SoundBankEditor:
+        """Read and parse a file, retaining its resolved path for output protection.
+
+        Args:
+            path: Path or string filename of the input artifact.
+
+        Returns:
+            New SoundBankEditor containing a parsed original and independent working state.
+
+        Raises:
+            SoundBankError: The path is not a file or format parsing fails.
+            OSError: Reading the file or resolving its path fails.
+
+        Notes:
+            Does not modify the input. Editors reject writing to this resolved
+            source_path even when output overwrite is enabled.
+        """
+
         return cls(SoundBank.from_file(path))
 
     @classmethod
     def from_bytes(cls, data: bytes) -> SoundBankEditor:
+        """Parse immutable input bytes without recording a source filename.
+
+        Args:
+            data: Complete file as bytes; bytearray/memoryview are not accepted
+                by the underlying parsed-file factory.
+
+        Returns:
+            New SoundBankEditor containing a parsed original and independent working state; source_path is None.
+
+        Raises:
+            SoundBankError: The input is not bytes or parsing checks fail.
+
+        Notes:
+            Checks required BKHD/DIDX/DATA/HIRC chunks, chunk bounds, DIDX ranges, and HIRC framing/IDs.
+            No file I/O occurs; source-path overwrite protection is unavailable.
+        """
+
         return cls(SoundBank.from_bytes(data))
 
     @property
     def version(self) -> int:
+        """Return the original Bank's Wwise version, without modifying it."""
+
         return self.original.version
 
     @property
     def bank_id(self) -> int:
+        """Return the original Bank's unsigned Bank ID."""
+
         return self.original.bank_id
 
     def _require_v120(self, operation: str) -> None:
@@ -312,15 +577,48 @@ class SoundBankEditor:
     def media_entry(
         self, *, index: int | None = None, media_id: int | None = None
     ) -> MediaEntry:
+        """Select one current working media entry without extracting to disk.
+
+        Args:
+            index: 1-based DIDX position; mutually exclusive with media_id.
+            media_id: Media identity that must resolve to exactly one entry.
+
+        Returns:
+            Immutable MediaEntry. Specify exactly one selector.
+
+        Raises:
+            SoundBankError: Both/neither selectors are supplied, the index is
+                out of range, or the Media ID does not resolve uniquely.
+        """
+
         selected = _resolve_media_index(self._media, index=index, media_id=media_id)
         return self._media[selected]
 
     def extract_media(
         self, *, index: int | None = None, media_id: int | None = None
     ) -> bytes:
+        """Return the current working WEM bytes selected by index or Media ID.
+
+        Args:
+            index: 1-based DIDX position; mutually exclusive with media_id.
+            media_id: Unique media identity, as for media_entry().
+
+        Returns:
+            Immutable embedded payload; no decoding or disk write occurs.
+
+        Raises:
+            SoundBankError: The selector is missing, conflicting, or not unique/in range.
+        """
+
         return self.media_entry(index=index, media_id=media_id).payload
 
     def extract_all_media(self) -> dict[int, bytes]:
+        """Return a new mapping of 1-based DIDX indices to current working WEM bytes.
+
+        Returns:
+            dict keyed by entry position, not Media ID. No files are written.
+        """
+
         return {index: entry.payload for index, entry in enumerate(self._media, 1)}
 
     def replace_media(
@@ -332,6 +630,29 @@ class SoundBankEditor:
         expected_media_id: int | None = None,
         expected_sha256: str | None = None,
     ) -> None:
+        """Replace one working media payload while retaining its Media ID.
+
+        Args:
+            wem: WEM bytes, bytearray, memoryview, or Path/string filename; checked
+                with validate_wem(), which does not decode audio.
+            index: 1-based DIDX position; supply exactly one of index or media_id.
+            media_id: Unique working Media ID selector.
+            expected_media_id: Optional exact identity guard; None disables it.
+            expected_sha256: Optional case-insensitive SHA-256 guard over the current
+                WEM payload; None disables it.
+
+        Raises:
+            SoundBankError: Selection fails, this entry was already replaced, a
+                supplied guard fails, or the WEM check fails.
+            OSError: Reading the replacement file fails.
+
+        Notes:
+            Returns None. After checks, records the replacement in memory with
+            offset zero; build() recalculates DIDX offsets and DATA alignment. May
+            select an appended entry. This method has no v120 version restriction.
+            Project workflow guards can be stricter than these optional parameters.
+        """
+
         selected = _resolve_media_index(self._media, index=index, media_id=media_id)
         current = self._media[selected]
         if selected in self._replaced_media:
@@ -355,6 +676,26 @@ class SoundBankEditor:
     def append_media(
         self, media_id: int, wem: bytes | bytearray | memoryview | Path | str
     ) -> MediaEntry:
+        """Append a WEM with an explicit unused media identity in a v120 Bank.
+
+        Args:
+            media_id: Unsigned 32-bit ID unused by working media and HIRC objects.
+            wem: WEM bytes, bytearray, memoryview, or Path/string filename.
+
+        Returns:
+            New immutable MediaEntry with provisional offset zero. Its DIDX index
+            is the new working media count.
+
+        Raises:
+            SoundBankError: The Bank is not v120, the ID is invalid/colliding,
+                or validate_wem() rejects the payload.
+            OSError: Reading the WEM file fails.
+
+        Notes:
+            Reserves the ID in HIRC and appends bookkeeping; does not add a Sound
+            or playback route. Original entries and payloads remain unchanged.
+        """
+
         self._require_v120("append media")
         media_id = _check_u32(media_id, "Media ID")
         if any(entry.media_id == media_id for entry in self._media):
@@ -374,6 +715,24 @@ class SoundBankEditor:
         *,
         expected_actions: Sequence[int],
     ) -> None:
+        """Add and attach a new PlayEvent Action to an existing v120 Event.
+
+        Args:
+            event_id: Existing Event to receive the new Action.
+            action_id: New unsigned 32-bit Action ID, unused by HIRC/media.
+            target_event_id: Existing Event the new Action will invoke.
+            expected_actions: Exact current ordered Action IDs of event_id.
+
+        Raises:
+            SoundBankError: Version, target/owner lookup, ordered guard, ID,
+                insertion, or Event body replacement checks fail.
+
+        Notes:
+            Returns None. Inserts the Action immediately before its owning Event,
+            then appends its ID to that Event's list. Does not create either Event.
+            This composition has no general rollback if a later operation fails.
+        """
+
         self._require_v120("add PlayEvent Action")
         self.hirc._get_object(HIRC_EVENT, target_event_id)
         actual_actions = self.hirc.event_actions(event_id)
@@ -411,6 +770,34 @@ class SoundBankEditor:
         delay_ms: int = 0,
         transition_ms: int | None = None,
     ) -> None:
+        """Append media, clone an embedded Sound, and attach a Play Action in v120.
+
+        Args:
+            event_id: Existing Event that will receive the Action.
+            action_id: New Action ID.
+            sound_id: New Sound ID.
+            media_id: New Media ID; all three new IDs must be distinct unsigned-32
+                identities unused by existing working HIRC objects and media.
+            donor_sound_id: Existing embedded v120 Sound to clone.
+            wem: WEM bytes, bytearray, memoryview, or Path/string filename.
+            expected_actions: Exact current ordered Action list of event_id.
+            expected_donor_source_id: Exact donor's embedded source Media ID.
+            delay_ms: Delay property passed to create_play_action(); zero omits it.
+            transition_ms: Optional transition property in milliseconds; None omits it.
+
+        Raises:
+            SoundBankError: Version, guards, media, identities, donor layout,
+                Action construction, or constituent edit checks fail.
+            OSError: Reading the WEM file fails.
+
+        Notes:
+            Returns None. Prechecks the listed IDs, Event guard, donor source, WEM,
+            and Action encoding before composing edits. It is not a general rollback
+            transaction for subsequent edit conflicts. Other donor Sound bytes,
+            including parent and memory-size data, are retained. The Play Action is
+            serialized immediately before its Event; validate() checks the result.
+        """
+
         self._require_v120("add custom Sound Action")
         new_ids = tuple(
             _check_u32(value, label)
@@ -475,6 +862,13 @@ class SoundBankEditor:
 
     @property
     def summary(self) -> SoundBankEditSummary:
+        """Return immutable current edit bookkeeping without validation or disk I/O.
+
+        Returns:
+            SoundBankEditSummary; media pairs use 1-based indices, object pairs use
+            (type, ID). Computing HIRC size delta serializes the working HIRC.
+        """
+
         return SoundBankEditSummary(
             replaced_media=tuple(
                 (index + 1, self._media[index].media_id)
@@ -499,6 +893,18 @@ class SoundBankEditor:
         return didx, bytes(data)
 
     def build(self) -> bytes:
+        """Serialize the working Bank to bytes without a full validation pass.
+
+        Returns:
+            Complete NBNK bytes. Media edits rebuild DIDX/DATA with 16-byte starts;
+            HIRC edits rebuild that chunk. Unchanged chunks retain their raw bytes.
+
+        Notes:
+            Does not write files, update the original Bank, or replace provisional
+            MediaEntry offsets with rebuilt offsets. Use validate() to obtain the
+            reparsed entries and verify the declared changes.
+        """
+
         media_changed = bool(self._replaced_media or self._added_media)
         hirc_payload = self.hirc.build()
         hirc_changed = hirc_payload != self.original.hirc_payload
@@ -518,6 +924,23 @@ class SoundBankEditor:
         return bytes(output)
 
     def validate(self) -> SoundBank:
+        """Build, reparse, and verify the Bank against working state and declarations.
+
+        Returns:
+            New parsed SoundBank with resolved media offsets and no source_path.
+
+        Raises:
+            SoundBankError: Reparse, identity, media bytes/alignment, or declared
+                HIRC change checks fail. For v120, also rejects missing Action/Event
+                targets, Actions serialized after their Events, or missing/misordered
+                children and media references of newly added Containers/Sounds.
+
+        Notes:
+            No disk writes or editor mutation. Unknown HIRC semantics and all
+            existing Container internals are not comprehensively validated. External
+            decoding and game acceptance remain separate checks.
+        """
+
         rebuilt = SoundBank.from_bytes(self.build())
         if rebuilt.version != self.version or rebuilt.bank_id != self.bank_id:
             raise SoundBankError("read-back verification changed BKHD identity")
@@ -644,9 +1067,41 @@ class SoundBankEditor:
         return rebuilt
 
     def diff(self) -> SoundBankDiff:
+        """Validate the working Bank and compare it to the original.
+
+        Returns:
+            Directional SoundBankDiff from original to validated working Bank.
+
+        Raises:
+            SoundBankError: validate() or the HIRC comparison fails.
+        """
+
         return self.original.diff(self.validate())
 
     def write_atomic(self, output: Path | str, *, overwrite: bool = False) -> Path:
+        """Validate and write one artifact using a temporary file beside the output.
+
+        Args:
+            output: Path or string filename; missing parent directories are created.
+            overwrite: Permit replacing an existing output when True. Never permits
+                replacing the original's recorded resolved source_path.
+
+        Returns:
+            Path of the written output, retaining the caller's relative/absolute form.
+
+        Raises:
+            SoundBankError: Validation fails, output resolves to the recorded input, or
+                output already exists and overwrite is False.
+            OSError: Directory creation, staging, fsync, or replacement fails.
+
+        Notes:
+            Calls build() and validate(), stages/fsyncs bytes, then uses os.replace().
+            Cleans up the staged file and leaves editor state unchanged. from_bytes()
+            has no source path to protect. The preflight existence check is not
+            concurrency-safe exclusive creation; this is not a multi-file transaction
+            or an on-disk read-back verification pass.
+        """
+
         payload = self.build()
         self.validate()
         return _write_atomic(

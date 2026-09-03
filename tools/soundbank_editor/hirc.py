@@ -1,4 +1,11 @@
-"""Guarded parsing and structural editing for Wwise HIRC objects."""
+"""Guarded HIRC framing, object-relative patches, and v120 structural helpers.
+
+Notes:
+    Public names and type/Action constants are re-exported and documented
+    by tools.soundbank_editor. A HIRC body includes its four-byte object ID
+    at offset zero. Read README.md for usage; format and routing principles
+    belong to the soundbank-workflow references.
+"""
 
 from __future__ import annotations
 
@@ -32,7 +39,18 @@ ACTION_PLAY_EVENT = 0x2103
 
 @dataclass
 class HircObject:
-    """One mutable HIRC object body."""
+    """Detached HIRC query/insert result with a mutable body copy.
+
+    Attributes:
+        index: Zero-based position in the serialized HIRC object sequence.
+        object_type: One-byte HIRC type code.
+        object_id: Unsigned 32-bit identity, also stored at the start of body.
+        body: Independent bytearray including the four-byte ID at offset zero.
+
+    Notes:
+        Public editor accessors return copies. Mutating this record or its body
+        does not edit the HircEditor; use guarded editing methods instead.
+    """
 
     index: int
     object_type: int
@@ -53,7 +71,19 @@ class _RandomSequenceContainerTail:
 
 @dataclass(frozen=True)
 class SwitchNodeParams:
-    """One v120 Switch Container child behavior record."""
+    """Immutable per-child behavior fields for a v120 Switch Container.
+
+    Attributes:
+        node_id: Unsigned 32-bit child object ID.
+        behavior_flags: Retained unsigned byte of behavior flags.
+        transition_flags: Retained unsigned byte of transition flags.
+        fade_out_ms: Signed 32-bit fade-out field in milliseconds.
+        fade_in_ms: Signed 32-bit fade-in field in milliseconds.
+
+    Notes:
+        Dataclass construction does not validate ranges; topology-consuming
+        APIs validate them. Flag semantics are not independently interpreted.
+    """
 
     node_id: int
     behavior_flags: int
@@ -64,7 +94,25 @@ class SwitchNodeParams:
 
 @dataclass(frozen=True)
 class SwitchContainerTopology:
-    """Guardable terminal routing topology for one v120 Switch Container."""
+    """Immutable, guardable v120 Switch Container terminal topology.
+
+    Attributes:
+        group_type: Switch (0) or State (1) group selector.
+        group_id: Unsigned 32-bit group ID.
+        default_switch: Unsigned default value ID; must have a surviving package.
+        continuous_validation: Stored flag, restricted to zero or one by APIs.
+        children: Ordered unique unsigned child IDs; nonempty when validated.
+        switch_packages: Ordered (value ID, ordered child-ID tuple) packages.
+            Value IDs are unique and packages nonempty. Children may occur in
+            several packages, but each package has no repeated child and the
+            union must cover exactly children.
+        node_params: Ordered SwitchNodeParams records, covering each child once.
+
+    Notes:
+        Construction alone does not validate topology or object existence.
+        Guard comparison includes ordering. Clone APIs validate all references
+        against the working editor before inserting the new object.
+    """
 
     group_type: int
     group_id: int
@@ -426,7 +474,18 @@ def _build_switch_container_tail(topology: SwitchContainerTopology) -> bytes:
 
 
 class HircEditor:
-    """Parse and edit HIRC objects using guarded object-relative operations."""
+    """Mutable HIRC editor with guarded patches and declared structural changes.
+
+    Attributes:
+        version: Wwise version used by version-specific parsing/authoring helpers.
+
+    Notes:
+        Construct from a HIRC payload, not a complete Bank. Generic framing and
+        equal-length field/body edits do not require v120. Structural additions,
+        size-changing body replacements, Event/Container helpers, and Pitch APIs
+        enforce v120 where documented. build() only serializes HIRC; use the
+        enclosing SoundBankEditor.validate() for Bank-level checks.
+    """
 
     def __init__(
         self,
@@ -435,6 +494,23 @@ class HircEditor:
         version: int = SUPPORTED_EDIT_VERSION,
         reserved_ids: Iterable[int] = (),
     ):
+        """Parse HIRC framing and initialize independent mutable object bodies.
+
+        Args:
+            payload: HIRC payload including object count but excluding chunk header.
+            version: Wwise version; defaults to SUPPORTED_EDIT_VERSION (120).
+            reserved_ids: Unsigned 32-bit media/other IDs to exclude from new HIRC IDs.
+
+        Raises:
+            SoundBankError: Object framing/bounds/count, ID uniqueness, trailing data,
+                or reserved-ID validation fails.
+
+        Notes:
+            Original objects may share IDs with reserved_ids; the reservation is
+            enforced for new objects. Unknown types are retained as uninterpreted
+            bodies. No object graph semantics or media payloads are validated here.
+        """
+
         if len(payload) < 4:
             raise SoundBankError("HIRC payload is missing its object count")
         self.version = version
@@ -510,26 +586,60 @@ class HircEditor:
 
     @property
     def changed_byte_count(self) -> int:
+        """Return the cumulative count of unequal bytes from patches/body replacements.
+
+        Notes:
+            Body replacements count zipped old/new bytes, excluding size-only
+            differences. Inserted objects are excluded. Repeated replacements can
+            count the same byte again; this is not a net whole-file byte diff.
+        """
+
         return self._changed_byte_count
 
     @property
     def added_objects(self) -> tuple[tuple[int, int], ...]:
+        """Return added (object type, object ID) pairs in insertion-call order.
+
+        Notes:
+            This order can differ from the current serialization order.
+        """
+
         return tuple(self._added_keys)
 
     @property
     def object_ids(self) -> frozenset[int]:
+        """Return a frozenset snapshot of current HIRC IDs, excluding reserved-only IDs."""
+
         return frozenset(self._by_id)
 
     @property
     def patched_objects(self) -> tuple[tuple[int, int], ...]:
+        """Return (type, ID) pairs with declared field patches, in first-patch order.
+
+        Notes:
+            Generic same-value patches are still declared; Pitch no-ops are not.
+        """
+
         return tuple(self._patched_ranges)
 
     @property
     def rebuilt_objects(self) -> tuple[tuple[int, int], ...]:
+        """Return (type, ID) pairs whose whole bodies were replaced.
+
+        Notes:
+            Ordering is unspecified because internal bookkeeping is a set. This
+            includes equal-length and same-value replacements, not just resized bodies.
+        """
+
         return tuple(self._replaced_keys)
 
     def objects(self) -> tuple[HircObject, ...]:
-        """Return copies of all objects in serialized order."""
+        """Return detached copies of every working object in serialization order.
+
+        Returns:
+            Tuple of HircObject records with independent bytearray bodies. Mutating
+            a returned record does not change this editor or its edit bookkeeping.
+        """
 
         return tuple(
             HircObject(
@@ -542,9 +652,35 @@ class HircEditor:
         )
 
     def object_body(self, object_type: int, object_id: int) -> bytes:
+        """Read the complete current body, including its four-byte object ID.
+
+        Args:
+            object_type: HIRC type code.
+            object_id: Existing object identity of that type.
+
+        Returns:
+            Immutable bytes, detached from working state.
+
+        Raises:
+            SoundBankError: The (type, ID) pair does not exist.
+        """
+
         return bytes(self._get_object(object_type, object_id).body)
 
     def object(self, object_type: int, object_id: int) -> HircObject:
+        """Read one working object as a detached mutable copy.
+
+        Args:
+            object_type: HIRC type code.
+            object_id: Existing identity of that type.
+
+        Returns:
+            HircObject with a zero-based serialized index and independent body.
+
+        Raises:
+            SoundBankError: The (type, ID) pair does not exist.
+        """
+
         item = self._get_object(object_type, object_id)
         return HircObject(
             item.index, item.object_type, item.object_id, bytearray(item.body)
@@ -559,6 +695,19 @@ class HircEditor:
             ) from error
 
     def reserve_id(self, object_id: int) -> None:
+        """Reserve an ID so future HIRC insertions cannot use it.
+
+        Args:
+            object_id: Unsigned 32-bit media/other identity to reserve.
+
+        Raises:
+            SoundBankError: The ID is invalid or already belongs to a HIRC object.
+
+        Notes:
+            Returns None. Reserving an already reserved ID is a no-op. This does
+            not insert an object or prevent a query for an existing object.
+        """
+
         object_id = _check_u32(object_id, "reserved ID")
         if object_id in self._by_id:
             raise SoundBankError(
@@ -567,7 +716,22 @@ class HircEditor:
         self._reserved_ids.add(object_id)
 
     def pitch_settings(self, object_type: int, object_id: int) -> HircPitchSettings:
-        """Read local v120 Pitch properties, distinguishing absence from zero."""
+        """Parse local v120 base and random Pitch properties without editing.
+
+        Args:
+            object_type: Sound, Random/Sequence Container, Switch Container, or Actor-Mixer.
+            object_id: Existing object of that type.
+
+        Returns:
+            HircPitchSettings in cents, preserving absent properties as None.
+
+        Raises:
+            SoundBankError: Version/type/identity is unsupported, or the required
+                prefix/property layout or stored Pitch values are malformed.
+
+        Notes:
+            Does not resolve inherited parent settings, RTPCs, States, or Actions.
+        """
 
         self._require_v120("read node pitch")
         object_type = _check_u8(object_type, "HIRC object type")
@@ -586,12 +750,35 @@ class HircEditor:
             random_range_cents: tuple[float, float] | None = None,
             label: str = "set node pitch",
     ) -> HircPitchSettings:
-        """Guard and upsert local Pitch properties; omitted values are retained.
+        """Guard and upsert local v120 Pitch properties using structural table parsing.
 
-        Values are cents encoded as float32. None in ``expected`` guards an
-        absent property; None in a replacement leaves that property alone.
-        Parent contributions are not changed. All fields are preflighted
-        before any mutation, including existing patch/rebuild conflicts.
+        Args:
+            object_type: Sound, Random/Sequence Container, Switch Container, or Actor-Mixer.
+            object_id: Existing object to edit.
+            expected: HircPitchSettings guarding both properties, including absence.
+                Numeric guards compare encoded float32, including signed zero.
+            base_cents: New finite float32-compatible int/float, or None to retain.
+            random_range_cents: New (min, max) tuple of finite float32-compatible
+                int/float endpoints with min <= max, or None to retain. Booleans,
+                NaN, infinity, and overflow are rejected for both replacements.
+            label: Context used in diagnostics.
+
+        Returns:
+            Stored HircPitchSettings after float32 encoding and read-back.
+
+        Raises:
+            SoundBankError: Version/type/layout/value/guard checks fail, both
+                replacements are None, a property count overflows, or edit conflicts occur.
+
+        Notes:
+            All candidate fields and conflicts are preflighted before mutation.
+            Same-value requests are no-ops after guard validation. Missing properties
+            are inserted in ID order, including explicit zero. Property removal is
+            not provided. Insertions use whole-body replacement and cannot follow
+            field patches on that object; subsequent field patches are rejected.
+            Equal-length updates may coexist with nonoverlapping patches, but cannot
+            rewrite an already patched field. Combine base/range insertion in one
+            call. Other bytes and parent contributions are retained.
         """
 
         self._require_v120(label)
@@ -645,6 +832,26 @@ class HircEditor:
         *,
         label: str,
     ) -> None:
+        """Apply one exact, equal-length guarded field patch within an object body.
+
+        Args:
+            object_type: Existing object's HIRC type.
+            object_id: Existing object identity.
+            offset: Body-relative byte offset including the leading ID; must be >= 4.
+            expected: Nonempty bytes that must exactly match the current field.
+            replacement: Bytes of the same length as expected.
+            label: Required diagnostic context.
+
+        Raises:
+            SoundBankError: Target/guard/bounds/length checks fail, the object has
+                been rebuilt, or the range overlaps any previous patch.
+
+        Notes:
+            Returns None. Mutates only after checks and records the patch range even
+            for identical bytes. No v120 restriction or semantic field decoding is
+            applied. Whole-body replacement after any field patch is rejected.
+        """
+
         item = self._check_patch(
             object_type, object_id, offset, expected, replacement, label=label
         )
@@ -704,6 +911,24 @@ class HircEditor:
         *,
         label: str,
     ) -> None:
+        """Encode and apply an unsigned 8-bit little-endian field patch.
+
+        Args:
+            object_type: Existing object's HIRC type.
+            object_id: Existing object identity.
+            offset: Body-relative byte offset, including ID bytes; must be >= 4.
+            expected: Exact old integer in 0..255; booleans are rejected.
+            replacement: New integer in the same range; booleans are rejected.
+            label: Required diagnostic context.
+
+        Raises:
+            SoundBankError: Values are invalid or patch_bytes() rejects the
+                target, old value, bounds, or patch/rebuild composition.
+
+        Notes:
+            Returns None. Uses patch_bytes() bookkeeping and version behavior.
+        """
+
         self.patch_bytes(
             object_type,
             object_id,
@@ -723,6 +948,24 @@ class HircEditor:
         *,
         label: str,
     ) -> None:
+        """Encode and apply an unsigned 16-bit little-endian field patch.
+
+        Args:
+            object_type: Existing object's HIRC type.
+            object_id: Existing object identity.
+            offset: Body-relative byte offset, including ID bytes; must be >= 4.
+            expected: Exact old integer in 0..65535; booleans are rejected.
+            replacement: New integer in the same range; booleans are rejected.
+            label: Required diagnostic context.
+
+        Raises:
+            SoundBankError: Values are invalid or patch_bytes() rejects the
+                target, old value, bounds, or patch/rebuild composition.
+
+        Notes:
+            Returns None. Uses patch_bytes() bookkeeping and version behavior.
+        """
+
         self.patch_bytes(
             object_type,
             object_id,
@@ -742,6 +985,24 @@ class HircEditor:
         *,
         label: str,
     ) -> None:
+        """Encode and apply an unsigned 32-bit little-endian field patch.
+
+        Args:
+            object_type: Existing object's HIRC type.
+            object_id: Existing object identity.
+            offset: Body-relative byte offset, including ID bytes; must be >= 4.
+            expected: Exact old integer in 0..4294967295; booleans are rejected.
+            replacement: New integer in the same range; booleans are rejected.
+            label: Required diagnostic context.
+
+        Raises:
+            SoundBankError: Values are invalid or patch_bytes() rejects the
+                target, old value, bounds, or patch/rebuild composition.
+
+        Notes:
+            Returns None. Uses patch_bytes() bookkeeping and version behavior.
+        """
+
         self.patch_bytes(
             object_type,
             object_id,
@@ -761,6 +1022,26 @@ class HircEditor:
         *,
         label: str,
     ) -> None:
+        """Encode old/new values as little-endian float32 and patch their exact bytes.
+
+        Args:
+            object_type: Existing object's HIRC type.
+            object_id: Existing object identity.
+            offset: Body-relative byte offset, including ID bytes; must be >= 4.
+            expected: Old value passed to struct.pack('<f'); comparison is byte-exact.
+            replacement: New value passed to struct.pack('<f').
+            label: Required diagnostic context.
+
+        Raises:
+            SoundBankError: patch_bytes() rejects the target, guard, range, or conflict.
+            struct.error: A value cannot be packed as float32.
+            OverflowError: A value exceeds the float32 encoding range.
+
+        Notes:
+            Returns None. Unlike set_pitch(), this low-level operation adds no
+            finite-number or semantic property validation. Signed zero is byte-distinct.
+        """
+
         self.patch_bytes(
             object_type,
             object_id,
@@ -779,6 +1060,27 @@ class HircEditor:
         *,
         label: str,
     ) -> None:
+        """Replace a complete guarded body while preserving its object identity.
+
+        Args:
+            object_type: Existing HIRC type.
+            object_id: Existing object ID, also required at replacement offset zero.
+            expected: Exact current full body, including the four-byte ID.
+            replacement: Complete new body, including the unchanged ID.
+            label: Required diagnostic context.
+
+        Raises:
+            SoundBankError: Target/old-body/ID checks fail, a prior field patch exists,
+                or a size-changing replacement is attempted outside v120.
+
+        Notes:
+            Returns None. Equal-length replacements have no v120 restriction.
+            Replacements may follow previous whole-body replacements when guarding
+            the current body, but field patches cannot follow any body replacement.
+            Same-value bodies are still recorded as rebuilt. Unmodeled semantics
+            and graph references are not validated by this method.
+        """
+
         item = self._get_object(object_type, object_id)
         key = (object_type, object_id)
         if self._patched_ranges.get(key):
@@ -813,6 +1115,30 @@ class HircEditor:
         before: tuple[int, int] | None = None,
         label: str = "insert HIRC object",
     ) -> HircObject:
+        """Insert one explicitly identified object in a v120 HIRC sequence.
+
+        Args:
+            object_type: Unsigned byte type code; bodies are not semantically decoded.
+            object_id: Unsigned 32-bit ID unused by HIRC and reserved media identities.
+            body_tail: bytes after the object ID; the method prepends the ID itself.
+            after: Optional existing (type, ID) insertion anchor.
+            before: Optional existing (type, ID) insertion anchor; mutually exclusive
+                with after. Without either anchor, insert after the last same-type
+                object, or at the end if no such type exists.
+            label: Diagnostic context.
+
+        Returns:
+            Detached HircObject copy of the inserted object with its zero-based index.
+
+        Raises:
+            SoundBankError: Version/type/ID/body-tail/anchor checks fail or IDs collide.
+
+        Notes:
+            Reindexes current objects and records the addition. Does not automatically
+            satisfy parent-child or Action-before-Event order; choose appropriate
+            anchors or use a high-level helper. Does not attach graph references.
+        """
+
         self._require_v120(label)
         object_type = _check_u8(object_type, "HIRC object type")
         object_id = _check_u32(object_id, "HIRC object ID")
@@ -861,6 +1187,21 @@ class HircEditor:
         return latest.object_type, latest.object_id
 
     def event_actions(self, event_id: int) -> tuple[int, ...]:
+        """Parse an existing v120 Event's ordered Action IDs.
+
+        Args:
+            event_id: Existing Event ID.
+
+        Returns:
+            Action-ID tuple in serialized list order; empty for an empty Event.
+
+        Raises:
+            SoundBankError: Version/lookup fails or body size does not match its count.
+
+        Notes:
+            Does not verify that the referenced Actions exist or precede the Event.
+        """
+
         self._require_v120("parse Event actions")
         body = self.object_body(HIRC_EVENT, event_id)
         if len(body) < 8:
@@ -883,6 +1224,23 @@ class HircEditor:
         expected_actions: Sequence[int],
         label: str = "append Event Action",
     ) -> None:
+        """Append an existing Action to a guarded existing v120 Event list.
+
+        Args:
+            event_id: Event to extend.
+            action_id: Existing unsigned-32 Action ID not already in that Event list.
+            expected_actions: Exact current ordered Action-ID sequence.
+            label: Diagnostic context.
+
+        Raises:
+            SoundBankError: Version/lookup/guard/duplicate checks fail or whole-body
+                replacement conflicts with prior Event field patches.
+
+        Notes:
+            Returns None. Rebuilds only the Event list; does not create/reorder the
+            Action. Bank validation separately checks Action-before-Event order.
+        """
+
         self._require_v120(label)
         action_id = _check_u32(action_id, "Action ID")
         self._get_object(HIRC_ACTION, action_id)
@@ -911,6 +1269,23 @@ class HircEditor:
         )
 
     def create_play_event_action(self, action_id: int, target_event_id: int) -> bytes:
+        """Construct a v120 PlayEvent Action body without inserting it.
+
+        Args:
+            action_id: Unsigned-32 identity to encode at body offset zero.
+            target_event_id: Unsigned-32 Event identity to encode as the target.
+
+        Returns:
+            Complete immutable Action body, including ID. Pass body[4:] to
+            insert_object() and attach it separately to its owning Event.
+
+        Raises:
+            SoundBankError: The version or either numeric ID is invalid.
+
+        Notes:
+            Does not reserve/check ID collisions, resolve the target, or mutate state.
+        """
+
         self._require_v120("create PlayEvent Action")
         return struct.pack(
             "<IHI3B",
@@ -932,6 +1307,29 @@ class HircEditor:
         transition_ms: int | None = None,
         fade_curve: int = 0x04,
     ) -> bytes:
+        """Construct a v120 Play Action body without inserting it.
+
+        Args:
+            action_id: Unsigned-32 Action identity encoded at body offset zero.
+            target_id: Unsigned-32 playback object identity to encode.
+            bank_id: Unsigned-32 Bank identity to encode.
+            delay_ms: Unsigned-32 delay when nonzero; zero omits the property.
+            transition_ms: Optional unsigned-32 transition in milliseconds; None
+                omits it, while zero encodes an explicit zero property.
+            fade_curve: Unsigned byte fade-curve code; defaults to 0x04.
+
+        Returns:
+            Complete immutable Action body, including ID. Insertion takes body[4:].
+
+        Raises:
+            SoundBankError: Version, ID, encoded delay/transition, or fade-byte checks fail.
+
+        Notes:
+            Does not reserve IDs, check target/Bank existence, insert an object, or
+            attach an Event reference. Omitted delay is tested by truthiness before
+            numeric validation, unlike an explicitly supplied transition.
+        """
+
         self._require_v120("create Play Action")
         properties: list[tuple[int, int]] = []
         if delay_ms:
@@ -967,7 +1365,30 @@ class HircEditor:
         before_event_id: int,
         label: str = "clone Stop Action",
     ) -> HircObject:
-        """Clone a reviewed v120 Stop Action and retarget its playback object."""
+        """Clone a guarded native v120 Stop Action and retarget its playback object.
+
+        Args:
+            donor_action_id: Existing Stop Action ID; its body must be at least ten bytes.
+            new_action_id: New unsigned-32 Action identity, unused by HIRC/media.
+            new_target_id: Unsigned-32 identity of an existing working playback object.
+            expected_target_id: Exact old unsigned-32 target ID.
+            expected_body_sha256: Exact 64-character lowercase hexadecimal SHA-256
+                over the entire donor body, including its ID.
+            before_event_id: Existing Event before which the clone is serialized.
+            label: Diagnostic context.
+
+        Returns:
+            Detached HircObject copy of the inserted Stop Action.
+
+        Raises:
+            SoundBankError: Version, donor type/layout/hash/target, new target,
+                anchor, or insertion/ID checks fail.
+
+        Notes:
+            Changes only Action ID and target ID; retains scope, transition, fade,
+            exceptions, and unknown bytes. Does not attach the clone to the Event;
+            use append_event_action() separately.
+        """
 
         self._require_v120(label)
         donor = self.object_body(HIRC_ACTION, donor_action_id)
@@ -1034,6 +1455,29 @@ class HircEditor:
         expected_source_id: int,
         label: str = "clone Sound",
     ) -> HircObject:
+        """Clone a reviewed embedded v120 Sound with new object and source identities.
+
+        Args:
+            donor_sound_id: Existing Sound with at least 18 body bytes and embedded
+                DATA stream type at the supported v120 layout position.
+            new_sound_id: Unused unsigned-32 HIRC/media identity.
+            new_source_id: Unsigned-32 Media ID to encode in the Sound.
+            expected_source_id: Exact donor source-ID guard.
+            label: Diagnostic context.
+
+        Returns:
+            Detached HircObject copy of the inserted Sound.
+
+        Raises:
+            SoundBankError: Version, donor lookup/layout/source guard, new IDs, or
+                insertion checks fail.
+
+        Notes:
+            Retains all other donor bytes, including parent and memory-size fields.
+            Does not check that the new media exists; Bank validation checks added
+            Sounds. Does not attach the Sound to a Container or Event.
+        """
+
         self._require_v120(label)
         donor = self.object_body(HIRC_SOUND, donor_sound_id)
         if len(donor) < 18:
@@ -1073,7 +1517,32 @@ class HircEditor:
         avoid_repeat_count: int | None = None,
         label: str = "clone Random/Sequence Container",
     ) -> HircObject:
-        """Clone a reviewed v120 Random Container with a rebuilt playlist."""
+        """Clone a v120 Random-mode Container with a guarded replacement playlist.
+
+        Args:
+            donor_container_id: Existing Random/Sequence Container in Random mode.
+            new_container_id: New unsigned-32 identity, unused by HIRC/media.
+            playlist: Nonempty sequence of (existing unique child ID, weight) pairs,
+                at most 65535 entries. Weights are integers in 1..2147483647.
+            expected_playlist: Exact donor ordered playlist, with the same pair rules.
+            expected_avoid_repeat_count: Exact unsigned-16 donor avoid-repeat value.
+            avoid_repeat_count: New unsigned-16 value, or None to preserve the donor.
+                Zero removes the local avoid-repeat restriction.
+            label: Diagnostic context.
+
+        Returns:
+            Detached copy of the new Container, inserted after all replacement children
+            and at least as late as the last existing Container of the same type.
+
+        Raises:
+            SoundBankError: Version, donor tail/mode, guard, playlist/range/reference,
+                or insertion/ID checks fail. Ambiguous terminal layouts are rejected.
+
+        Notes:
+            Retains donor bytes before the children/playlist tail except the new ID
+            and requested avoid-repeat value. Does not change child DirectParentID
+            fields or attach the clone to any parent/Action.
+        """
 
         self._require_v120(label)
         donor = self.object_body(
@@ -1145,7 +1614,21 @@ class HircEditor:
         self,
         container_id: int,
     ) -> SwitchContainerTopology:
-        """Return the parsed terminal topology of one v120 Switch Container."""
+        """Parse the unique terminal topology of an existing v120 Switch Container.
+
+        Args:
+            container_id: Existing Switch Container ID.
+
+        Returns:
+            Immutable SwitchContainerTopology with ordered children/packages/parameters.
+
+        Raises:
+            SoundBankError: Version/lookup fails or the terminal layout is malformed
+                or ambiguous, including incomplete internal child coverage.
+
+        Notes:
+            Does not validate referenced objects against the entire working graph.
+        """
 
         self._require_v120("parse Switch Container topology")
         body = self.object_body(HIRC_SWITCH_CONTAINER, container_id)
@@ -1163,7 +1646,34 @@ class HircEditor:
         expected_body_sha256: str,
         label: str = "clone Switch Container",
     ) -> HircObject:
-        """Clone a reviewed v120 Switch Container and filter/remap its children."""
+        """Clone a guarded v120 Switch Container and filter/remap its child branches.
+
+        Args:
+            donor_container_id: Existing Switch Container to clone.
+            new_container_id: Unused unsigned-32 HIRC/media identity.
+            child_map: Mapping covering every donor child exactly once. Values are
+                existing unique unsigned-32 replacement object IDs or None to omit
+                that branch from the clone. At least one child must remain.
+            expected_topology: Exact reviewed donor topology, including list order.
+            expected_body_sha256: Complete donor-body digest (including object ID)
+                as exactly 64 lowercase hexadecimal characters.
+            label: Diagnostic context.
+
+        Returns:
+            Detached new HircObject, placed after all retained children and at least
+            as late as the last existing Switch Container.
+
+        Raises:
+            SoundBankError: Version, hash/topology guards, donor layout, mapping,
+                replacement references, default-package/child coverage, or insertion
+                checks fail. Removing the default package is rejected.
+
+        Notes:
+            Keeps donor prefix bytes except ID; preserves ordered surviving packages
+            and per-child behavior/fade fields. Empty filtered packages are omitted.
+            Does not delete original children/media, update their DirectParentID,
+            or attach the clone to a new route.
+        """
 
         self._require_v120(label)
         donor = self.object_body(HIRC_SWITCH_CONTAINER, donor_container_id)
@@ -1287,7 +1797,32 @@ class HircEditor:
             expected_body_sha256: str,
             label: str = "clone Switch Container with explicit topology",
     ) -> HircObject:
-        """Clone a reviewed v120 Switch Container with an explicit new tail."""
+        """Clone a guarded v120 Switch Container using a complete replacement topology.
+
+        Args:
+            donor_container_id: Existing Switch Container to clone.
+            new_container_id: Unused unsigned-32 HIRC/media identity.
+            replacement_topology: Complete new SwitchContainerTopology. Every child
+                must exist, packages must cover exactly the children, parameters must
+                cover each child once, and the selected default must have a package.
+            expected_topology: Exact reviewed ordered donor topology.
+            expected_body_sha256: Full donor-body SHA-256 including ID, as exactly
+                64 lowercase hexadecimal characters.
+            label: Diagnostic context.
+
+        Returns:
+            Detached new HircObject, after all replacement children and at least as
+            late as the last existing Switch Container.
+
+        Raises:
+            SoundBankError: Version, donor/hash/topology, replacement coverage/ranges,
+                child existence, or insertion/identity checks fail.
+
+        Notes:
+            Replaces the complete topology tail, retaining donor prefix bytes except
+            the new ID. Unlike child-map cloning, packages and parameters can be
+            assigned independently. Does not update child parents or attach the clone.
+        """
 
         self._require_v120(label)
         donor = self.object_body(HIRC_SWITCH_CONTAINER, donor_container_id)
@@ -1344,6 +1879,13 @@ class HircEditor:
 
     @property
     def resized_objects(self) -> tuple[tuple[int, int, int, int], ...]:
+        """Return original objects whose current body lengths differ from their inputs.
+
+        Returns:
+            (type, ID, original byte length, current byte length) tuples in original
+            object order. Lengths include ID bytes; newly inserted objects are excluded.
+        """
+
         resized: list[tuple[int, int, int, int]] = []
         for key, original_size in self._original_sizes.items():
             current_size = len(self._by_key[key].body)
@@ -1352,6 +1894,16 @@ class HircEditor:
         return tuple(resized)
 
     def build(self) -> bytes:
+        """Serialize the current HIRC object count and bodies in working order.
+
+        Returns:
+            HIRC payload bytes, excluding the outer chunk tag/length header.
+
+        Notes:
+            Does not validate references, load order, or containing Bank media, and
+            does not write files. Use SoundBankEditor.validate() for Bank-level checks.
+        """
+
         output = bytearray(struct.pack("<I", len(self._objects)))
         for item in self._objects:
             output += struct.pack("<BI", item.object_type, len(item.body))

@@ -1,4 +1,11 @@
-"""Lossless LMT v95/TIML parsing and guarded Wwise request editing."""
+"""Lossless MHW LMT v95/TIML parsing and guarded request substitution.
+
+Notes:
+    Public names are re-exported by tools.soundbank_editor. Offsets in
+    parsed records are absolute LMT byte positions; public Motion IDs are
+    zero-based offset-table positions. EventGroup/slot hash constants are
+    documented in the package docstring. README.md provides API examples.
+"""
 
 from __future__ import annotations
 
@@ -86,7 +93,15 @@ def _normalize_trigger_frames(value: Sequence[float]) -> tuple[float, ...]:
 
 @dataclass(frozen=True)
 class TimlKeyframe:
-    """One typed TIML keyframe."""
+    """Immutable typed keyframe from an embedded TIML transform.
+
+    Attributes:
+        offset: Absolute LMT byte offset of the 20-byte keyframe.
+        value: Parsed scalar or four-component value according to data_type.
+        frame: Finite frame position stored as float32.
+        transition: Signed 16-bit transition field.
+        data_type: Keyframe type, checked against the enclosing transform.
+    """
 
     offset: int
     value: int | float | tuple[int, int, int, int]
@@ -97,7 +112,13 @@ class TimlKeyframe:
 
 @dataclass(frozen=True)
 class TimlTransform:
-    """One TIML property transform and its keyframes."""
+    """Immutable TIML property transform and its ordered keyframes.
+
+    Attributes:
+        datatype_hash: Unsigned property hash; may identify ReqNo A-H or mTrigger.
+        data_type: Type used to parse each keyframe's value.
+        keyframes: Keyframes in their original serialized order.
+    """
 
     datatype_hash: int
     data_type: int
@@ -106,7 +127,12 @@ class TimlTransform:
 
 @dataclass(frozen=True)
 class TimlType:
-    """One timeline type, such as an EventGroup."""
+    """Immutable TIML timeline type and its ordered transforms.
+
+    Attributes:
+        timeline_hash: Unsigned type hash, mapped to EventGroup names when known.
+        transforms: Property transforms in their original serialized order.
+    """
 
     timeline_hash: int
     transforms: tuple[TimlTransform, ...]
@@ -114,7 +140,18 @@ class TimlType:
 
 @dataclass(frozen=True)
 class LmtAction:
-    """One populated LMT Motion action header and embedded TIML."""
+    """Immutable populated Motion header and its embedded TIML.
+
+    Attributes:
+        motion_id: Zero-based position in the LMT offset table, including holes.
+        header_offset: Absolute byte offset of the Motion header.
+        fcurve_offset: Absolute stored animation-curve offset; curves are not decoded.
+        fcurve_count: Stored animation-curve count.
+        frame_count: Stored Motion length in frames.
+        loop_frame: Signed loop-frame field, preserved without reinterpretation.
+        timl_offset: Absolute embedded TIML offset, or zero when absent.
+        timl: Parsed timeline types; empty if TIML is absent.
+    """
 
     motion_id: int
     header_offset: int
@@ -127,6 +164,13 @@ class LmtAction:
 
     @property
     def header_identity(self) -> tuple[int, ...]:
+        """Return header fields used for preservation checks as an ordered tuple.
+
+        Returns:
+            (motion_id, header_offset, fcurve_offset, fcurve_count, frame_count,
+            loop_frame, timl_offset); embedded TIML contents are excluded.
+        """
+
         return (
             self.motion_id,
             self.header_offset,
@@ -140,7 +184,25 @@ class LmtAction:
 
 @dataclass(frozen=True)
 class TriggeredRequest:
-    """One mTrigger-to-ReqNo route, optionally resolved through WWEV."""
+    """Immutable trigger-to-request row with an optional WWEV record expansion.
+
+    Attributes:
+        motion_id: Zero-based Motion ID.
+        frame_count: Stored length of that Motion.
+        timl_offset: Absolute LMT byte offset of the shared/unshared TIML.
+        shared_timl_motions: All Motion IDs using this TIML, including this Motion.
+        event_group: Recognized EventGroup00-10 name.
+        trigger_frame: Frame at which the slot is activated.
+        trigger_mask: Complete stored trigger mask; route selection uses low eight bits.
+        slot: Activated ReqNo slot name, A-H.
+        request_no: Positive request assignment active at trigger_frame.
+        wwev_record: 1-based WWEV record index, or None if unresolved/not supplied.
+        wwev_mode: Matched record's signed mode, or None.
+        event_id: Matched record's unsigned Event ID, or None.
+
+    Notes:
+        Repeated WWEV matches generate separate rows, not a collapsed Event.
+    """
 
     motion_id: int
     frame_count: int
@@ -261,7 +323,19 @@ def _value_at(keyframes: Sequence[TimlKeyframe], frame: float) -> int | None:
 
 @dataclass(frozen=True)
 class LmtFile:
-    """An immutable, losslessly parsed MHW LMT v95 file."""
+    """Immutable LMT v95 file; construct with from_file() or from_bytes().
+
+    Attributes:
+        version: Accepted LMT version, 95.
+        entry_count: Total Motion offset-table slots, including empty entries.
+        actions: Populated Motion headers in table order, with parsed TIML.
+        source_path: Resolved input filename for from_file(), otherwise None.
+
+    Notes:
+        The complete original payload is retained, including unmodeled data.
+        Factories validate supported headers, pointers, and typed TIML records;
+        direct dataclass construction bypasses parsing checks.
+    """
 
     version: int
     entry_count: int
@@ -271,6 +345,23 @@ class LmtFile:
 
     @classmethod
     def from_file(cls, path: Path | str) -> LmtFile:
+        """Read and parse a file, retaining its resolved path for output protection.
+
+        Args:
+            path: Path or string filename of the input artifact.
+
+        Returns:
+            Parsed LmtFile.
+
+        Raises:
+            LmtError: The path is not a file or format parsing fails.
+            OSError: Reading the file or resolving its path fails.
+
+        Notes:
+            Does not modify the input. Editors reject writing to this resolved
+            source_path even when output overwrite is enabled.
+        """
+
         source = Path(path)
         if not source.is_file():
             raise LmtError(f"LMT does not exist: {source}")
@@ -285,6 +376,23 @@ class LmtFile:
 
     @classmethod
     def from_bytes(cls, payload: bytes) -> LmtFile:
+        """Parse immutable input bytes without recording a source filename.
+
+        Args:
+            payload: Complete file as bytes; bytearray/memoryview are not accepted
+                by the underlying parsed-file factory.
+
+        Returns:
+            Parsed LmtFile; source_path is None.
+
+        Raises:
+            LmtError: The input is not bytes or parsing checks fail.
+
+        Notes:
+            Checks LMT v95 header, offset table, populated Motion headers, and typed TIML pointers/keyframes.
+            No file I/O occurs; source-path overwrite protection is unavailable.
+        """
+
         if not isinstance(payload, bytes):
             raise LmtError("LMT input must be bytes")
         require_range(payload, 0, LMT_HEADER.size, "LMT header", LmtError)
@@ -341,9 +449,27 @@ class LmtFile:
         return cls(version, entry_count, tuple(actions), payload)
 
     def to_bytes(self) -> bytes:
+        """Return the complete retained LMT payload byte-for-byte.
+
+        Notes:
+            No rebuilding, validation, or disk I/O occurs.
+        """
+
         return self._payload
 
     def action(self, motion_id: int) -> LmtAction:
+        """Look up exactly one populated Motion by its offset-table ID.
+
+        Args:
+            motion_id: Zero-based table position, not index into the actions tuple.
+
+        Returns:
+            Immutable LmtAction for that Motion.
+
+        Raises:
+            LmtError: There is not exactly one populated matching Motion.
+        """
+
         matches = [action for action in self.actions if action.motion_id == motion_id]
         if len(matches) != 1:
             raise LmtError(
@@ -352,11 +478,45 @@ class LmtFile:
         return matches[0]
 
     def timl_for_motion(self, motion_id: int) -> tuple[TimlType, ...]:
+        """Return the parsed timeline types for a populated Motion.
+
+        Args:
+            motion_id: Zero-based Motion offset-table position.
+
+        Returns:
+            Tuple of TimlType, empty when the Motion has no TIML.
+
+        Raises:
+            LmtError: action() cannot resolve the Motion uniquely.
+        """
+
         return self.action(motion_id).timl
 
     def triggered_requests(
         self, wwev: WwevFile | None = None
     ) -> tuple[TriggeredRequest, ...]:
+        """Expand recognized EventGroup triggers into request and optional WWEV rows.
+
+        Args:
+            wwev: Parsed WwevFile to resolve each positive ReqNo, or None.
+
+        Returns:
+            Immutable rows sorted by Motion, trigger frame, EventGroup, slot, and
+            WWEV record index. Each matching WWEV record gets a separate row; missing
+            matches or omitted wwev retain one row with None WWEV fields. Shared TIML
+            lists every Motion using it, including the current Motion.
+
+        Raises:
+            LmtError: wwev is neither WwevFile nor None.
+
+        Notes:
+            Uses EventGroup00-10 and low-eight mTrigger bits A-H. The active request
+            is the latest integer assignment at/before the trigger (frame tolerance
+            1e-5). Unknown groups, missing transforms, inactive slots, and absent or
+            nonpositive assignments produce no row. This is a route report, not a
+            full ambiguity/type validator or a lookup into an NBNK.
+        """
+
         if wwev is not None and not isinstance(wwev, WwevFile):
             raise LmtError("wwev must be a WwevFile or None")
         shared_by_offset: dict[int, list[int]] = defaultdict(list)
@@ -435,7 +595,19 @@ class LmtFile:
 
 @dataclass(frozen=True)
 class LmtRequestEdit:
-    """One declared guarded request-keyframe substitution."""
+    """Immutable record of one guarded request-keyframe substitution.
+
+    Attributes:
+        motion_id: Zero-based Motion ID.
+        event_group: EventGroup00-10 name.
+        slot: Normalized uppercase ReqNo slot A-H.
+        request_keyframe_frame: Actual matched assignment frame.
+        trigger_frames: Sorted unique verified trigger frames after replacement.
+        offset: Absolute LMT byte offset of the four-byte assignment value.
+        old_request: Previous positive signed-16 request number.
+        new_request: Replacement positive signed-16 request number.
+        changed_byte_count: Differing bytes within the four-byte value, not always four.
+    """
 
     motion_id: int
     event_group: str
@@ -450,26 +622,76 @@ class LmtRequestEdit:
 
 @dataclass(frozen=True)
 class LmtEditSummary:
-    """Observable changes made by an LmtEditor."""
+    """Immutable current LMT edit report, without running validation.
+
+    Attributes:
+        changed_byte_count: Net differing bytes between original and working LMT.
+        edits: Declared LmtRequestEdit records in edit order.
+    """
 
     changed_byte_count: int
     edits: tuple[LmtRequestEdit, ...]
 
 
 class LmtEditor:
-    """A transactional editor for guarded ReqNo substitutions in one LMT."""
+    """In-memory editor for guarded substitutions in unshared Motion TIML.
+
+    Attributes:
+        original: Immutable source LmtFile; retained for byte preservation and
+            source-path checks. New/removed timelines are not supported.
+    """
 
     def __init__(self, lmt: LmtFile):
+        """Copy the retained LMT payload into independent working memory.
+
+        Args:
+            lmt: Parsed original LmtFile; its source_path is retained for write protection.
+        """
+
         self.original = lmt
         self._payload = bytearray(lmt.to_bytes())
         self._edits: list[LmtRequestEdit] = []
 
     @classmethod
     def from_file(cls, path: Path | str) -> LmtEditor:
+        """Read and parse a file, retaining its resolved path for output protection.
+
+        Args:
+            path: Path or string filename of the input artifact.
+
+        Returns:
+            New LmtEditor containing a parsed original and independent working state.
+
+        Raises:
+            LmtError: The path is not a file or format parsing fails.
+            OSError: Reading the file or resolving its path fails.
+
+        Notes:
+            Does not modify the input. Editors reject writing to this resolved
+            source_path even when output overwrite is enabled.
+        """
+
         return cls(LmtFile.from_file(path))
 
     @classmethod
     def from_bytes(cls, payload: bytes) -> LmtEditor:
+        """Parse immutable input bytes without recording a source filename.
+
+        Args:
+            payload: Complete file as bytes; bytearray/memoryview are not accepted
+                by the underlying parsed-file factory.
+
+        Returns:
+            New LmtEditor containing a parsed original and independent working state; source_path is None.
+
+        Raises:
+            LmtError: The input is not bytes or parsing checks fail.
+
+        Notes:
+            Checks LMT v95 header, offset table, populated Motion headers, and typed TIML pointers/keyframes.
+            No file I/O occurs; source-path overwrite protection is unavailable.
+        """
+
         return cls(LmtFile.from_bytes(payload))
 
     def replace_request(
@@ -483,7 +705,34 @@ class LmtEditor:
         replacement_request: int,
         expected_trigger_frames: Sequence[float],
     ) -> LmtRequestEdit:
-        """Replace exactly one request assignment guarded by its complete route."""
+        """Replace one four-byte request assignment guarded by its Motion route.
+
+        Args:
+            motion_id: Zero-based populated Motion ID with unshared embedded TIML.
+            event_group: Exact EventGroup00-10 name.
+            slot: ReqNo slot A-H, normalized to uppercase.
+            request_keyframe_frame: Finite assignment frame, matched within 1e-5.
+            expected_request: Exact old ReqNo in 1..32767.
+            replacement_request: Different replacement ReqNo in 1..32767.
+            expected_trigger_frames: Nonempty sequence of finite frames; sorted and
+                deduplicated, then compared within 1e-5 to all triggers for the old
+                request in this transform. Also checked against the replacement route.
+
+        Returns:
+            LmtRequestEdit containing actual assignment/trigger frames, offset, and
+            changed-byte count. The working payload and edit list are then updated.
+
+        Raises:
+            LmtError: Motion/range/group/slot/frame guards fail; TIML is absent/shared;
+                the request transform is not uniquely typed as data type 1; assignment
+                selection is ambiguous; edits overlap; or candidate read-back and
+                replacement-trigger checks fail.
+
+        Notes:
+            Candidate checks run before committing this edit. Other bytes and Motion
+            headers remain unchanged. No WWEV lookup, new-request collision check
+            across files, or game trigger verification is performed here.
+        """
 
         if (
             not isinstance(motion_id, int)
@@ -664,9 +913,24 @@ class LmtEditor:
         return tuple(sorted(frames))
 
     def build(self) -> bytes:
+        """Return immutable current LMT bytes without reparsing or writing a file."""
+
         return bytes(self._payload)
 
     def validate(self) -> LmtFile:
+        """Reparse and verify working LMT bytes against the original and declared edits.
+
+        Returns:
+            Parsed LmtFile of the current payload, with no source_path.
+
+        Raises:
+            LmtError: Reparse fails, size/header metadata changes, undeclared bytes
+                differ, or an edited request value/trigger-frame set fails read-back.
+
+        Notes:
+            Does not mutate the editor, write a file, or resolve requests through WWEV.
+        """
+
         payload = self.build()
         if len(payload) != len(self.original.to_bytes()):
             raise LmtError("read-back verification changed LMT file size")
@@ -722,6 +986,12 @@ class LmtEditor:
 
     @property
     def summary(self) -> LmtEditSummary:
+        """Return net byte differences and declared edits as an immutable LmtEditSummary.
+
+        Notes:
+            This compares current bytes to the original without running validate().
+        """
+
         changed = sum(
             before != after
             for before, after in zip(self.original.to_bytes(), self.build())
@@ -729,6 +999,29 @@ class LmtEditor:
         return LmtEditSummary(changed_byte_count=changed, edits=tuple(self._edits))
 
     def write_atomic(self, output: Path | str, *, overwrite: bool = False) -> Path:
+        """Validate and write one artifact using a temporary file beside the output.
+
+        Args:
+            output: Path or string filename; missing parent directories are created.
+            overwrite: Permit replacing an existing output when True. Never permits
+                replacing the original's recorded resolved source_path.
+
+        Returns:
+            Path of the written output, retaining the caller's relative/absolute form.
+
+        Raises:
+            LmtError: Validation fails, output resolves to the recorded input, or
+                output already exists and overwrite is False.
+            OSError: Directory creation, staging, fsync, or replacement fails.
+
+        Notes:
+            Calls build() and validate(), stages/fsyncs bytes, then uses os.replace().
+            Cleans up the staged file and leaves editor state unchanged. from_bytes()
+            has no source path to protect. The preflight existence check is not
+            concurrency-safe exclusive creation; this is not a multi-file transaction
+            or an on-disk read-back verification pass.
+        """
+
         payload = self.build()
         self.validate()
         return _write_atomic(

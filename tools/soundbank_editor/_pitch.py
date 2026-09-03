@@ -14,7 +14,20 @@ _PITCH_ID = 0x02
 
 @dataclass(frozen=True)
 class HircPitchSettings:
-    """Local pitch contributions in cents; None means an absent property."""
+    """Immutable local Pitch values for inspection and exact property guards.
+
+    Attributes:
+        base_cents: Local base offset in cents, or None when the property is absent.
+        random_range_cents: Local (minimum, maximum) offsets in cents, or None
+            when the random property is absent. Zero is distinct from absence.
+
+    Notes:
+        One semitone is 100 cents. These are local contributions, not the final
+        inherited playback Pitch. Construction does not validate values;
+        HircEditor.set_pitch() checks guards and replacements as finite float32.
+        None in this inspected/expected record means absence; None in set_pitch()
+        replacement arguments instead means retain the existing property.
+    """
 
     base_cents: float | None
     random_range_cents: tuple[float, float] | None
