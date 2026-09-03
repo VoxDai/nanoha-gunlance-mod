@@ -22,6 +22,26 @@ ORIGINAL_ROUTE_ACTION_ID = 267_255_962
 VOICE_ACTION_ID = 708_529_406
 VOICE_EVENT_ID = 3_176_129_810
 
+STATIONARY_MEDIA_IDS = (
+    VOICE_MEDIA_ID, 3_899_958_096, 1_917_220_401, 2_922_118_034, 3_798_249_131, 3_222_869_860,
+)
+STATIONARY_SOUND_IDS = (
+    VOICE_SOUND_ID, 776_774_097, 3_655_378_684, 3_336_805_367, 1_609_904_242, 3_412_709_805,
+)
+STATIONARY_MEDIA_INDICES = (34, 39, 40, 41, 42, 43)
+STATIONARY_RANDOM_ID = 847_783_544
+STATIONARY_PLAYLIST = tuple((sound_id, 50_000) for sound_id in STATIONARY_SOUND_IDS)
+STATIONARY_RANDOM_DONOR_ID = 522_283_251
+STATIONARY_RANDOM_DONOR_SHA256 = (
+    "e47758895339f8a1e74a65b122921135b97edf7ee01ad69f5d2a388f66e1955d"
+)
+STATIONARY_SOUND_DONOR_SHA256 = (
+    "708699420d9237c644f13919834d5f4374d67e29a94762dc1bc0b0b98e133186"
+)
+STATIONARY_RANDOM_SHA256 = (
+    "db3a22c71a5c29ad75d077c95b70a2b7f65f98b7c3940b4ba4c8fab2707a6644"
+)
+
 ORIGINAL_EVENT_ID = 3_567_942_167
 ORIGINAL_EVENT_ACTION_ID = 1_061_269_777
 DONOR_SOUND_ID = 233_981_936
@@ -96,6 +116,65 @@ WIDE_SWEEP_RANDOM_SHA256 = (
 WIDE_SWEEP_UNUSED_EVENT_IDS = (1_359_210_849, 2_281_439_929)
 
 
+def _guard_stationary_draw_original(bank: soundbank_editor.SoundBankEditor) -> None:
+    editor = bank.hirc
+    if (
+        editor.event_actions(ORIGINAL_EVENT_ID) != (ORIGINAL_EVENT_ACTION_ID,)
+        or editor.object_body(soundbank_editor.HIRC_ACTION, ORIGINAL_EVENT_ACTION_ID)
+        != editor.create_play_action(
+            ORIGINAL_EVENT_ACTION_ID, STATIONARY_RANDOM_DONOR_ID, bank.bank_id
+        )
+        or bank.media_entry(index=27).media_id != DONOR_MEDIA_ID
+        or hashlib.sha256(editor.object_body(
+            soundbank_editor.HIRC_SOUND, DONOR_SOUND_ID
+        )).hexdigest() != STATIONARY_SOUND_DONOR_SHA256
+        or hashlib.sha256(editor.object_body(
+            soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, STATIONARY_RANDOM_DONOR_ID
+        )).hexdigest() != STATIONARY_RANDOM_DONOR_SHA256
+    ):
+        raise soundbank_editor.SoundBankError("stationary-draw original route or donor changed")
+
+
+def validate_stationary_draw_hirc(bank: soundbank_editor.SoundBankEditor) -> None:
+    """Verify the six-choice voice route in callbacks and staged bundles."""
+
+    _guard_stationary_draw_original(bank)
+    editor = bank.hirc
+    random_body = editor.object_body(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, STATIONARY_RANDOM_ID
+    )
+    if (
+        hashlib.sha256(random_body).hexdigest() != STATIONARY_RANDOM_SHA256
+        or editor.pitch_settings(soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, STATIONARY_RANDOM_ID)
+        != soundbank_editor.HircPitchSettings(None, (-50.0, 50.0))
+    ):
+        raise soundbank_editor.SoundBankError(
+            "stationary-draw Random selection, parent, or Pitch differ"
+        )
+    for index, sound_id, media_id in zip(
+        STATIONARY_MEDIA_INDICES, STATIONARY_SOUND_IDS, STATIONARY_MEDIA_IDS, strict=True
+    ):
+        if (
+            bank.media_entry(index=index).media_id != media_id
+            or editor.object_body(soundbank_editor.HIRC_SOUND, sound_id)
+            != standard_voice_sound_body(sound_id, media_id, direct_parent_id=STATIONARY_RANDOM_ID)
+        ):
+            raise soundbank_editor.SoundBankError("stationary-draw voice Sound or DIDX order differs")
+    actions = (ORIGINAL_ROUTE_ACTION_ID, VOICE_ACTION_ID)
+    if (
+        editor.event_actions(VOICE_EVENT_ID) != actions
+        or editor.object_body(soundbank_editor.HIRC_ACTION, actions[0])
+        != editor.create_play_event_action(actions[0], ORIGINAL_EVENT_ID)
+        or editor.object_body(soundbank_editor.HIRC_ACTION, actions[1])
+        != editor.create_play_action(actions[1], STATIONARY_RANDOM_ID, bank.bank_id)
+    ):
+        raise soundbank_editor.SoundBankError("stationary-draw original delegation or voice Play differs")
+    positions = {obj.object_id: obj.index for obj in editor.objects()}
+    ordered = (*STATIONARY_SOUND_IDS, STATIONARY_RANDOM_ID, *actions, VOICE_EVENT_ID, ORIGINAL_EVENT_ID)
+    if any(positions[left] >= positions[right] for left, right in zip(ordered, ordered[1:])):
+        raise soundbank_editor.SoundBankError("stationary-draw HIRC serialization order differs")
+
+
 def _guard_wide_sweep_original(bank: soundbank_editor.SoundBankEditor) -> None:
     editor = bank.hirc
     if (
@@ -123,7 +202,7 @@ def validate_wide_sweep_hirc(bank: soundbank_editor.SoundBankEditor) -> None:
 
     _guard_wide_sweep_original(bank)
     editor = bank.hirc
-    if len(editor.objects()) != 140 or len(editor.build()) != 7831:
+    if len(editor.objects()) != 146 or len(editor.build()) != 8234:
         raise soundbank_editor.SoundBankError("wide-sweep combined HIRC counts differ")
     random_body = editor.object_body(soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WIDE_SWEEP_RANDOM_ID)
     if (
@@ -194,32 +273,28 @@ def _apply_wide_sweep(bank: soundbank_editor.SoundBankEditor) -> None:
     validate_wide_sweep_hirc(bank)
 
 
-def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
-    """Create isolated action routes and append the shared reload Event Action."""
-
-    bank.media_entry(media_id=VOICE_MEDIA_ID)
+def _apply_stationary_draw(bank: soundbank_editor.SoundBankEditor) -> None:
+    _guard_stationary_draw_original(bank)
     editor = bank.hirc
-    if editor.event_actions(ORIGINAL_EVENT_ID) != (ORIGINAL_EVENT_ACTION_ID,):
-        raise soundbank_editor.SoundBankError(
-            "original stationary-draw Event route differs from its design guard"
+    for sound_id, media_id in zip(STATIONARY_SOUND_IDS, STATIONARY_MEDIA_IDS, strict=True):
+        bank.media_entry(media_id=media_id)
+        insert_standard_voice_sound(
+            editor, sound_id, media_id, direct_parent_id=STATIONARY_RANDOM_ID,
+            label="insert standard stationary-draw voice Sound",
         )
-
-    stationary_donor = editor.object_body(
-        soundbank_editor.HIRC_SOUND, DONOR_SOUND_ID
+    editor.clone_random_sequence_container(
+        STATIONARY_RANDOM_DONOR_ID, STATIONARY_RANDOM_ID, STATIONARY_PLAYLIST,
+        expected_playlist=((DONOR_SOUND_ID, 50_000),), expected_avoid_repeat_count=1,
+        avoid_repeat_count=0, label="clone uniform stationary-draw Random",
     )
-    if (
-        len(stationary_donor) < 13
-        or stationary_donor[8] != 0
-        or struct.unpack_from("<I", stationary_donor, 9)[0] != DONOR_MEDIA_ID
-    ):
-        raise soundbank_editor.SoundBankError(
-            "stationary-draw donor Sound differs from its design guard"
-        )
-    insert_standard_voice_sound(
-        editor,
-        VOICE_SOUND_ID,
-        VOICE_MEDIA_ID,
-        label="insert standard stationary-draw custom-voice Sound",
+    editor.patch_u32(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, STATIONARY_RANDOM_ID, 0x0B,
+        768_813_060, STANDARD_VOICE_PARENT_ID, label="parent stationary-draw Random to voice mixer",
+    )
+    editor.set_pitch(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, STATIONARY_RANDOM_ID,
+        expected=soundbank_editor.HircPitchSettings(None, (-50.0, 50.0)),
+        random_range_cents=(-50.0, 50.0),
     )
 
     original_route = editor.create_play_event_action(
@@ -232,7 +307,7 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
         before=(soundbank_editor.HIRC_EVENT, ORIGINAL_EVENT_ID),
         label="add stationary-draw PlayEvent Action for the original route",
     )
-    voice = editor.create_play_action(VOICE_ACTION_ID, VOICE_SOUND_ID, bank.bank_id)
+    voice = editor.create_play_action(VOICE_ACTION_ID, STATIONARY_RANDOM_ID, bank.bank_id)
     editor.insert_object(
         soundbank_editor.HIRC_ACTION,
         VOICE_ACTION_ID,
@@ -247,6 +322,14 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
         before=(soundbank_editor.HIRC_EVENT, ORIGINAL_EVENT_ID),
         label="add isolated stationary-draw Event",
     )
+    validate_stationary_draw_hirc(bank)
+
+
+def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
+    """Create isolated action routes and append the shared reload Event Action."""
+
+    _apply_stationary_draw(bank)
+    editor = bank.hirc
 
     bank.media_entry(media_id=OVERHEAD_VOICE_MEDIA_ID)
     if bank.media_entry(index=OVERHEAD_DONOR_MEDIA_INDEX).media_id != OVERHEAD_DONOR_MEDIA_ID:
@@ -429,10 +512,21 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (36, RELOAD_VOICE_MEDIA_ID),
         (37, WIDE_SWEEP_MEDIA_IDS[0]),
         (38, WIDE_SWEEP_MEDIA_IDS[1]),
+        (39, STATIONARY_MEDIA_IDS[1]),
+        (40, STATIONARY_MEDIA_IDS[2]),
+        (41, STATIONARY_MEDIA_IDS[3]),
+        (42, STATIONARY_MEDIA_IDS[4]),
+        (43, STATIONARY_MEDIA_IDS[5]),
     ),
-    hirc_changed_bytes=5,
+    hirc_changed_bytes=9,
     added_hirc_objects=(
         (soundbank_editor.HIRC_SOUND, VOICE_SOUND_ID),
+        (soundbank_editor.HIRC_SOUND, STATIONARY_SOUND_IDS[1]),
+        (soundbank_editor.HIRC_SOUND, STATIONARY_SOUND_IDS[2]),
+        (soundbank_editor.HIRC_SOUND, STATIONARY_SOUND_IDS[3]),
+        (soundbank_editor.HIRC_SOUND, STATIONARY_SOUND_IDS[4]),
+        (soundbank_editor.HIRC_SOUND, STATIONARY_SOUND_IDS[5]),
+        (soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, STATIONARY_RANDOM_ID),
         (soundbank_editor.HIRC_ACTION, ORIGINAL_ROUTE_ACTION_ID),
         (soundbank_editor.HIRC_ACTION, VOICE_ACTION_ID),
         (soundbank_editor.HIRC_EVENT, VOICE_EVENT_ID),
@@ -453,7 +547,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
     resized_hirc_objects=(
         (soundbank_editor.HIRC_EVENT, RELOAD_EVENT_ID, 12, 16),
     ),
-    hirc_size_delta=581,
+    hirc_size_delta=984,
 )
 
 
@@ -505,6 +599,36 @@ PLAN = SoundBankBuildPlan(
             38, WIDE_SWEEP_MEDIA_IDS[1],
             "audio/wp_gun_cmn/wide_sweep/"
             "nanoha_smasher_02(movie_2nd_as.nanoha.smasher.1).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            39, STATIONARY_MEDIA_IDS[1],
+            "audio/wp_gun_cmn/stationary_draw/"
+            "raising_heart_standby_ready_02(movie_1st.raising_heart.standby_ready_01.1).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            40, STATIONARY_MEDIA_IDS[2],
+            "audio/wp_gun_cmn/stationary_draw/"
+            "raising_heart_standby_ready_03(movie_1st.raising_heart.standby_ready_02.1).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            41, STATIONARY_MEDIA_IDS[3],
+            "audio/wp_gun_cmn/stationary_draw/"
+            "raising_heart_standby_ready_04(movie_1st.raising_heart.standby_ready_03.1).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            42, STATIONARY_MEDIA_IDS[4],
+            "audio/wp_gun_cmn/stationary_draw/"
+            "raising_heart_standby_ready_05(movie_1st.raising_heart.standby_ready_04.1).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            43, STATIONARY_MEDIA_IDS[5],
+            "audio/wp_gun_cmn/stationary_draw/"
+            "raising_heart_standby_ready_06(movie_1st.raising_heart.standby_ready_05.1).wav",
             wem_channels=1,
         ),
     ),
