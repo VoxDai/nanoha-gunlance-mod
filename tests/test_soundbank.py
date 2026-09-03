@@ -15,13 +15,35 @@ from ._soundbank_fixtures import SOUNDBANK_ROOT, make_random_container_tail
 class SoundBankRoundTripTests(unittest.TestCase):
     def test_every_original_bank_round_trips_byte_exactly(self) -> None:
         for path in sorted(SOUNDBANK_ROOT.glob("*.nbnk")):
-            if path.name == "pl_act_vo_event.nbnk":
-                continue
-            bank = soundbank_editor.SoundBank.from_file(path)
-            self.assertEqual(bank.to_bytes(), path.read_bytes(), path.name)
-            editor = soundbank_editor.SoundBankEditor(bank)
-            self.assertEqual(editor.build(), path.read_bytes(), path.name)
-            self.assertEqual(editor.validate().to_bytes(), path.read_bytes(), path.name)
+            with self.subTest(bank=path.name):
+                raw = path.read_bytes()
+                chunks = {}
+                offset = 0
+                while offset < len(raw):
+                    self.assertLessEqual(offset + 8, len(raw))
+                    tag, size = struct.unpack_from("<4sI", raw, offset)
+                    end = offset + 8 + size
+                    self.assertLessEqual(end, len(raw))
+                    self.assertNotIn(tag, chunks)
+                    chunks[tag] = raw[offset + 8:end]
+                    offset = end
+                if b"DIDX" not in chunks:
+                    # Routing-only references have no embedded media. Round-trip
+                    # their HIRC with the public HIRC editor instead of skipping.
+                    self.assertNotIn(b"DATA", chunks)
+                    version = struct.unpack_from("<I", chunks[b"BKHD"])[0]
+                    hirc = soundbank_editor.HircEditor(chunks[b"HIRC"], version=version)
+                    self.assertEqual(hirc.build(), chunks[b"HIRC"])
+                    chunks[b"HIRC"] = hirc.build()
+                    rebuilt = b"".join(struct.pack("<4sI", tag, len(payload)) + payload
+                                       for tag, payload in chunks.items())
+                    self.assertEqual(rebuilt, raw)
+                else:
+                    bank = soundbank_editor.SoundBank.from_file(path)
+                    self.assertEqual(bank.to_bytes(), raw)
+                    editor = soundbank_editor.SoundBankEditor(bank)
+                    self.assertEqual(editor.build(), raw)
+                    self.assertEqual(editor.validate().to_bytes(), raw)
 
     def test_media_selection_and_extraction_are_one_based(self) -> None:
         bank = soundbank_editor.SoundBank.from_file(

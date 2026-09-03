@@ -1,4 +1,4 @@
-"""Build stationary-draw and overhead-smash character-voice requests."""
+"""Build stationary-draw, overhead-smash, and frame-11 wide-sweep requests."""
 
 from __future__ import annotations
 
@@ -36,9 +36,18 @@ ORIGINAL_MECHANICAL_SLOT = "F"
 ORIGINAL_MECHANICAL_REQUEST = 6505
 ORIGINAL_MECHANICAL_TRIGGER_FRAMES = (32.0,)
 
+WIDE_SWEEP_MOTION_ID = 143
+WIDE_SWEEP_EVENT_GROUP = "EventGroup06"
+WIDE_SWEEP_SLOT = "A"
+WIDE_SWEEP_REQUEST_KEYFRAME = 0.0
+WIDE_SWEEP_TRIGGER_FRAMES = (11.0,)
+WIDE_SWEEP_OLD_REQUEST = 6486
+WIDE_SWEEP_NEW_REQUEST = 6596
+WIDE_SWEEP_REQUEST_OFFSET = 1_202_416
+
 
 def apply_edits(editor: soundbank_editor.LmtEditor) -> None:
-    """Guard and replace the stationary-draw and two character-voice requests."""
+    """Guard and replace the four reviewed animation request assignments."""
 
     editor.replace_request(
         motion_id=MOTION_ID,
@@ -67,10 +76,19 @@ def apply_edits(editor: soundbank_editor.LmtEditor) -> None:
         replacement_request=OVERHEAD_NEW_REQUEST,
         expected_trigger_frames=LINK_TRIGGER_FRAMES,
     )
+    editor.replace_request(
+        motion_id=WIDE_SWEEP_MOTION_ID,
+        event_group=WIDE_SWEEP_EVENT_GROUP,
+        slot=WIDE_SWEEP_SLOT,
+        request_keyframe_frame=WIDE_SWEEP_REQUEST_KEYFRAME,
+        expected_request=WIDE_SWEEP_OLD_REQUEST,
+        replacement_request=WIDE_SWEEP_NEW_REQUEST,
+        expected_trigger_frames=WIDE_SWEEP_TRIGGER_FRAMES,
+    )
 
 
 EXPECTED_SUMMARY = soundbank_editor.LmtEditSummary(
-    changed_byte_count=5,
+    changed_byte_count=6,
     edits=(
         soundbank_editor.LmtRequestEdit(
             motion_id=MOTION_ID,
@@ -105,6 +123,17 @@ EXPECTED_SUMMARY = soundbank_editor.LmtEditSummary(
             new_request=OVERHEAD_NEW_REQUEST,
             changed_byte_count=2,
         ),
+        soundbank_editor.LmtRequestEdit(
+            motion_id=WIDE_SWEEP_MOTION_ID,
+            event_group=WIDE_SWEEP_EVENT_GROUP,
+            slot=WIDE_SWEEP_SLOT,
+            request_keyframe_frame=WIDE_SWEEP_REQUEST_KEYFRAME,
+            trigger_frames=WIDE_SWEEP_TRIGGER_FRAMES,
+            offset=WIDE_SWEEP_REQUEST_OFFSET,
+            old_request=WIDE_SWEEP_OLD_REQUEST,
+            new_request=WIDE_SWEEP_NEW_REQUEST,
+            changed_byte_count=1,
+        ),
     ),
 )
 
@@ -114,6 +143,7 @@ PLAN = LmtBuildPlan(
     design_ids=(
         "wp_gun_cmn.stationary_draw",
         "wp_gun_cmn.overhead_smash",
+        "wp_gun_cmn.wide_sweep",
     ),
     source="original/lmt/w07_00.lmt",
     target="hm/wp/wp07/mot/w07_00/w07_00.lmt",

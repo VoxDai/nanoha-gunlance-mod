@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 import struct
 
@@ -15,6 +16,13 @@ from .hm_wp07_snd_ev import (
     OVERHEAD_ORIGINAL_MODE,
     OVERHEAD_ORIGINAL_RECORD_SHA256,
     OVERHEAD_ORIGINAL_REQUEST,
+    WIDE_SWEEP_DONOR_EVENT_ID,
+    WIDE_SWEEP_DONOR_MODE,
+    WIDE_SWEEP_DONOR_RECORD_SHA256,
+    WIDE_SWEEP_DONOR_REQUEST,
+    WIDE_SWEEP_NEW_EVENT_ID,
+    WIDE_SWEEP_NEW_RECORD_SHA256,
+    WIDE_SWEEP_NEW_REQUEST,
 )
 from .pl_voice import (
     DONOR_EVENT_ID as ORIGINAL_GRUNT_EVENT_ID,
@@ -34,6 +42,10 @@ from .w07_00 import (
     QUICK_RELOAD_MOTION_ID,
     QUICK_RELOAD_SLOT,
     SLOT,
+    WIDE_SWEEP_EVENT_GROUP,
+    WIDE_SWEEP_MOTION_ID,
+    WIDE_SWEEP_NEW_REQUEST as WIDE_SWEEP_LMT_REQUEST,
+    WIDE_SWEEP_SLOT,
 )
 from .wp_gun_cmn import (
     DONOR_MEDIA_ID,
@@ -58,6 +70,9 @@ from .wp_gun_cmn import (
     VOICE_EVENT_ID,
     VOICE_MEDIA_ID,
     VOICE_SOUND_ID,
+    WIDE_SWEEP_EVENT_ID,
+    WIDE_SWEEP_UNUSED_EVENT_IDS,
+    validate_wide_sweep_hirc,
 )
 from .voice_standard import standard_voice_sound_body
 
@@ -416,4 +431,98 @@ OVERHEAD_SMASH_VALIDATOR = BundleValidator(
     name="overhead_smash_route",
     design_id="wp_gun_cmn.overhead_smash",
     validate=validate_overhead_smash,
+)
+
+
+def validate_wide_sweep(staged: Mapping[Path, Path]) -> None:
+    """Require one frame-11 voice and preserve later native sounds and grunts."""
+
+    lmt = soundbank_editor.LmtFile.from_file(_path(staged, LMT_TARGET, "wide sweep"))
+    wwev = soundbank_editor.WwevFile.from_file(_path(staged, WWEV_TARGET, "wide sweep"))
+    bank = soundbank_editor.SoundBankEditor.from_file(_path(staged, BANK_TARGET, "wide sweep"))
+    if WIDE_SWEEP_EVENT_ID != WIDE_SWEEP_NEW_EVENT_ID or WIDE_SWEEP_LMT_REQUEST != WIDE_SWEEP_NEW_REQUEST:
+        raise BuildError("wide-sweep artifact request or Event IDs diverged")
+    all_routes = lmt.triggered_requests(wwev)
+    routes = tuple(
+        row for row in all_routes
+        if row.request_no == WIDE_SWEEP_NEW_REQUEST or row.event_id == WIDE_SWEEP_NEW_EVENT_ID
+    )
+    expected_route = soundbank_editor.TriggeredRequest(
+        motion_id=WIDE_SWEEP_MOTION_ID,
+        frame_count=187,
+        timl_offset=0x124BE0,
+        shared_timl_motions=(WIDE_SWEEP_MOTION_ID,),
+        event_group=WIDE_SWEEP_EVENT_GROUP,
+        trigger_frame=11.0,
+        trigger_mask=0x01,
+        slot=WIDE_SWEEP_SLOT,
+        request_no=WIDE_SWEEP_NEW_REQUEST,
+        wwev_record=45,
+        wwev_mode=100,
+        event_id=WIDE_SWEEP_NEW_EVENT_ID,
+    )
+    if routes != (expected_route,):
+        raise BuildError(f"wide sweep expected exactly one frame-11 route; found {routes!r}")
+    record = wwev.record(WIDE_SWEEP_NEW_REQUEST)
+    if (record.index, record.mode, record.event_id, record.sha256) != (
+        45, WIDE_SWEEP_DONOR_MODE, WIDE_SWEEP_NEW_EVENT_ID, WIDE_SWEEP_NEW_RECORD_SHA256
+    ):
+        raise BuildError("wide-sweep appended WWEV record differs from its complete guard")
+    if len(wwev.records) != 45 or any(wwev.records_for_request(request) for request in (6597, 6598)):
+        raise BuildError("wide-sweep WWEV contains unexpected timing candidates")
+    if any(record.event_id in WIDE_SWEEP_UNUSED_EVENT_IDS for record in wwev.records):
+        raise BuildError("wide-sweep WWEV still references an unused timing Event")
+
+    native_records = (
+        (WIDE_SWEEP_DONOR_REQUEST, ((22, WIDE_SWEEP_DONOR_MODE, WIDE_SWEEP_DONOR_EVENT_ID,
+                                    WIDE_SWEEP_DONOR_RECORD_SHA256),)),
+        (6488, ((24, 100, 2467230204,
+                 "f1ad3a74af5e568cbf058b9fa10b4df01459042fd40e7b62989b51b0e3e957d9"),)),
+        (6410, ((4, 200, 252365729,
+                 "e7fd989c59feb3d3543d02dd77ac79113f435212f795ed371cafc59a042d218c"),
+                (5, 200, 3350794741,
+                 "9f39b9a7d1443461da8e5e75d6b9d7a62b54badd488494714312df74fd2553f2"))),
+    )
+    for request, expected_records in native_records:
+        actual = tuple((r.index, r.mode, r.event_id, r.sha256) for r in wwev.records_for_request(request))
+        if actual != expected_records:
+            raise BuildError(f"wide-sweep original request {request} lost records, order, or conditions")
+    later_routes = tuple(
+        row for row in all_routes if row.motion_id == WIDE_SWEEP_MOTION_ID
+        and row.event_group == WIDE_SWEEP_EVENT_GROUP and row.trigger_frame in (27.0, 49.0)
+    )
+    expected_later = tuple(
+        replace(expected_route, trigger_frame=frame, trigger_mask=mask, slot=slot,
+                request_no=request, wwev_record=index, wwev_mode=mode, event_id=event)
+        for frame, mask, slot, request, index, mode, event in (
+            (27.0, 0x20, "F", 6488, 24, 100, 2467230204),
+            (49.0, 0x10, "E", 6410, 4, 200, 252365729),
+            (49.0, 0x10, "E", 6410, 5, 200, 3350794741),
+        )
+    )
+    if later_routes != expected_later:
+        raise BuildError("wide-sweep later metal/air and paired native routes changed")
+
+    voice_groups = [group for group in lmt.timl_for_motion(WIDE_SWEEP_MOTION_ID)
+                    if soundbank_editor.EVENT_GROUP_HASHES.get(group.timeline_hash) == "EventGroup02"]
+    if len(voice_groups) != 1:
+        raise BuildError("wide-sweep native character-voice timeline is missing or duplicated")
+    expected_keyframes = {
+        soundbank_editor.REQUEST_SLOT_HASHES[0]: ((0.0, 1129),),
+        soundbank_editor.REQUEST_SLOT_HASHES[1]: ((0.0, 1009),),
+        soundbank_editor.TRIGGER_HASH: ((0.0, 0), (27.0, 0), (166.0, 2)),
+    }
+    actual_keyframes = {
+        transform.datatype_hash: tuple((key.frame, key.value) for key in transform.keyframes)
+        for transform in voice_groups[0].transforms
+    }
+    if len(voice_groups[0].transforms) != 3 or actual_keyframes != expected_keyframes:
+        raise BuildError("wide-sweep disabled frame-27 or native frame-166 voice changed")
+    validate_wide_sweep_hirc(bank)
+
+
+WIDE_SWEEP_VALIDATOR = BundleValidator(
+    name="wide_sweep_route",
+    design_id="wp_gun_cmn.wide_sweep",
+    validate=validate_wide_sweep,
 )

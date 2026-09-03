@@ -1,15 +1,18 @@
-"""Build stationary-draw, overhead-smash replacement, and reload voice routes."""
+"""Build stationary-draw, overhead-smash, reload, and wide-sweep voice routes."""
 
 from __future__ import annotations
 
+import hashlib
 import struct
 
 from tools import soundbank_editor
 
 from .base import MediaAddition, SoundBankBuildPlan, run_single_cli
 from .voice_standard import (
+    STANDARD_VOICE_PARENT_ID,
     STANDARD_VOICE_REFERENCE_INPUTS,
     insert_standard_voice_sound,
+    standard_voice_sound_body,
 )
 
 
@@ -69,6 +72,126 @@ RELOAD_CONTAINER_PLAYLIST = struct.pack(
     RELOAD_DONOR_SOUND_ID,
     50_000,
 )
+
+WIDE_SWEEP_MEDIA_IDS = (1_484_106_982, 2_274_559_001)
+WIDE_SWEEP_SOUND_IDS = (102_041_635, 3_822_519_236)
+WIDE_SWEEP_RANDOM_ID = 3_645_186_695
+WIDE_SWEEP_PLAYLIST = ((WIDE_SWEEP_SOUND_IDS[0], 70_000), (WIDE_SWEEP_SOUND_IDS[1], 30_000))
+WIDE_SWEEP_ORIGINAL_ROUTE_ACTION_ID = 2_768_755_612
+WIDE_SWEEP_VOICE_ACTION_ID = 3_181_937_101
+WIDE_SWEEP_EVENT_ID = 4_096_779_774
+
+WIDE_SWEEP_ORIGINAL_EVENT_ID = 2_467_230_206
+WIDE_SWEEP_ORIGINAL_ACTION_ID = 281_299_658
+WIDE_SWEEP_ORIGINAL_CONTAINER_ID = 5_732_403
+WIDE_SWEEP_ORIGINAL_SOUND_ID = 402_899_610
+WIDE_SWEEP_ORIGINAL_MEDIA_ID = 367_086_010
+WIDE_SWEEP_RANDOM_DONOR_ID = 570_218_704
+WIDE_SWEEP_RANDOM_DONOR_SHA256 = (
+    "be0beffcec2f1a026d5bea182c34c2fbfcb2a129b1b4efa8c33146bfeb046427"
+)
+WIDE_SWEEP_RANDOM_SHA256 = (
+    "369e0b6264741e600b9e87a2a05034365fcaafa6ae82a19ed178d66357fc0efd"
+)
+WIDE_SWEEP_UNUSED_EVENT_IDS = (1_359_210_849, 2_281_439_929)
+
+
+def _guard_wide_sweep_original(bank: soundbank_editor.SoundBankEditor) -> None:
+    editor = bank.hirc
+    if (
+        editor.event_actions(WIDE_SWEEP_ORIGINAL_EVENT_ID) != (WIDE_SWEEP_ORIGINAL_ACTION_ID,)
+        or editor.object_body(soundbank_editor.HIRC_ACTION, WIDE_SWEEP_ORIGINAL_ACTION_ID)
+        != editor.create_play_action(
+            WIDE_SWEEP_ORIGINAL_ACTION_ID, WIDE_SWEEP_ORIGINAL_CONTAINER_ID, bank.bank_id
+        )
+        or bank.media_entry(index=6).media_id != WIDE_SWEEP_ORIGINAL_MEDIA_ID
+    ):
+        raise soundbank_editor.SoundBankError("wide-sweep original Event/Action/media route changed")
+    sound = editor.object_body(soundbank_editor.HIRC_SOUND, WIDE_SWEEP_ORIGINAL_SOUND_ID)
+    if (
+        struct.unpack_from("<I", sound, 9)[0] != WIDE_SWEEP_ORIGINAL_MEDIA_ID
+        or struct.unpack_from("<I", sound, 0x19)[0] != WIDE_SWEEP_ORIGINAL_CONTAINER_ID
+        or hashlib.sha256(editor.object_body(
+            soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WIDE_SWEEP_RANDOM_DONOR_ID
+        )).hexdigest() != WIDE_SWEEP_RANDOM_DONOR_SHA256
+    ):
+        raise soundbank_editor.SoundBankError("wide-sweep original Sound or Random donor changed")
+
+
+def validate_wide_sweep_hirc(bank: soundbank_editor.SoundBankEditor) -> None:
+    """Guard the complete weighted voice route in both callbacks and staged bundles."""
+
+    _guard_wide_sweep_original(bank)
+    editor = bank.hirc
+    if len(editor.objects()) != 140 or len(editor.build()) != 7831:
+        raise soundbank_editor.SoundBankError("wide-sweep combined HIRC counts differ")
+    random_body = editor.object_body(soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WIDE_SWEEP_RANDOM_ID)
+    if (
+        hashlib.sha256(random_body).hexdigest() != WIDE_SWEEP_RANDOM_SHA256
+        or editor.pitch_settings(soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WIDE_SWEEP_RANDOM_ID)
+        != soundbank_editor.HircPitchSettings(None, (-50.0, 50.0))
+    ):
+        raise soundbank_editor.SoundBankError("wide-sweep Random weights, repeat, parent, or Pitch differ")
+    for index, sound_id, media_id in zip((37, 38), WIDE_SWEEP_SOUND_IDS, WIDE_SWEEP_MEDIA_IDS):
+        if (
+            bank.media_entry(index=index).media_id != media_id
+            or editor.object_body(soundbank_editor.HIRC_SOUND, sound_id)
+            != standard_voice_sound_body(sound_id, media_id, direct_parent_id=WIDE_SWEEP_RANDOM_ID)
+        ):
+            raise soundbank_editor.SoundBankError("wide-sweep voice Sound or DIDX order differs")
+    actions = (WIDE_SWEEP_ORIGINAL_ROUTE_ACTION_ID, WIDE_SWEEP_VOICE_ACTION_ID)
+    if (
+        editor.event_actions(WIDE_SWEEP_EVENT_ID) != actions
+        or editor.object_body(soundbank_editor.HIRC_ACTION, actions[0])
+        != editor.create_play_event_action(actions[0], WIDE_SWEEP_ORIGINAL_EVENT_ID)
+        or editor.object_body(soundbank_editor.HIRC_ACTION, actions[1])
+        != editor.create_play_action(actions[1], WIDE_SWEEP_RANDOM_ID, bank.bank_id)
+    ):
+        raise soundbank_editor.SoundBankError("wide-sweep original delegation or voice Play differs")
+    if any(event in editor.object_ids for event in WIDE_SWEEP_UNUSED_EVENT_IDS):
+        raise soundbank_editor.SoundBankError("wide-sweep unused timing Events must not be present")
+    positions = {obj.object_id: obj.index for obj in editor.objects()}
+    ordered = (*WIDE_SWEEP_SOUND_IDS, WIDE_SWEEP_RANDOM_ID, *actions, WIDE_SWEEP_EVENT_ID)
+    if any(positions[left] >= positions[right] for left, right in zip(ordered, ordered[1:])):
+        raise soundbank_editor.SoundBankError("wide-sweep HIRC serialization order differs")
+
+
+def _apply_wide_sweep(bank: soundbank_editor.SoundBankEditor) -> None:
+    _guard_wide_sweep_original(bank)
+    editor = bank.hirc
+    for sound_id, media_id in zip(WIDE_SWEEP_SOUND_IDS, WIDE_SWEEP_MEDIA_IDS):
+        bank.media_entry(media_id=media_id)
+        insert_standard_voice_sound(
+            editor, sound_id, media_id, direct_parent_id=WIDE_SWEEP_RANDOM_ID,
+            label="insert standard wide-sweep voice Sound",
+        )
+    editor.clone_random_sequence_container(
+        WIDE_SWEEP_RANDOM_DONOR_ID, WIDE_SWEEP_RANDOM_ID, WIDE_SWEEP_PLAYLIST,
+        expected_playlist=((647_150_707, 50_000),), expected_avoid_repeat_count=1,
+        avoid_repeat_count=0, label="clone weighted one-shot wide-sweep Random",
+    )
+    editor.patch_u32(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WIDE_SWEEP_RANDOM_ID, 0x0B,
+        768_813_060, STANDARD_VOICE_PARENT_ID, label="parent wide-sweep Random to voice mixer",
+    )
+    editor.set_pitch(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WIDE_SWEEP_RANDOM_ID,
+        expected=soundbank_editor.HircPitchSettings(None, (-50.0, 50.0)),
+        random_range_cents=(-50.0, 50.0),
+    )
+    for action_id, body in (
+        (WIDE_SWEEP_ORIGINAL_ROUTE_ACTION_ID, editor.create_play_event_action(
+            WIDE_SWEEP_ORIGINAL_ROUTE_ACTION_ID, WIDE_SWEEP_ORIGINAL_EVENT_ID)),
+        (WIDE_SWEEP_VOICE_ACTION_ID, editor.create_play_action(
+            WIDE_SWEEP_VOICE_ACTION_ID, WIDE_SWEEP_RANDOM_ID, bank.bank_id)),
+    ):
+        editor.insert_object(soundbank_editor.HIRC_ACTION, action_id, body[4:])
+    editor.insert_object(
+        soundbank_editor.HIRC_EVENT, WIDE_SWEEP_EVENT_ID,
+        struct.pack("<III", 2, WIDE_SWEEP_ORIGINAL_ROUTE_ACTION_ID, WIDE_SWEEP_VOICE_ACTION_ID),
+        label="add isolated frame-11 wide-sweep Event",
+    )
+    validate_wide_sweep_hirc(bank)
 
 
 def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
@@ -295,6 +418,7 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
         expected_actions=(RELOAD_ORIGINAL_ACTION_ID,),
         label="append Raising Heart voice to reload Event",
     )
+    _apply_wide_sweep(bank)
 
 
 EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
@@ -303,8 +427,10 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (34, VOICE_MEDIA_ID),
         (35, OVERHEAD_VOICE_MEDIA_ID),
         (36, RELOAD_VOICE_MEDIA_ID),
+        (37, WIDE_SWEEP_MEDIA_IDS[0]),
+        (38, WIDE_SWEEP_MEDIA_IDS[1]),
     ),
-    hirc_changed_bytes=1,
+    hirc_changed_bytes=5,
     added_hirc_objects=(
         (soundbank_editor.HIRC_SOUND, VOICE_SOUND_ID),
         (soundbank_editor.HIRC_ACTION, ORIGINAL_ROUTE_ACTION_ID),
@@ -317,11 +443,17 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (soundbank_editor.HIRC_EVENT, OVERHEAD_VOICE_EVENT_ID),
         (soundbank_editor.HIRC_SOUND, RELOAD_VOICE_SOUND_ID),
         (soundbank_editor.HIRC_ACTION, RELOAD_VOICE_ACTION_ID),
+        (soundbank_editor.HIRC_SOUND, WIDE_SWEEP_SOUND_IDS[0]),
+        (soundbank_editor.HIRC_SOUND, WIDE_SWEEP_SOUND_IDS[1]),
+        (soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WIDE_SWEEP_RANDOM_ID),
+        (soundbank_editor.HIRC_ACTION, WIDE_SWEEP_ORIGINAL_ROUTE_ACTION_ID),
+        (soundbank_editor.HIRC_ACTION, WIDE_SWEEP_VOICE_ACTION_ID),
+        (soundbank_editor.HIRC_EVENT, WIDE_SWEEP_EVENT_ID),
     ),
     resized_hirc_objects=(
         (soundbank_editor.HIRC_EVENT, RELOAD_EVENT_ID, 12, 16),
     ),
-    hirc_size_delta=317,
+    hirc_size_delta=581,
 )
 
 
@@ -331,6 +463,7 @@ PLAN = SoundBankBuildPlan(
         "wp_gun_cmn.stationary_draw",
         "wp_gun_cmn.overhead_smash",
         "wp_gun_cmn.reload",
+        "wp_gun_cmn.wide_sweep",
     ),
     source="original/nbnk/wp_gun_cmn.nbnk",
     target="sound/wwise/Windows/wp_gun_cmn.nbnk",
@@ -360,6 +493,18 @@ PLAN = SoundBankBuildPlan(
             RELOAD_VOICE_MEDIA_ID,
             "audio/wp_gun_cmn/reload/"
             "raising_heart_reload_01(movie_2nd_as.raising_heart.reload.1).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            37, WIDE_SWEEP_MEDIA_IDS[0],
+            "audio/wp_gun_cmn/wide_sweep/"
+            "nanoha_smasher_01(gears_of_destiny.attack_voice.attack_05.1).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            38, WIDE_SWEEP_MEDIA_IDS[1],
+            "audio/wp_gun_cmn/wide_sweep/"
+            "nanoha_smasher_02(movie_2nd_as.nanoha.smasher.1).wav",
             wem_channels=1,
         ),
     ),
