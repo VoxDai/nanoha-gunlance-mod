@@ -55,6 +55,95 @@ before their parent Container, and every Action referenced by an Event must be
 serialized before that Event. The high-level Container and Action APIs preserve
 these load-order requirements automatically.
 
+## Read and set node pitch
+
+`HircEditor.pitch_settings()` and `set_pitch()` support Wwise v120 Sounds, Random/Sequence Containers, Switch
+Containers, and Actor-Mixers (`HIRC_ACTOR_MIXER`). Both base Pitch and its random offsets are in **cents**
+(100 cents = one semitone). The API locates the property tables structurally; callers do not supply byte offsets.
+
+```python
+bank = soundbank_editor.SoundBank.from_file(
+    Path("original/nbnk/wp07_gun_epvsp_shell.nbnk")
+)
+editor = soundbank_editor.SoundBankEditor(bank)
+
+settings = editor.hirc.pitch_settings(
+    soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, 145848034
+)
+# HircPitchSettings(base_cents=None, random_range_cents=(-50.0, 50.0))
+
+# Add a fixed offset and change the existing random range in one guarded edit.
+updated = editor.hirc.set_pitch(
+    soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+    145848034,
+    expected=soundbank_editor.HircPitchSettings(
+        base_cents=None, random_range_cents=(-50.0, 50.0)
+    ),
+    base_cents=-100.0,
+    random_range_cents=(-25.0, 25.0),
+)
+# This container now contributes between -125 and -75 cents.
+rebuilt = editor.validate()
+```
+
+`HircPitchSettings` is frozen. A `None` field in the inspected/expected settings means that the property **does not
+exist**, which differs from an explicit zero. `expected` must match both fields, including absence; numerical guards
+compare float32 encodings, including the sign of zero. Persistent builders should supply reviewed literal settings
+rather than deriving the guard from the live target during a build.
+
+In `set_pitch()` replacement arguments, omitted values or `None` retain the current setting. At least one setting is
+required. Missing properties are inserted in ID order, even when the requested value is zero. The returned settings
+contain the stored float32 values. Same-value requests are no-ops after guard validation and leave the body and edit
+summary unchanged.
+
+For example, on a fresh editor for the same original Bank, disable just the container's random contribution while
+retaining its absent base Pitch:
+
+```python
+editor = soundbank_editor.SoundBankEditor(bank)
+editor.hirc.set_pitch(
+    soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+    145848034,
+    expected=soundbank_editor.HircPitchSettings(None, (-50.0, 50.0)),
+    random_range_cents=(0.0, 0.0),
+)
+```
+
+To add a fixed local offset directly to its Sound, whose own Pitch properties are absent:
+
+```python
+editor.hirc.set_pitch(
+    soundbank_editor.HIRC_SOUND,
+    535190438,
+    expected=soundbank_editor.HircPitchSettings(None, None),
+    base_cents=100.0,
+)
+```
+
+These methods read/edit **local node contributions**. Parent Pitch settings still accumulate, and RTPC/State/Action
+changes may also affect playback. A Sound with no local random property can inherit a random range from its Container or
+Actor-Mixer. Setting a child's local base or range to zero does not cancel an ancestor's contribution. Editing a shared
+Actor-Mixer affects all descendants that inherit its settings.
+
+Base values and range endpoints must be Python `int`/`float` numbers encodable as finite float32, excluding booleans,
+NaN, infinity and overflow. Random ranges are two-element `(min, max)` tuples with `min <= max`; asymmetric ranges are
+allowed. Property removal is not provided; `(0.0, 0.0)` leaves an explicit zero range. Unsupported object types/versions
+and malformed property tables raise `SoundBankError`.
+
+Edits are preflighted as a unit: a bad guard, invalid input, count overflow or edit conflict leaves the object and edit
+bookkeeping unchanged. Existing Pitch values use the normal field-patch bookkeeping, while insertion rebuilds the object
+and updates its size. Other property bytes, node routing, FX/source parameters, and the remaining object body are
+preserved.
+
+The existing composition rules still apply:
+
+- Equal-length Pitch edits can coexist with non-overlapping field patches; rewriting an already patched Pitch field is
+  rejected, except for a no-op.
+- Inserting a property cannot follow any field patch on that same object. After an object rebuild, field patches
+  (including equal-length Pitch edits)
+  are rejected. Combine required base/range changes in one call when inserting properties, and use the existing guarded
+  whole-body replacement workflow when combining a structural change with other edits on the same object.
+
 ## Add a custom one-shot Sound
 
 ```python

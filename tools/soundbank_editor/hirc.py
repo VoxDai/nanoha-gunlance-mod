@@ -8,6 +8,13 @@ import hashlib
 import struct
 
 from ._binary import check_unsigned
+from ._pitch import (
+    HircPitchSettings,
+    _encode_pitch_settings,
+    _pack_cents,
+    _pack_pitch_range,
+    _parse_pitch_layout,
+)
 from .errors import SoundBankError
 
 
@@ -17,6 +24,7 @@ HIRC_ACTION = 0x03
 HIRC_EVENT = 0x04
 HIRC_RANDOM_SEQUENCE_CONTAINER = 0x05
 HIRC_SWITCH_CONTAINER = 0x06
+HIRC_ACTOR_MIXER = 0x07
 ACTION_STOP = 0x0103
 ACTION_PLAY = 0x0403
 ACTION_PLAY_EVENT = 0x2103
@@ -558,6 +566,75 @@ class HircEditor:
             )
         self._reserved_ids.add(object_id)
 
+    def pitch_settings(self, object_type: int, object_id: int) -> HircPitchSettings:
+        """Read local v120 Pitch properties, distinguishing absence from zero."""
+
+        self._require_v120("read node pitch")
+        object_type = _check_u8(object_type, "HIRC object type")
+        object_id = _check_u32(object_id, "HIRC object ID")
+        label = f"read pitch for object {object_id}"
+        body = self.object_body(object_type, object_id)
+        return _parse_pitch_layout(body, object_type, label).settings(label)
+
+    def set_pitch(
+            self,
+            object_type: int,
+            object_id: int,
+            *,
+            expected: HircPitchSettings,
+            base_cents: float | None = None,
+            random_range_cents: tuple[float, float] | None = None,
+            label: str = "set node pitch",
+    ) -> HircPitchSettings:
+        """Guard and upsert local Pitch properties; omitted values are retained.
+
+        Values are cents encoded as float32. None in ``expected`` guards an
+        absent property; None in a replacement leaves that property alone.
+        Parent contributions are not changed. All fields are preflighted
+        before any mutation, including existing patch/rebuild conflicts.
+        """
+
+        self._require_v120(label)
+        object_type = _check_u8(object_type, "HIRC object type")
+        object_id = _check_u32(object_id, "HIRC object ID")
+        if base_cents is None and random_range_cents is None:
+            raise SoundBankError(f"{label}: specify at least one Pitch setting")
+        body = self.object_body(object_type, object_id)
+        layout = _parse_pitch_layout(body, object_type, label)
+        current = layout.settings(label)
+        if layout.encoded != _encode_pitch_settings(expected, f"{label} expected"):
+            raise SoundBankError(
+                f"{label}: object {object_id} expected pitch {expected} "
+                f"but found {current}"
+            )
+        base = layout.base.pitch if base_cents is None else _pack_cents(base_cents, label)
+        random = (
+            layout.random.pitch
+            if random_range_cents is None
+            else _pack_pitch_range(random_range_cents, label)
+        )
+        candidate = layout.replace(body, base, random, label)
+        read_back = _parse_pitch_layout(candidate, object_type, label)
+        result = read_back.settings(label)
+        if read_back.encoded != (base, random):
+            raise SoundBankError(f"{label}: Pitch read-back verification failed")
+        if candidate == body:
+            return result
+
+        if len(candidate) != len(body):
+            self.replace_object_body(object_type, object_id, body, candidate, label=label)
+        else:
+            patches = []
+            for bundle, value in ((layout.base, base), (layout.random, random)):
+                if bundle.pitch != value:
+                    patches.append((bundle.pitch_offset, bundle.pitch, value))
+            # A later conflict must not leave an earlier field partially edited.
+            for offset, old, new in patches:
+                self._check_patch(object_type, object_id, offset, old, new, label=label)
+            for offset, old, new in patches:
+                self.patch_bytes(object_type, object_id, offset, old, new, label=label)
+        return result
+
     def patch_bytes(
         self,
         object_type: int,
@@ -568,6 +645,26 @@ class HircEditor:
         *,
         label: str,
     ) -> None:
+        item = self._check_patch(
+            object_type, object_id, offset, expected, replacement, label=label
+        )
+        end = offset + len(expected)
+        item.body[offset:end] = replacement
+        self._patched_ranges.setdefault((object_type, object_id), []).append((offset, end))
+        self._changed_byte_count += sum(
+            before != after for before, after in zip(expected, replacement)
+        )
+
+    def _check_patch(
+            self,
+            object_type: int,
+            object_id: int,
+            offset: int,
+            expected: bytes,
+            replacement: bytes,
+            *,
+            label: str,
+    ) -> HircObject:
         if len(expected) != len(replacement):
             raise SoundBankError(f"{label}: HIRC field patches must preserve length")
         if not expected:
@@ -595,11 +692,7 @@ class HircEditor:
                 f"{label}: object type 0x{object_type:02X} ID {object_id} "
                 f"at body+0x{offset:X} expected {expected.hex()} but found {actual.hex()}"
             )
-        item.body[offset:end] = replacement
-        self._patched_ranges.setdefault(key, []).append((offset, end))
-        self._changed_byte_count += sum(
-            before != after for before, after in zip(expected, replacement)
-        )
+        return item
 
     def patch_u8(
         self,
