@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+
 from tools import soundbank_editor
 
 from .base import MediaAddition, SoundBankBuildPlan, run_single_cli
@@ -32,6 +34,14 @@ RANDOM_OVER_LIMIT_BEHAVIOR_OFFSET = 0x19
 RANDOM_MAX_INSTANCES_OFFSET = 0x1B
 SWITCH_PARENT_OFFSET = 0x0B
 ORIGINAL_SWITCH_PARENT_ID = 422_956_649
+
+DONOR_RANDOM_BODY_SHA256 = (
+    "dd0dfececc9d361c76f00553fe4179e4558f9adf909199c64c0fd28e9997237f"
+)
+VOICE_RANDOM_BODY_SHA256 = (
+    "396592e4835d0108b6049e3f40c2d1e6fb66c628c52fb59da3506f49c0c4756f"
+)
+VOICE_RANDOM_PITCH = soundbank_editor.HircPitchSettings(None, (-50, 50))
 
 DONOR_SWITCH_BODY_SHA256 = (
     "a6df54f2d29b79482420ff8a17420b0952cbb64589e03dde1358c02ab99043bb"
@@ -116,6 +126,78 @@ def _guard_original_route(
         raise soundbank_editor.SoundBankError(
             "original gunlance guard Event route differs from its design guard"
         )
+    donor_random = editor.object_body(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, DONOR_RANDOM_ID
+    )
+    if hashlib.sha256(donor_random).hexdigest() != DONOR_RANDOM_BODY_SHA256:
+        raise soundbank_editor.SoundBankError(
+            "original gunlance guard Random body differs from its design guard"
+        )
+
+
+def _configure_voice_random(editor: soundbank_editor.HircEditor) -> None:
+    """Compose the instance limit and random Pitch as one guarded replacement."""
+
+    kind = soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER
+    cloned_body = editor.object_body(kind, VOICE_RANDOM_ID)
+    if len(cloned_body) != 91:
+        raise soundbank_editor.SoundBankError(
+            "Protection Random clone must have a 91-byte body before Pitch insertion"
+        )
+    staged = soundbank_editor.HircEditor(editor.build(), version=editor.version)
+    staged.patch_u32(
+        kind,
+        VOICE_RANDOM_ID,
+        RANDOM_PARENT_OFFSET,
+        DONOR_SWITCH_ID,
+        VOICE_SWITCH_ID,
+        label="route Protection Random to the voice Switch",
+    )
+    staged.patch_u8(
+        kind,
+        VOICE_RANDOM_ID,
+        RANDOM_OVER_LIMIT_BEHAVIOR_OFFSET,
+        0,
+        1,
+        label="set Protection Random over-limit behavior to Kill Newest",
+    )
+    staged.patch_u16(
+        kind,
+        VOICE_RANDOM_ID,
+        RANDOM_MAX_INSTANCES_OFFSET,
+        0,
+        1,
+        label="limit Protection Random to one audio instance",
+    )
+
+    # Pitch insertion resizes the body, so reparse after the guarded field patches.
+    staged = soundbank_editor.HircEditor(staged.build(), version=editor.version)
+    staged.set_pitch(
+        kind,
+        VOICE_RANDOM_ID,
+        expected=soundbank_editor.HircPitchSettings(None, None),
+        random_range_cents=VOICE_RANDOM_PITCH.random_range_cents,
+        label="set Protection Random Pitch to plus/minus 50 cents",
+    )
+    final_body = staged.object_body(kind, VOICE_RANDOM_ID)
+    if (
+        len(final_body) != 100
+        or hashlib.sha256(final_body).hexdigest() != VOICE_RANDOM_BODY_SHA256
+    ):
+        raise soundbank_editor.SoundBankError(
+            "Protection Random final body differs from its design guard"
+        )
+    editor.replace_object_body(
+        kind,
+        VOICE_RANDOM_ID,
+        cloned_body,
+        final_body,
+        label="apply composed Protection Random body",
+    )
+    if editor.pitch_settings(kind, VOICE_RANDOM_ID) != VOICE_RANDOM_PITCH:
+        raise soundbank_editor.SoundBankError(
+            "Protection Random Pitch read-back differs from its design guard"
+        )
 
 
 def _guard_voice_route_serialization(
@@ -169,30 +251,7 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
         avoid_repeat_count=0,
         label="clone gunlance guard Random Container",
     )
-    editor.patch_u32(
-        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
-        VOICE_RANDOM_ID,
-        RANDOM_PARENT_OFFSET,
-        DONOR_SWITCH_ID,
-        VOICE_SWITCH_ID,
-        label="route Protection Random to the voice Switch",
-    )
-    editor.patch_u8(
-        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
-        VOICE_RANDOM_ID,
-        RANDOM_OVER_LIMIT_BEHAVIOR_OFFSET,
-        0,
-        1,
-        label="set Protection Random over-limit behavior to Kill Newest",
-    )
-    editor.patch_u16(
-        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
-        VOICE_RANDOM_ID,
-        RANDOM_MAX_INSTANCES_OFFSET,
-        0,
-        1,
-        label="limit Protection Random to one audio instance",
-    )
+    _configure_voice_random(editor)
 
     editor.clone_switch_container_with_topology(
         DONOR_SWITCH_ID,
@@ -240,7 +299,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (142, VOICE_MEDIA_IDS[1]),
         (143, SILENCE_MEDIA_ID),
     ),
-    hirc_changed_bytes=11,
+    hirc_changed_bytes=51,
     added_hirc_objects=(
         (soundbank_editor.HIRC_SOUND, VOICE_SOUND_IDS[0]),
         (soundbank_editor.HIRC_SOUND, VOICE_SOUND_IDS[1]),
@@ -250,7 +309,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (soundbank_editor.HIRC_ACTION, VOICE_ACTION_ID),
     ),
     resized_hirc_objects=((soundbank_editor.HIRC_EVENT, EVENT_ID, 12, 16),),
-    hirc_size_delta=421,
+    hirc_size_delta=430,
 )
 
 PLAN = SoundBankBuildPlan(
