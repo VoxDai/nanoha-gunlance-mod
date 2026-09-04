@@ -3,18 +3,42 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import struct
 
 from tools import soundbank_editor
 
 from .base import MediaAddition, SoundBankBuildPlan, run_single_cli
 from .voice_standard import (
+    STANDARD_VOICE_PARENT_ID,
     STANDARD_VOICE_REFERENCE_INPUTS,
     insert_standard_voice_sound,
+    standard_voice_sound_body,
 )
 
 
-FULL_BURST_MEDIA_ID = 242_768_048
+FULL_BURST_MEDIA_IDS = (
+    242_768_048,
+    954_495_929,
+    2_170_495_128,
+    2_062_876_979,
+)
+FULL_BURST_SOUND_IDS = (
+    960_803_121,
+    479_969_098,
+    2_544_331_946,
+    4_251_385_954,
+)
+FULL_BURST_RANDOM_DONOR_ID = 58_172_267
+FULL_BURST_RANDOM_DONOR_BODY_SHA256 = (
+    "53ce24846e01ef33e99c2c66575a9e50e367730b25231c53289fc2e772c4aff7"
+)
+FULL_BURST_RANDOM_DONOR_PARENT_ID = 717_111_903
+FULL_BURST_RANDOM_ID = 853_759_195
+FULL_BURST_RANDOM_BODY_SHA256 = (
+    "6ed503ce5f4b061e412c7221932068fb105c4cb11b72e68fa4125d76ab879895"
+)
+FULL_BURST_PLAYLIST = tuple((sound_id, 25_000) for sound_id in FULL_BURST_SOUND_IDS)
 STARLIGHT_MEDIA_ID = 322_318_543
 STARLIGHT_BREAKER_MEDIA_ID = 3_332_910_283
 BREAKER_MEDIA_ID = 2_217_266_443
@@ -22,6 +46,19 @@ WYVERN_LEFT_EVENT_ID = 3_253_425_110
 WYVERN_LEFT_ORIGINAL_ACTION_ID = 120_830_402
 REMOVED_LEFT_BREAKER_ACTION_ID = 2_807_447_016
 REMOVED_LEFT_BREAKER_SOUND_ID = 3_070_096_299
+
+
+@dataclass(frozen=True)
+class FullBurstRoute:
+    """One guarded native full-burst route receiving the shared Random."""
+
+    label: str
+    event_id: int
+    expected_actions: tuple[int, ...]
+    original_container_id: int
+    donor_sound_id: int
+    expected_donor_source_id: int
+    action_id: int
 
 
 @dataclass(frozen=True)
@@ -53,55 +90,50 @@ class StopRoute:
 
 
 FULL_BURST_ROUTES = (
-    OverlayRoute(
+    FullBurstRoute(
         "1-shell full burst",
         2_727_643_338,
         (449_657_149,),
+        108_007_348,
         219_848_096,
         768_048_455,
-        FULL_BURST_MEDIA_ID,
         3_386_055_930,
-        960_803_121,
     ),
-    OverlayRoute(
+    FullBurstRoute(
         "2-shell full burst",
         2_727_643_337,
         (646_158_903,),
+        58_172_267,
         46_149_961,
         669_932_693,
-        FULL_BURST_MEDIA_ID,
         4_199_321_359,
-        479_969_098,
     ),
-    OverlayRoute(
+    FullBurstRoute(
         "3-shell full burst",
         1_124_197_610,
         (19_077_629,),
-        46_149_961,
-        669_932_693,
-        FULL_BURST_MEDIA_ID,
+        246_916_390,
+        641_882_349,
+        31_902_971,
         4_100_049_135,
-        2_544_331_946,
     ),
-    OverlayRoute(
+    FullBurstRoute(
         "4-shell full burst",
         680_296_805,
         (223_369_281,),
-        46_149_961,
-        669_932_693,
-        FULL_BURST_MEDIA_ID,
+        505_597_934,
+        68_448_090,
+        385_933_384,
         4_272_498_343,
-        4_251_385_954,
     ),
-    OverlayRoute(
+    FullBurstRoute(
         "5-shell full burst",
         1_765_608_260,
         (403_102_539,),
-        46_149_961,
-        669_932_693,
-        FULL_BURST_MEDIA_ID,
+        885_313_651,
+        994_484_287,
+        272_642_002,
         3_047_212_046,
-        1_519_403_237,
     ),
 )
 
@@ -162,20 +194,194 @@ WYVERNS_FIRE_STOP_ROUTES = (
 )
 
 
+def _guard_sound_source(
+    editor: soundbank_editor.HircEditor,
+    sound_id: int,
+    expected_source_id: int,
+    label: str,
+) -> None:
+    donor = editor.object_body(soundbank_editor.HIRC_SOUND, sound_id)
+    if (
+        len(donor) < 13
+        or donor[8] != 0
+        or struct.unpack_from("<I", donor, 9)[0] != expected_source_id
+    ):
+        raise soundbank_editor.SoundBankError(
+            f"target route donor Sound differs from its guard for {label}"
+        )
+
+
+def _guard_full_burst_original(bank: soundbank_editor.SoundBankEditor) -> None:
+    editor = bank.hirc
+    donor = editor.object_body(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+        FULL_BURST_RANDOM_DONOR_ID,
+    )
+    if hashlib.sha256(donor).hexdigest() != FULL_BURST_RANDOM_DONOR_BODY_SHA256:
+        raise soundbank_editor.SoundBankError(
+            "full-burst Random donor differs from its design guard"
+        )
+    for route in FULL_BURST_ROUTES:
+        if editor.event_actions(route.event_id) != route.expected_actions:
+            raise soundbank_editor.SoundBankError(
+                f"original Event Action list differs for {route.label}"
+            )
+        original_action_id = route.expected_actions[0]
+        expected_action = editor.create_play_action(
+            original_action_id,
+            route.original_container_id,
+            bank.bank_id,
+        )
+        if (
+            editor.object_body(soundbank_editor.HIRC_ACTION, original_action_id)
+            != expected_action
+        ):
+            raise soundbank_editor.SoundBankError(
+                f"original Action no longer targets its Container for {route.label}"
+            )
+        _guard_sound_source(
+            editor,
+            route.donor_sound_id,
+            route.expected_donor_source_id,
+            route.label,
+        )
+
+
+def _validate_full_burst_hirc(bank: soundbank_editor.SoundBankEditor) -> None:
+    editor = bank.hirc
+    for sound_id, media_id in zip(
+        FULL_BURST_SOUND_IDS, FULL_BURST_MEDIA_IDS, strict=True
+    ):
+        bank.media_entry(media_id=media_id)
+        expected = standard_voice_sound_body(
+            sound_id,
+            media_id,
+            direct_parent_id=FULL_BURST_RANDOM_ID,
+        )
+        if editor.object_body(soundbank_editor.HIRC_SOUND, sound_id) != expected:
+            raise soundbank_editor.SoundBankError(
+                f"full-burst standard voice Sound differs for {sound_id}"
+            )
+
+    random_body = editor.object_body(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+        FULL_BURST_RANDOM_ID,
+    )
+    if (
+        len(random_body) != 119
+        or hashlib.sha256(random_body).hexdigest() != FULL_BURST_RANDOM_BODY_SHA256
+        or editor.pitch_settings(
+            soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+            FULL_BURST_RANDOM_ID,
+        )
+        != soundbank_editor.HircPitchSettings(None, (-50.0, 50.0))
+    ):
+        raise soundbank_editor.SoundBankError(
+            "full-burst Random playlist, parent, settings, or Pitch differ"
+        )
+
+    positions = {item.object_id: item.index for item in editor.objects()}
+    if max(positions[sound_id] for sound_id in FULL_BURST_SOUND_IDS) >= positions[
+        FULL_BURST_RANDOM_ID
+    ]:
+        raise soundbank_editor.SoundBankError(
+            "full-burst Sounds must serialize before their Random"
+        )
+    for route in FULL_BURST_ROUTES:
+        expected_actions = (*route.expected_actions, route.action_id)
+        expected_action = editor.create_play_action(
+            route.action_id,
+            FULL_BURST_RANDOM_ID,
+            bank.bank_id,
+        )
+        if (
+            editor.event_actions(route.event_id) != expected_actions
+            or editor.object_body(soundbank_editor.HIRC_ACTION, route.action_id)
+            != expected_action
+            or not (
+                positions[FULL_BURST_RANDOM_ID]
+                < positions[route.action_id]
+                < positions[route.event_id]
+            )
+        ):
+            raise soundbank_editor.SoundBankError(
+                f"full-burst Random Play route differs for {route.label}"
+            )
+
+
+def _apply_full_burst(bank: soundbank_editor.SoundBankEditor) -> None:
+    _guard_full_burst_original(bank)
+    editor = bank.hirc
+    for sound_id, media_id in zip(
+        FULL_BURST_SOUND_IDS, FULL_BURST_MEDIA_IDS, strict=True
+    ):
+        bank.media_entry(media_id=media_id)
+        insert_standard_voice_sound(
+            editor,
+            sound_id,
+            media_id,
+            direct_parent_id=FULL_BURST_RANDOM_ID,
+            label=f"insert full-burst standard voice Sound {sound_id}",
+        )
+
+    editor.clone_random_sequence_container(
+        FULL_BURST_RANDOM_DONOR_ID,
+        FULL_BURST_RANDOM_ID,
+        FULL_BURST_PLAYLIST,
+        expected_playlist=((46_149_961, 50_000),),
+        expected_avoid_repeat_count=1,
+        avoid_repeat_count=0,
+        label="clone uniform full-burst Random",
+    )
+    editor.patch_u32(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+        FULL_BURST_RANDOM_ID,
+        0x0B,
+        FULL_BURST_RANDOM_DONOR_PARENT_ID,
+        STANDARD_VOICE_PARENT_ID,
+        label="parent full-burst Random to voice mixer",
+    )
+    editor.set_pitch(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+        FULL_BURST_RANDOM_ID,
+        expected=soundbank_editor.HircPitchSettings(None, (-50.0, 50.0)),
+        random_range_cents=(-50.0, 50.0),
+        label="guard full-burst Random plus/minus 50 cents Pitch",
+    )
+
+    for route in FULL_BURST_ROUTES:
+        action = editor.create_play_action(
+            route.action_id,
+            FULL_BURST_RANDOM_ID,
+            bank.bank_id,
+        )
+        editor.insert_object(
+            soundbank_editor.HIRC_ACTION,
+            route.action_id,
+            action[4:],
+            before=(soundbank_editor.HIRC_EVENT, route.event_id),
+            label=f"add shared Random Play Action for {route.label}",
+        )
+        editor.append_event_action(
+            route.event_id,
+            route.action_id,
+            expected_actions=route.expected_actions,
+            label=f"append shared Random Action for {route.label}",
+        )
+    _validate_full_burst_hirc(bank)
+
+
 def _add_overlay(
     bank: soundbank_editor.SoundBankEditor, route: OverlayRoute
 ) -> None:
     editor = bank.hirc
     bank.media_entry(media_id=route.media_id)
-    donor = editor.object_body(soundbank_editor.HIRC_SOUND, route.donor_sound_id)
-    if (
-        len(donor) < 13
-        or donor[8] != 0
-        or struct.unpack_from("<I", donor, 9)[0] != route.expected_donor_source_id
-    ):
-        raise soundbank_editor.SoundBankError(
-            f"target route donor Sound differs from its guard for {route.label}"
-        )
+    _guard_sound_source(
+        editor,
+        route.donor_sound_id,
+        route.expected_donor_source_id,
+        route.label,
+    )
     insert_standard_voice_sound(
         editor,
         route.sound_id,
@@ -228,7 +434,8 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
         raise soundbank_editor.SoundBankError(
             "Wyvern left Event differs from the byte-exact no-voice path guard"
         )
-    for route in (*FULL_BURST_ROUTES, *WYVERNS_FIRE_ROUTES):
+    _apply_full_burst(bank)
+    for route in WYVERNS_FIRE_ROUTES:
         _add_overlay(bank, route)
     for route in WYVERNS_FIRE_STOP_ROUTES:
         _add_stop_route(bank, route)
@@ -237,22 +444,25 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
 EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
     replaced_media=(),
     added_media=(
-        (43, FULL_BURST_MEDIA_ID),
+        (43, FULL_BURST_MEDIA_IDS[0]),
         (44, STARLIGHT_MEDIA_ID),
         (45, STARLIGHT_BREAKER_MEDIA_ID),
         (46, BREAKER_MEDIA_ID),
+        (47, FULL_BURST_MEDIA_IDS[1]),
+        (48, FULL_BURST_MEDIA_IDS[2]),
+        (49, FULL_BURST_MEDIA_IDS[3]),
     ),
-    hirc_changed_bytes=10,
+    hirc_changed_bytes=14,
     added_hirc_objects=(
         (soundbank_editor.HIRC_SOUND, 960_803_121),
-        (soundbank_editor.HIRC_ACTION, 3_386_055_930),
         (soundbank_editor.HIRC_SOUND, 479_969_098),
-        (soundbank_editor.HIRC_ACTION, 4_199_321_359),
         (soundbank_editor.HIRC_SOUND, 2_544_331_946),
-        (soundbank_editor.HIRC_ACTION, 4_100_049_135),
         (soundbank_editor.HIRC_SOUND, 4_251_385_954),
+        (soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, FULL_BURST_RANDOM_ID),
+        (soundbank_editor.HIRC_ACTION, 3_386_055_930),
+        (soundbank_editor.HIRC_ACTION, 4_199_321_359),
+        (soundbank_editor.HIRC_ACTION, 4_100_049_135),
         (soundbank_editor.HIRC_ACTION, 4_272_498_343),
-        (soundbank_editor.HIRC_SOUND, 1_519_403_237),
         (soundbank_editor.HIRC_ACTION, 3_047_212_046),
         (soundbank_editor.HIRC_SOUND, 4_149_261_730),
         (soundbank_editor.HIRC_ACTION, 4_011_774_951),
@@ -273,7 +483,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (soundbank_editor.HIRC_EVENT, 2_727_643_338, 12, 16),
         (soundbank_editor.HIRC_EVENT, 3_655_102_100, 12, 16),
     ),
-    hirc_size_delta=688,
+    hirc_size_delta=761,
 )
 
 
@@ -293,7 +503,7 @@ PLAN = SoundBankBuildPlan(
     media_additions=(
         MediaAddition(
             43,
-            FULL_BURST_MEDIA_ID,
+            FULL_BURST_MEDIA_IDS[0],
             "audio/wp07_gun_epvsp_shell/full_burst/"
             "nanoha_shoot_01(battle_of_aces.attack_voice.attack_03.1).wav",
             wem_channels=1,
@@ -318,6 +528,27 @@ PLAN = SoundBankBuildPlan(
             BREAKER_MEDIA_ID,
             "audio/wp07_gun_epvsp_shell/wyverns_fire/"
             "nanoha_breaker_01(gears_of_destiny.attack_voice.attack_06.2).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            47,
+            FULL_BURST_MEDIA_IDS[1],
+            "audio/wp07_gun_epvsp_shell/full_burst/"
+            "nanoha_shoot_02(gears_of_destiny.attack_voice.attack_03.1).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            48,
+            FULL_BURST_MEDIA_IDS[2],
+            "audio/wp07_gun_epvsp_shell/full_burst/"
+            "nanoha_shoot_03(movie_1st.nanoha.shoot_02.1).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            49,
+            FULL_BURST_MEDIA_IDS[3],
+            "audio/wp07_gun_epvsp_shell/full_burst/"
+            "nanoha_shoot_04(movie_1st.nanoha.shoot_03.1).wav",
             wem_channels=1,
         ),
     ),
