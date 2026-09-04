@@ -70,6 +70,10 @@ OVERHEAD_SOUND_AUX_IDS = (3_015_692_424, 0, 0, 0)
 RELOAD_VOICE_MEDIA_ID = 1_284_288_484
 RELOAD_VOICE_SOUND_ID = 1_474_128_429
 RELOAD_VOICE_ACTION_ID = 3_418_611_510
+RELOAD_VOICE_PITCH = soundbank_editor.HircPitchSettings(None, (-50.0, 50.0))
+RELOAD_VOICE_SOUND_SHA256 = (
+    "49b0c3c0cd9a4532abf62b92e701f30cb3f6418d5385c98b1e50ca45d2665c21"
+)
 
 RELOAD_EVENT_ID = 3_476_627_122
 RELOAD_ORIGINAL_ACTION_ID = 126_049_847
@@ -202,7 +206,7 @@ def validate_wide_sweep_hirc(bank: soundbank_editor.SoundBankEditor) -> None:
 
     _guard_wide_sweep_original(bank)
     editor = bank.hirc
-    if len(editor.objects()) != 146 or len(editor.build()) != 8234:
+    if len(editor.objects()) != 146 or len(editor.build()) != 8243:
         raise soundbank_editor.SoundBankError("wide-sweep combined HIRC counts differ")
     random_body = editor.object_body(soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WIDE_SWEEP_RANDOM_ID)
     if (
@@ -323,6 +327,47 @@ def _apply_stationary_draw(bank: soundbank_editor.SoundBankEditor) -> None:
         label="add isolated stationary-draw Event",
     )
     validate_stationary_draw_hirc(bank)
+
+
+def _validate_reload_hirc(bank: soundbank_editor.SoundBankEditor) -> None:
+    """Verify the complete reload voice overlay and its local random Pitch."""
+
+    editor = bank.hirc
+    sound_body = editor.object_body(
+        soundbank_editor.HIRC_SOUND, RELOAD_VOICE_SOUND_ID
+    )
+    if (
+        bank.media_entry(index=36).media_id != RELOAD_VOICE_MEDIA_ID
+        or len(sound_body) != 55
+        or hashlib.sha256(sound_body).hexdigest() != RELOAD_VOICE_SOUND_SHA256
+        or editor.pitch_settings(
+            soundbank_editor.HIRC_SOUND, RELOAD_VOICE_SOUND_ID
+        )
+        != RELOAD_VOICE_PITCH
+    ):
+        raise soundbank_editor.SoundBankError(
+            "reload voice Sound, media, parent, positioning, or Pitch differ"
+        )
+    if (
+        editor.object_body(soundbank_editor.HIRC_ACTION, RELOAD_VOICE_ACTION_ID)
+        != editor.create_play_action(
+            RELOAD_VOICE_ACTION_ID, RELOAD_VOICE_SOUND_ID, bank.bank_id
+        )
+        or editor.event_actions(RELOAD_EVENT_ID)
+        != (RELOAD_ORIGINAL_ACTION_ID, RELOAD_VOICE_ACTION_ID)
+    ):
+        raise soundbank_editor.SoundBankError(
+            "reload voice Action or Event route differs"
+        )
+    positions = {item.object_id: item.index for item in editor.objects()}
+    if not (
+        positions[RELOAD_VOICE_SOUND_ID]
+        < positions[RELOAD_VOICE_ACTION_ID]
+        < positions[RELOAD_EVENT_ID]
+    ):
+        raise soundbank_editor.SoundBankError(
+            "reload voice HIRC objects violate Wwise v120 load order"
+        )
 
 
 def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
@@ -483,6 +528,13 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
         RELOAD_VOICE_MEDIA_ID,
         label="insert standard reload custom-voice Sound",
     )
+    editor.set_pitch(
+        soundbank_editor.HIRC_SOUND,
+        RELOAD_VOICE_SOUND_ID,
+        expected=soundbank_editor.HircPitchSettings(None, None),
+        random_range_cents=RELOAD_VOICE_PITCH.random_range_cents,
+        label="set reload voice Pitch to plus/minus 50 cents",
+    )
     reload_voice = editor.create_play_action(
         RELOAD_VOICE_ACTION_ID,
         RELOAD_VOICE_SOUND_ID,
@@ -501,6 +553,7 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
         expected_actions=(RELOAD_ORIGINAL_ACTION_ID,),
         label="append Raising Heart voice to reload Event",
     )
+    _validate_reload_hirc(bank)
     _apply_wide_sweep(bank)
 
 
@@ -518,7 +571,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (42, STATIONARY_MEDIA_IDS[4]),
         (43, STATIONARY_MEDIA_IDS[5]),
     ),
-    hirc_changed_bytes=9,
+    hirc_changed_bytes=17,
     added_hirc_objects=(
         (soundbank_editor.HIRC_SOUND, VOICE_SOUND_ID),
         (soundbank_editor.HIRC_SOUND, STATIONARY_SOUND_IDS[1]),
@@ -547,7 +600,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
     resized_hirc_objects=(
         (soundbank_editor.HIRC_EVENT, RELOAD_EVENT_ID, 12, 16),
     ),
-    hirc_size_delta=984,
+    hirc_size_delta=993,
 )
 
 
