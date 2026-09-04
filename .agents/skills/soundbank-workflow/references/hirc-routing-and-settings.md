@@ -116,7 +116,7 @@ reparse with the Library and wwiser, then re-extract changed media. These checks
 do not replace game acceptance. For a persistent feature, provide `audio-design`
 with:
 
-- Original Bank path, SHA-256, version, Bank ID, DIDX index, and Media ID.
+- Original Bank path, version, Bank ID, DIDX index, and Media ID.
 - Original and proposed routes, serialization order, donors, parents, paired
   paths, collision checks, and Stop/interruption behavior.
 - Reviewed old/new fields and body/topology guards, allowed changes, and

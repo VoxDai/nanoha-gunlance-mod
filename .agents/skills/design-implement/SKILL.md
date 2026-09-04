@@ -18,8 +18,9 @@ fix implementation. Builders never parse design documents at build time.
   `audio/`, `original/`, `docs/mapping/`, `assets/chunk/`, `output/`, or
   `release/`.
 - Treat the selected design as authoritative. If it lacks final audio, source
-  artifacts, IDs, hashes, editor guards, target paths, or an exact behavioral
-  contract, stop and report what `audio-design` must resolve.
+  artifacts, IDs, required structural body or record guards, editor guards,
+  target paths, or an exact behavioral contract, stop and report what
+  `audio-design` must resolve.
 - Never invent or silently repair a design value. Values derived by executing
   its complete guarded edit in memory, such as a combined summary, may be
   calculated and fixed in the plan.
@@ -35,11 +36,12 @@ fix implementation. Builders never parse design documents at build time.
    they share a target or ID domain.
 2. Parse the design front matter and require one valid, repository-unique
    `design_id` plus a non-empty list of safe nativePC-relative targets.
-3. Resolve every linked final WAV and every `original/` input. Verify the
-   recorded format version, source SHA-256, Bank ID, DIDX/Media identities,
-   route topology, record hash, frame/slot guards, and expected preservation
-   rules against the original artifacts. Use `soundbank-workflow` when deeper
-   binary inspection is needed.
+3. Resolve every linked final WAV and every `original/` input by its recorded
+   path. Verify the recorded format version, Bank ID, DIDX/Media identities,
+   route topology, structural body or record hashes, frame/slot guards, and
+   expected preservation rules against the original artifacts. Do not require
+   or add whole-file hashes for audio or `original/` files in the design. Use
+   `soundbank-workflow` when deeper binary inspection is needed.
 4. Match each target against `ModBuildPlan`. A target has exactly one artifact
    owner. Merge into that owner when it exists; create one same-artifact module
    only when it does not. Never register two plans for one target.
@@ -52,6 +54,9 @@ fix implementation. Builders never parse design documents at build time.
 For every affected plan, add the design ID and keep its complete contract
 explicit: project-relative source and target, source identity, ordered edits,
 guarded callback, and the exact combined summary for all implemented designs.
+When the executable plan requires a runtime source-hash guard, derive it from
+the file resolved by the design path and keep it in the builder; do not write
+it back into the design.
 
 ### SoundBank
 

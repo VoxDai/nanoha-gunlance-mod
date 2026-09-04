@@ -8,8 +8,6 @@ It fixes the default audible route and media contract established by the
 
 - Source donor: `original/nbnk/wp_cmn_epvsp.nbnk`, Wwise v120, Bank ID
   `1149256632`, Sound `890667980`, Media `838569492`.
-- Donor Bank SHA-256:
-  `76b1bc422e3041fafc5cdb2cd671937d298bd9de86421cfc597df1a61998c3c8`.
 - Original 46-byte donor body SHA-256:
   `b2b6d8e026d1e0aad1e4f308bbd7fdf01e516b1e02c9db6f834199b23cd9412e`.
 - Canonical changes: set `DirectParentID=209038110` and set body `+0x20`
@@ -18,9 +16,8 @@ It fixes the default audible route and media contract established by the
 - The canonical donor-ID body SHA-256 after those two changes is
   `54433bb432a51b7912e85edbae003f4d2cb2445ce34242b0a1713fc680a74a64`.
 - The external parent is locked by
-  `original/nbnk/pl_act_vo_event.nbnk`: file SHA-256
-  `4830c1c0394a5af14f52adf8d7b96463032b7631f0e20061ee6a829da6358582`,
-  Bank ID `3755575407`, Actor-Mixer `209038110` body SHA-256
+  `original/nbnk/pl_act_vo_event.nbnk`: Bank ID `3755575407`, Actor-Mixer
+  `209038110` body SHA-256
   `3f95ef076e1c9119c81973022288e86d273d5dd4de8501fc0aad26c218584a80`.
   Treat this Bank as a reference input; do not add it to the Mod package.
 
@@ -50,5 +47,5 @@ audio to remain byte-exact. Only an explicit behavioral requirement backed by
 an in-game probe may authorize duplicate playback.
 
 Record the selected Event, untouched paired Event, exact Action lists, standard
-Sound IDs, mono runtime channel count, reference hashes, and expected HIRC
-summary in the design.
+Sound IDs, mono runtime channel count, structural body guards, and expected
+HIRC summary in the design.

@@ -29,8 +29,7 @@ target_artifacts:
 
 ## 实现契约
 
-- 原始 Bank：`original/nbnk/wp_gun_cmn.nbnk`，Wwise v120，Bank ID `939294496`，SHA-256
-  `bba3b716b0bbaf06dfe562adf9867c43dd78b29dd5132b150f1f08142b54cfa1`。
+- 原始 Bank：`original/nbnk/wp_gun_cmn.nbnk`，Wwise v120，Bank ID `939294496`。
 
 | 名称                   | Event ID   | 原 Action ID | Container ID | donor Sound / Media ID | DIDX / 原 Media ID | 新 Action ID            | 新 Sound ID |
 |------------------------|------------|--------------|--------------|------------------------|--------------------|-------------------------|-------------|
@@ -47,7 +46,7 @@ target_artifacts:
 |------|------|-------------|----------------|------|----------------|----------|-------------|
 | 两类下砸共享人物语音替换 | `original/wwev/pl_voice.wwev` | 1409 | 967571325 | 4 | `73c0de66cceb0d4c467d1652296537e0a63b53490620542d1b9174df7a3da507` | 6595 | 2866569635 |
 
-- LMT 固定为 v95，原文件 SHA-256 为 `7897e766963b177b2dc157f65204e8a4ef9a35aba4b294c8d0f0635209800b94`。Motion 128
+- `original/lmt/w07_00.lmt` 固定为 v95。Motion 128
   共 199 帧，TIML `0xEF7C0` 仅由该 Motion 使用；只允许将 EventGroup02 槽 B 赋值帧 0、偏移 `0xF03C0` 的 ReqNo
   `1409` 改为 `6595`，并以 trigger mask `0x02` 在第 18 帧触发。Motion 131 共 23 帧，TIML `0xFC040` 仅由该 Motion
   使用；只允许将 EventGroup02 槽 A 赋值帧 0、偏移 `0xFC5A0` 的 ReqNo `1409` 改为 `6595`，并以 trigger mask
@@ -55,14 +54,12 @@ target_artifacts:
   `LmtEditSummary.changed_byte_count` 为 `5`。
 - Motion 128 的 EventGroup06 槽 F 必须保持原赋值帧 0 / ReqNo `6505`，并在第 32 帧以 trigger mask `0x20` 触发；不得再改为
   ReqNo `6593`。Motion 151 的 EventGroup02 槽 B / 第 18 帧 / ReqNo `1409` 同样保持原样，作为未扩散控制路线。
-- `original/wwev/pl_voice.wwev` 固定为 v19，SHA-256
-  `7667e0caca4bb7d4d2c3dda62085db3a9a8b68992b9f7a089aaed9dc84afa696`。完整克隆第 20 条、大小 `129` 字节的 donor
+- `original/wwev/pl_voice.wwev` 固定为 v19。完整克隆第 20 条、大小 `129` 字节的 donor
   记录，只替换 ReqNo 与 Event ID，追加为第 101 条；新增记录 SHA-256 为
   `c430e117fad198b99f94187fc7ff7c3ca1140c1ae618ad306037c16d9f4a7ed6`。原有 100 条记录、四个依赖字符串、顺序及
   记录边界保持 byte-exact。donor ReqNo `1409` 唯一解析为 mode `4` / Event `967571325`；ReqNo `6595` 已在
   `assets/chunk/` 的 1300 个 WWEV、52816 条记录中确认零占用，并由 `append_cloned_record()` 的碰撞 guard 锁定。
-- `original/wwev/hm_wp07_snd_ev.wwev` 固定为 v19，SHA-256
-  `82c7162f3cb502e3ce3e1e7c1e6ff4823d373a764148d6d761f675420bcd2a0f`。原记录 #28 / ReqNo `6505` / mode `100` /
+- `original/wwev/hm_wp07_snd_ev.wwev` 固定为 v19。原记录 #28 / ReqNo `6505` / mode `100` /
   Event `1129041389` / 完整记录 SHA-256
   `716e10c4bb841822f8d5b178580980d654f4367e5753403474bc8b50cfb7f2c8` 必须保持 byte-exact；该 artifact 只允许
   `stationary_draw` 追加 ReqNo `6592` 为记录 #44，不再为本设计追加 ReqNo `6593` 或记录 #45。
@@ -82,14 +79,12 @@ target_artifacts:
   Event。
 - 原有 DIDX #1–#33 保持 byte-exact；在 `stationary_draw` 的 DIDX #34 后追加 Accel 为 DIDX #35 / Media ID
   `1280643898`，并在其后保留 `reload` 的 DIDX #36。新 Sound 使用 46-byte 标准语音 body，来源为
-  `original/nbnk/wp_cmn_epvsp.nbnk`（SHA-256
-  `76b1bc422e3041fafc5cdb2cd671937d298bd9de86421cfc597df1a61998c3c8`）的 Sound `890667980` / Media
+  `original/nbnk/wp_cmn_epvsp.nbnk` 的 Sound `890667980` / Media
   `838569492`（原 body SHA-256 `b2b6d8e026d1e0aad1e4f308bbd7fdf01e516b1e02c9db6f834199b23cd9412e`），仅替换
   Sound ID 与 Media ID，固定 `DirectParentID=209038110`、body `+0x20` 的 `PositioningParams.uByVector=0xC1`；标准
   body SHA-256 为 `54433bb432a51b7912e85edbae003f4d2cb2445ce34242b0a1713fc680a74a64`。新 Sound 不加入原机械
   Container。
-- 外部父级由 `original/nbnk/pl_act_vo_event.nbnk` 锁定：SHA-256
-  `4830c1c0394a5af14f52adf8d7b96463032b7631f0e20061ee6a829da6358582`、Bank ID `3755575407`、Actor-Mixer
+- 外部父级由 `original/nbnk/pl_act_vo_event.nbnk` 锁定：Bank ID `3755575407`、Actor-Mixer
   `209038110` body SHA-256 `3f95ef076e1c9119c81973022288e86d273d5dd4de8501fc0aad26c218584a80`；该参考 Bank 不打入 Mod。审计未发现
   以原人物语音播放根或标准外部父级为 target、并由原生 Event 引用的匹配 Stop Action，因此本设计不新增 Stop Action。
 - 项目 WAV 固定为 48 kHz、stereo、24-bit PCM，实测 `-21.01` LUFS-I，设计表按最近整数记录为 `-21 LUFS-I`；构建时不做

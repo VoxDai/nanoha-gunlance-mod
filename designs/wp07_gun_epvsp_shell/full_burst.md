@@ -28,17 +28,12 @@ target_artifacts:
 
 四份最终 WAV 均为 48 kHz、stereo、24-bit PCM，依次为 58000／30000／54000／42000 帧
 （1.208333／0.625／1.125／0.875 秒），实测响度为 -20.99／-20.98／-21.00／-21.00 LUFS-I，true peak 为
--15.76／-15.09／-13.56／-12.26 dBTP。最终 SHA-256 依次为
-`08b1f6683edac5481b8d3aa863d0bb680f64306b2d87031fed3d510707d04f95`、
-`cc9790d25247702cbb11dd059ce6565f9c8bbf5efc17045586a344eb49013853`、
-`76219fba6451ea452f42f0eabf9bc4f3e545ee20b95cd01e0b00ad27f7d1f387`、
-`0d7492f51e474d13423c9375428b34ff3a9f795e0a0b2b7279a1b38e1f9f64bb`。构建只无增益下混为 48 kHz、16-bit mono
+-15.76／-15.09／-13.56／-12.26 dBTP。构建只无增益下混为 48 kHz、16-bit mono
 Wwise PCM WEM，channel config `000001410000`；不在构建时校正响度。
 
 ## 实现契约
 
-- 原始 Bank：`original/nbnk/wp07_gun_epvsp_shell.nbnk`，Wwise v120，Bank ID `3273965928`，SHA-256
-  `41bb0136e89e8434d716caed9c37b399e44cd0cb057f3fa9ab706437696782a1`。
+- 原始 Bank：`original/nbnk/wp07_gun_epvsp_shell.nbnk`，Wwise v120，Bank ID `3273965928`。
 
 | 名称 | Event ID | 原 Action ID | Container ID | donor Sound / Media ID | DIDX / 原 Media ID | 新 Action ID | 新 Sound ID |
 |------|----------|--------------|--------------|------------------------|--------------------|--------------|-------------|
@@ -65,12 +60,10 @@ Wwise PCM WEM，channel config `000001410000`；不在构建时校正响度。
 - 四个 Sound 使用标准 46-byte 语音模板，Sound / Media 映射依次为 `960803121 / 242768048`、
   `479969098 / 954495929`、`2544331946 / 2170495128`、`4251385954 / 2062876979`；DirectParentID 均为
   `853759195`，body `+0x20` 的 `PositioningParams.uByVector=0xC1`，无本地 Pitch，不叠加第二份随机偏移。模板来源为
-  `original/nbnk/wp_cmn_epvsp.nbnk`（文件 SHA-256
-  `76b1bc422e3041fafc5cdb2cd671937d298bd9de86421cfc597df1a61998c3c8`）的 Sound `890667980` / Media
+  `original/nbnk/wp_cmn_epvsp.nbnk` 的 Sound `890667980` / Media
   `838569492`，原 body SHA-256 `b2b6d8e026d1e0aad1e4f308bbd7fdf01e516b1e02c9db6f834199b23cd9412e`；沿用项目已验证的
   Container 语音层级。
-- 外部父级由 `original/nbnk/pl_act_vo_event.nbnk` 锁定：文件 SHA-256
-  `4830c1c0394a5af14f52adf8d7b96463032b7631f0e20061ee6a829da6358582`、Bank ID `3755575407`、Actor-Mixer
+- 外部父级由 `original/nbnk/pl_act_vo_event.nbnk` 锁定：Bank ID `3755575407`、Actor-Mixer
   `209038110` body SHA-256 `3f95ef076e1c9119c81973022288e86d273d5dd4de8501fc0aad26c218584a80`；该参考 Bank 不打入 Mod。
 - 原 Bank 的 Stop Action 仅以 `60034062`、`662442083`、`1054468797`、`956375262`、`599243561` 为目标，未命中五条
   全弹原播放根或其父链；新 Random 不新增 Stop Action。3–5 发的成对空间路径只向表中 Event 追加语音，另一条成对 Event 及其

@@ -39,8 +39,7 @@ target_artifacts:
 
 ## 实现契约
 
-- 原始 Bank: `original/nbnk/wp_gun_cmn.nbnk`，Wwise v120，SHA-256
-  `bba3b716b0bbaf06dfe562adf9867c43dd78b29dd5132b150f1f08142b54cfa1`
+- 原始 Bank: `original/nbnk/wp_gun_cmn.nbnk`，Wwise v120
 - Bank ID: `939294496`
 
 | 名称                 | Event ID   | 原 Action ID | Container ID | donor Sound / Media ID | DIDX / 原 Media ID | 新 Action ID | 新 Sound ID |
@@ -53,14 +52,14 @@ target_artifacts:
 | 原地拔刀（语音 05） | 3567942167 | 1061269777   | 522283251    | 233981936 / 867938822  | #27 / 867938822    | 708529406    | 1609904242  |
 | 原地拔刀（语音 06） | 3567942167 | 1061269777   | 522283251    | 233981936 / 867938822  | #27 / 867938822    | 708529406    | 3412709805  |
 
-| 语音 | DIDX / 新 Media ID | 最终 WAV SHA-256 |
-|------|--------------------|------------------|
-| 01 | #34 / 863865614 | `4eafdd6704f72123eede9f7fc2fc07c9af54b15f8e79ab749abf0744578d0aff` |
-| 02 | #39 / 3899958096 | `922cd488f6a976fe502577fa1ed98bfafb299bd345fe83b0b17acd22e8398fc2` |
-| 03 | #40 / 1917220401 | `83623e31bf9c8982e9d3145bcff33d501a4913d8e6403b9b7a25bfd9bad945e9` |
-| 04 | #41 / 2922118034 | `21b2b70bd30cf5f5970d533fe1acd5df0121c9130042060ea31e8b938ce3b8fd` |
-| 05 | #42 / 3798249131 | `bbcc22fc6815fabfd239e4f6941b76aab6ab58f3780c789154e01729d9dbc15b` |
-| 06 | #43 / 3222869860 | `a1a60d60b11f2ed64ecd18f9995036bff3529ac18bb0c9aa67eae38fcd21828f` |
+| 语音 | DIDX / 新 Media ID |
+|------|--------------------|
+| 01 | #34 / 863865614 |
+| 02 | #39 / 3899958096 |
+| 03 | #40 / 1917220401 |
+| 04 | #41 / 2922118034 |
+| 05 | #42 / 3798249131 |
+| 06 | #43 / 3222869860 |
 
 - 原 Event `3567942167` 的 Action 列表固定为 `(1061269777,)`，原 Action 完整 body SHA-256 为
   `6c8f6ba1362064c06db17ed2248d1f9f288a3f0459caba8c77131d8b487c810a`，必须仍为无 delay Play，目标原 Container `522283251`。
@@ -77,14 +76,12 @@ target_artifacts:
   `db3a22c71a5c29ad75d077c95b70a2b7f65f98b7c3940b4ba4c8fab2707a6644`。
 - 原有 DIDX #1–#33 的身份与媒体载荷保持 byte-exact；保留既有语音 01 的 #34 和 ID，五份新媒体按 02–06 追加为 #39–#43。
   下砸、装填、横扫占用的 #35–#38、其音频和路线保持原样。
-- 六个 Sound 使用 46-byte 标准语音 body，来源为 `original/nbnk/wp_cmn_epvsp.nbnk`（文件 SHA-256
-  `76b1bc422e3041fafc5cdb2cd671937d298bd9de86421cfc597df1a61998c3c8`、Bank ID `1149256632`）的 Sound `890667980` /
+- 六个 Sound 使用 46-byte 标准语音 body，来源为 `original/nbnk/wp_cmn_epvsp.nbnk`（Bank ID `1149256632`）的 Sound `890667980` /
   Media `838569492`，原 body SHA-256 为 `b2b6d8e026d1e0aad1e4f308bbd7fdf01e516b1e02c9db6f834199b23cd9412e`。
   使用标准模板（SHA-256 `54433bb432a51b7912e85edbae003f4d2cb2445ce34242b0a1713fc680a74a64`），仅替换 Sound/Media ID
   和 `DirectParentID=847783544`，保持 body `+0x20` 的 `PositioningParams.uByVector=0xC1`；子 Sound 不设置本地 Pitch。
   该 Container → 标准语音 Sound 层级沿用横扫已确认的语音路由。
-- 外部父级由 `original/nbnk/pl_act_vo_event.nbnk` 锁定：文件 SHA-256
-  `4830c1c0394a5af14f52adf8d7b96463032b7631f0e20061ee6a829da6358582`、Bank ID `3755575407`、Actor-Mixer
+- 外部父级由 `original/nbnk/pl_act_vo_event.nbnk` 锁定：Bank ID `3755575407`、Actor-Mixer
   `209038110` body SHA-256 `3f95ef076e1c9119c81973022288e86d273d5dd4de8501fc0aad26c218584a80`；其父级 `694534885`
   body SHA-256 为 `e55d7200a7e2df6833bc634f2b9f8518958cd882da9f18eb5f102f3a6c884bcb`。两级均无局部 Pitch，两个参考 Bank 不打入 Mod。
 - 原生播放根及父链为 `522283251 → 768813060 → 972300144 → 694534885`；原 Bank 未发现原生 Event 引用的匹配 Stop Action，
@@ -106,10 +103,10 @@ target_artifacts:
 |------------------|-----------------------------------------|-------------|----------------|------|--------------------------------------------------------------------|----------|-------------|
 | 原地普通攻击拔刀 | `original/wwev/hm_wp07_snd_ev.wwev` | 6470        | 3567942167     | 2    | `1c6fd120501ce70925b00d8ab0166a38b132934e220a1095506424024a33e53f` | 6592     | 3176129810  |
 
-- LMT 固定为 v95，原文件 SHA-256 为 `7897e766963b177b2dc157f65204e8a4ef9a35aba4b294c8d0f0635209800b94`。Motion 2 共 91
+- `original/lmt/w07_00.lmt` 固定为 v95。Motion 2 共 91
   帧，TIML `0xC6E0` 仅由该 Motion 使用；以 trigger mask `0x02` 在第 9 帧触发槽 B。只允许将赋值帧 0、偏移
   `0xCC50` 的 ReqNo `6470` 改为 `6592`，文件长度不变且 changed-byte count 为 `1`。
-- WWEV 固定为 v19，原文件 SHA-256 为 `82c7162f3cb502e3ce3e1e7c1e6ff4823d373a764148d6d761f675420bcd2a0f`。完整克隆第 17 条
+- `original/wwev/hm_wp07_snd_ev.wwev` 固定为 v19。完整克隆第 17 条
   donor 记录并仅替换 ReqNo 和 Event ID；追加为第 44 条、增加 `129` 字节，原有 43 条记录、依赖字符串及 顺序保持 byte-exact。
 - ReqNo `6592` 保持既有值。端到端读回必须只产生 Motion 2 / 第 9 帧 / EventGroup06 / 槽 B / ReqNo `6592` / mode `2` /
   Event `3176129810` 一条新路由，并验证完整原声委托、六选一 Container、Pitch、每个 Sound 的父级和媒体，以及加载顺序。

@@ -25,8 +25,7 @@ target_artifacts:
 
 ## 实现契约
 
-- 原始 Bank: `original/nbnk/wp_gun_cmn.nbnk`，Wwise v120，Bank ID `939294496`，SHA-256
-  `bba3b716b0bbaf06dfe562adf9867c43dd78b29dd5132b150f1f08142b54cfa1`。
+- 原始 Bank: `original/nbnk/wp_gun_cmn.nbnk`，Wwise v120，Bank ID `939294496`。
 
 | 名称                  | Event ID   | 原 Action ID | Container ID | donor Sound / Media ID | DIDX / 原 Media ID | 新 Action ID | 新 Sound ID |
 |-----------------------|------------|----------------|--------------|------------------------|--------------------|----------------|-------------|
@@ -37,14 +36,12 @@ target_artifacts:
 - Event `3476627122` 的 Action 列表由 `126049847` 变为 `126049847, 3418611510`，原 Action 始终在第一项；新 Action 为无
   delay 的 Play，目标新 Sound `1474128429`，并序列化在目标 Event 之前。
 - 表中 donor `176748589` 及 Container `411055943` 只作为原路径 guard；新 Sound 使用 46-byte 标准语音 body，来源为
-  `original/nbnk/wp_cmn_epvsp.nbnk`（文件 SHA-256
-  `76b1bc422e3041fafc5cdb2cd671937d298bd9de86421cfc597df1a61998c3c8`）的 Sound `890667980` / Media `838569492`（原 body SHA-256
+  `original/nbnk/wp_cmn_epvsp.nbnk` 的 Sound `890667980` / Media `838569492`（原 body SHA-256
   `b2b6d8e026d1e0aad1e4f308bbd7fdf01e516b1e02c9db6f834199b23cd9412e`），仅替换 Sound ID 与 Media ID，固定
   `DirectParentID=209038110`、body `+0x20` 的 `PositioningParams.uByVector=0xC1`；标准 body SHA-256 为
   `54433bb432a51b7912e85edbae003f4d2cb2445ce34242b0a1713fc680a74a64`。Container 保持 byte-exact，继续仅包含 donor
   Sound、权重 `50000`、avoid-repeat `1` 的原随机播放列表；新 Sound 不加入该 Container。
-- 外部父级由 `original/nbnk/pl_act_vo_event.nbnk` 锁定：文件 SHA-256
-  `4830c1c0394a5af14f52adf8d7b96463032b7631f0e20061ee6a829da6358582`、Bank ID `3755575407`、Actor-Mixer
+- 外部父级由 `original/nbnk/pl_act_vo_event.nbnk` 锁定：Bank ID `3755575407`、Actor-Mixer
   `209038110` body SHA-256 `3f95ef076e1c9119c81973022288e86d273d5dd4de8501fc0aad26c218584a80`；该参考 Bank 不打入 Mod。
 - 项目 WAV 固定为 48 kHz、stereo、24-bit PCM，并保持音频表记录的 -24 LUFS-I；构建时不做增益、归一化或响度修正，只无增益下混为
   48 kHz、16-bit mono Wwise PCM WEM。

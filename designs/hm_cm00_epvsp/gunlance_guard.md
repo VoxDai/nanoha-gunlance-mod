@@ -29,8 +29,7 @@ Heart「Protection」语音，每次有效播放随机产生 `[-50, +50] cents` 
 | 10 ms 静音回退                 | [silence_10ms](../../audio/hm_cm00_epvsp/silence_10ms.wav)                                                                          | -∞ LUFS-I（特殊静音） | 独立媒体；只供非枪铳或未匹配武器值的默认分支播放    |
 
 两段 Protection 均为 48 kHz、stereo、24-bit PCM、5 秒，并保持表中记录的 -24 LUFS-I。静音回退是功能性特殊音频，允许不符合普通
-语音的 24-bit 与命名规范；实际为 48 kHz、stereo、16-bit PCM、480 帧全零采样、-∞ LUFS-I，SHA-256 为
-`94988ef93524fb8b65c1884f413729ae71b526e694d63aca79adf27e27b02222`。三份 WAV 构建时均不做增益、归一化或响度修正，只无增益下混为
+语音的 24-bit 与命名规范；实际为 48 kHz、stereo、16-bit PCM、480 帧全零采样、-∞ LUFS-I。三份 WAV 构建时均不做增益、归一化或响度修正，只无增益下混为
 48 kHz、16-bit mono Wwise PCM WEM。随机 Container 的 `avoid-repeat=0`，两份语音各有 50% 概率，允许连续选中同一份。
 每次有效播放在 Container 上随机产生 `[-50, +50] cents` 音调偏移；两个 Protection Sound 继承该偏移，不再添加本地
 Pitch 属性。实例上限为 1，超过上限时采用 Kill Newest。素材文件时长保持 5 秒，运行时播放时长可随音调变化，连续防御的
@@ -38,8 +37,7 @@ Pitch 属性。实例上限为 1，超过上限时采用 Kill Newest。素材文
 
 ## 实现契约
 
-- 原始 Bank: `original/nbnk/hm_cm00_epvsp.nbnk`，Wwise v120，SHA-256
-  `73b52c1a69532f0a84ab6dfa2e95bd804bf8affc5af77450786d700c177a9977`
+- 原始 Bank: `original/nbnk/hm_cm00_epvsp.nbnk`，Wwise v120
 - Bank ID: `707566772`
 
 | 名称          | Event ID   | 原 Action ID | Container ID | donor Sound / Media ID | DIDX / 原 Media ID | 新 Action ID | 新 Sound ID |
@@ -72,14 +70,13 @@ Pitch 属性。实例上限为 1，超过上限时采用 Kill Newest。素材文
   父级字段仍在 `+0x0B`，Kill Newest 与实例上限字段分别移至 `+0x22` 和 `+0x24`。最终 body SHA-256 固定为
   `396592e4835d0108b6049e3f40c2d1e6fb66c628c52fb59da3506f49c0c4756f`；除明确声明的 ID、父级、playlist、avoid-repeat、
   实例限制和随机 Pitch 外，保留 donor 的其它属性与未知字节。
-- 三个新 Sound 均使用 46-byte 标准语音 body：来源为 `original/nbnk/wp_cmn_epvsp.nbnk`（SHA-256
-  `76b1bc422e3041fafc5cdb2cd671937d298bd9de86421cfc597df1a61998c3c8`）的 Sound `890667980` / Media `838569492`，原 body
+- 三个新 Sound 均使用 46-byte 标准语音 body：来源为 `original/nbnk/wp_cmn_epvsp.nbnk` 的 Sound
+  `890667980` / Media `838569492`，原 body
   SHA-256 为 `b2b6d8e026d1e0aad1e4f308bbd7fdf01e516b1e02c9db6f834199b23cd9412e`，标准 C1 body SHA-256 为
   `54433bb432a51b7912e85edbae003f4d2cb2445ce34242b0a1713fc680a74a64`。Protection 两个 Sound 的
   `DirectParentID=3163089818`，静音 Sound 的 `DirectParentID=4010844647`，三者 body `+0x20` 的
   `PositioningParams.uByVector=0xC1`。
-- 外部父级由 `original/nbnk/pl_act_vo_event.nbnk` 锁定：文件 SHA-256
-  `4830c1c0394a5af14f52adf8d7b96463032b7631f0e20061ee6a829da6358582`、Bank ID `3755575407`、Actor-Mixer `209038110` body
+- 外部父级由 `original/nbnk/pl_act_vo_event.nbnk` 锁定：Bank ID `3755575407`、Actor-Mixer `209038110` body
   SHA-256 `3f95ef076e1c9119c81973022288e86d273d5dd4de8501fc0aad26c218584a80`；该参考 Bank 不打入 Mod。
 - 依次追加 DIDX #141 / Media `141209263`、#142 / Media `440767416`、#143 / Media `2901559960`。三份运行时媒体均为
   48 kHz、16-bit mono Wwise PCM，并由构建读回验证格式。

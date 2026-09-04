@@ -25,7 +25,8 @@ contract under `designs/`. The design is the complete input for
   overwrite an `original/` destination. If an existing destination differs
   from the resolved source, stop and report the conflict.
 - Use mapping and research documents only as evidence. Inspect the original
-  binaries before fixing IDs, guards, hashes, versions, byte counts, or routes.
+  binaries before fixing IDs, guards, structural body or record hashes,
+  versions, byte counts, or routes.
 - Never invent Event, Action, Container, Sound, Media, DIDX, ReqNo, frame,
   offset, record, or summary values. Preserve an existing `design_id`.
 - Use only final project WAVs. Probes, placeholders, and unprocessed source
@@ -74,6 +75,9 @@ List only final repository audio with links relative to the design file:
 | 名称 | 音频 | 响度（LUFS-I） | 播放方式 |
 ```
 
+Identify each final WAV by its repository-relative link only. Do not record a
+whole-file hash for an audio file in the design.
+
 Record replacement versus independent append, sharing, synchronization, delay, and distinct spatial paths. Measure
 integrated loudness read-only with FFmpeg
 `loudnorm` and use its unrounded `input_i` to validate the inclusive
@@ -95,7 +99,8 @@ the correction in a design or builder.
 ### 实现契约
 
 For every target, record its project-relative source under `original/`,
-supported version, source SHA-256, and the exact editor guards. For NBNK, record
+supported version, and the exact editor guards. Identify each `original/` file
+by path only; do not record its whole-file hash in the design. For NBNK, record
 the parsed Bank ID and use this core table:
 
 ```markdown
@@ -160,8 +165,8 @@ Do not reduce a cross-format route to its final Event ID.
    `original/wwev/` directory.
 3. If a dependency is missing, locate exactly one source under
    `assets/chunk/`, copy it byte-for-byte to the correct new `original/`
-   path, and verify matching SHA-256 values. Stop on absence, ambiguity, or a
-   differing existing destination.
+   path, and verify the source and destination are byte-exact. Stop on absence,
+   ambiguity, or a differing existing destination.
 4. Inspect every original through `tools.soundbank_editor`; use
    `soundbank-workflow` and a task-specific wwiser dump under `/tmp` when
    topology needs deeper proof. For each custom playback route, complete the
@@ -170,15 +175,16 @@ Do not reduce a cross-format route to its final Event ID.
    `LmtFile.triggered_requests()` and the matching `WwevFile`.
 5. Verify every final audio link, measure its unrounded LUFS-I, and validate its format and filename. Stop and report
    ordinary WAVs outside the loudness range or media contract; document any justified special-audio exception. Build an
-   in-memory guarded prototype when exact summaries, output hashes, or collision checks cannot be established by
-   inspection alone; do not publish it.
+   in-memory guarded prototype when exact summaries, structural body or record
+   hashes, or collision checks cannot be established by inspection alone; do
+   not publish it.
 6. Create or update the design, keeping behavior, audio, and implementation
    facts in their respective sections.
 7. Reparse the front matter, require a unique `design_id`, validate every
    local link and table column count, and ensure all game-artifact contract
    paths point into `original/`, never `assets/chunk/`.
-8. Run `git diff --check` and report the design, promoted artifacts and
-   hashes, verified route facts, unresolved blockers, and any disagreement with
+8. Run `git diff --check` and report the design, promoted artifact paths,
+   verified route facts, unresolved blockers, and any disagreement with
    existing builders or mapping.
 
 When the contract is complete, hand off its path or `design_id` to

@@ -32,8 +32,7 @@ Pitch 基值缺省，随机范围为 `[-50, +50] cents`；两个 Sound 不设置
 
 ## 实现契约
 
-- 原始 Bank: `original/nbnk/wp_cmn_epvsp.nbnk`，Wwise v120，SHA-256
-  `76b1bc422e3041fafc5cdb2cd671937d298bd9de86421cfc597df1a61998c3c8`
+- 原始 Bank: `original/nbnk/wp_cmn_epvsp.nbnk`，Wwise v120
 - Bank ID: `1149256632`
 
 | 名称                                | Event ID | 原 Action ID | Container ID | donor Sound / Media ID | DIDX / 原 Media ID | 新 Action ID | 新 Sound ID |
@@ -61,8 +60,7 @@ Pitch 基值缺省，随机范围为 `[-50, +50] cents`；两个 Sound 不设置
   `DirectParentID=3800640078`，并将 body `+0x20` 的 `PositioningParams.uByVector` 固定为 `0xC1`；Charging Completed 与
   Condition Green 的最终 body SHA-256 分别为 `5052b089e940f8b99e5b4f8091ebfa54f5e6de51fa09e4a1854a8c2f1598518e`、
   `25b4895802884802a7955c98a9357d8b9de7e29d196c40f2da2753b38fca268d`。
-- 外部父级由 `original/nbnk/pl_act_vo_event.nbnk` 锁定：文件 SHA-256
-  `4830c1c0394a5af14f52adf8d7b96463032b7631f0e20061ee6a829da6358582`、Bank ID `3755575407`、Actor-Mixer
+- 外部父级由 `original/nbnk/pl_act_vo_event.nbnk` 锁定：Bank ID `3755575407`、Actor-Mixer
   `209038110` body SHA-256 `3f95ef076e1c9119c81973022288e86d273d5dd4de8501fc0aad26c218584a80`；该参考 Bank 不打入 Mod。
 - 原生播放根及父级链为 `306760817 → 914939451 → 972300144 → 694534885`；未发现由原生 Event 引用且以该链任一对象为目标的
   Stop Action，因此不新增 Stop 路由。

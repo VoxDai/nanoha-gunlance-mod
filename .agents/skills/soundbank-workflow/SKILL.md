@@ -63,7 +63,7 @@ structures are preserved or rejected instead of being guessed.
 ## Work from Evidence to a Verified Artifact
 
 1. **Confirm the input.** Read the documented `original/` artifact and record
-   its path, SHA-256, and format identity. Never modify it, `assets/chunk/`, or
+   its path and format identity. Never modify it, `assets/chunk/`, or
    reference Mod samples. Keep diagnostics and prototypes in one task-specific
    temporary directory.
 2. **Query the affected graph.** Pair every 1-based DIDX index with its Media
