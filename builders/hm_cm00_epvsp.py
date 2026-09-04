@@ -325,21 +325,21 @@ PLAN = SoundBankBuildPlan(
         MediaAddition(
             141,
             VOICE_MEDIA_IDS[0],
-            "audio/hm_cm00_epvsp/"
+            "audio/hm_cm00_epvsp/gunlance_guard/"
             "raising_heart_protection_01(movie_1st.raising_heart.protection_01.1).wav",
             wem_channels=1,
         ),
         MediaAddition(
             142,
             VOICE_MEDIA_IDS[1],
-            "audio/hm_cm00_epvsp/"
+            "audio/hm_cm00_epvsp/gunlance_guard/"
             "raising_heart_protection_02(movie_1st.raising_heart.protection_02.1).wav",
             wem_channels=1,
         ),
         MediaAddition(
             143,
             SILENCE_MEDIA_ID,
-            "audio/hm_cm00_epvsp/silence_10ms.wav",
+            "audio/silence_10ms.wav",
             wem_channels=1,
         ),
     ),

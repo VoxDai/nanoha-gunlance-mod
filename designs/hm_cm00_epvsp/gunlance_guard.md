@@ -24,9 +24,9 @@ Heart「Protection」语音，每次有效播放随机产生 `[-50, +50] cents` 
 
 | 名称                           | 音频                                                                                                                                | 响度（LUFS-I）        | 播放方式                                            |
 |--------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|-----------------------|-----------------------------------------------------|
-| Raising Heart「Protection 01」 | [raising_heart_protection_01](<../../audio/hm_cm00_epvsp/raising_heart_protection_01(movie_1st.raising_heart.protection_01.1).wav>) | -24 LUFS-I            | 独立媒体；权重 `50000`，与 Protection 02 等概率随机；继承 Container 的 ±50 cents 随机音调 |
-| Raising Heart「Protection 02」 | [raising_heart_protection_02](<../../audio/hm_cm00_epvsp/raising_heart_protection_02(movie_1st.raising_heart.protection_02.1).wav>) | -24 LUFS-I            | 独立媒体；权重 `50000`，与 Protection 01 等概率随机；继承 Container 的 ±50 cents 随机音调 |
-| 10 ms 静音回退                 | [silence_10ms](../../audio/hm_cm00_epvsp/silence_10ms.wav)                                                                          | -∞ LUFS-I（特殊静音） | 独立媒体；只供非枪铳或未匹配武器值的默认分支播放    |
+| Raising Heart「Protection 01」 | [raising_heart_protection_01](<../../audio/hm_cm00_epvsp/gunlance_guard/raising_heart_protection_01(movie_1st.raising_heart.protection_01.1).wav>) | -24 LUFS-I            | 独立媒体；权重 `50000`，与 Protection 02 等概率随机；继承 Container 的 ±50 cents 随机音调 |
+| Raising Heart「Protection 02」 | [raising_heart_protection_02](<../../audio/hm_cm00_epvsp/gunlance_guard/raising_heart_protection_02(movie_1st.raising_heart.protection_02.1).wav>) | -24 LUFS-I            | 独立媒体；权重 `50000`，与 Protection 01 等概率随机；继承 Container 的 ±50 cents 随机音调 |
+| 10 ms 静音回退                 | [silence_10ms](../../audio/silence_10ms.wav)                                                                                         | -∞ LUFS-I（特殊静音） | 独立媒体；只供非枪铳或未匹配武器值的默认分支播放    |
 
 两段 Protection 均为 48 kHz、stereo、24-bit PCM、5 秒，并保持表中记录的 -24 LUFS-I。静音回退是功能性特殊音频，允许不符合普通
 语音的 24-bit 与命名规范；实际为 48 kHz、stereo、16-bit PCM、480 帧全零采样、-∞ LUFS-I。三份 WAV 构建时均不做增益、归一化或响度修正，只无增益下混为
