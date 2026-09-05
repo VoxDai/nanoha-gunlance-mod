@@ -1,4 +1,4 @@
-"""Build stationary-draw, overhead-smash, and frame-11 wide-sweep requests."""
+"""Build reviewed gunlance Motion request replacements."""
 
 from __future__ import annotations
 
@@ -45,9 +45,18 @@ WIDE_SWEEP_OLD_REQUEST = 6486
 WIDE_SWEEP_NEW_REQUEST = 6596
 WIDE_SWEEP_REQUEST_OFFSET = 1_202_416
 
+CHARGED_SHELLING_MOTION_IDS = (132, 133, 134)
+CHARGED_SHELLING_EVENT_GROUP = "EventGroup06"
+CHARGED_SHELLING_SLOT = "B"
+CHARGED_SHELLING_REQUEST_KEYFRAME = 0.0
+CHARGED_SHELLING_TRIGGER_FRAMES = (1.0,)
+CHARGED_SHELLING_OLD_REQUEST = 6470
+CHARGED_SHELLING_NEW_REQUEST = 6599
+CHARGED_SHELLING_REQUEST_OFFSETS = (0xFEDF0, 0x101850, 0x104C70)
+
 
 def apply_edits(editor: soundbank_editor.LmtEditor) -> None:
-    """Guard and replace the four reviewed animation request assignments."""
+    """Guard and replace the seven reviewed animation request assignments."""
 
     editor.replace_request(
         motion_id=MOTION_ID,
@@ -85,10 +94,20 @@ def apply_edits(editor: soundbank_editor.LmtEditor) -> None:
         replacement_request=WIDE_SWEEP_NEW_REQUEST,
         expected_trigger_frames=WIDE_SWEEP_TRIGGER_FRAMES,
     )
+    for motion_id in CHARGED_SHELLING_MOTION_IDS:
+        editor.replace_request(
+            motion_id=motion_id,
+            event_group=CHARGED_SHELLING_EVENT_GROUP,
+            slot=CHARGED_SHELLING_SLOT,
+            request_keyframe_frame=CHARGED_SHELLING_REQUEST_KEYFRAME,
+            expected_request=CHARGED_SHELLING_OLD_REQUEST,
+            replacement_request=CHARGED_SHELLING_NEW_REQUEST,
+            expected_trigger_frames=CHARGED_SHELLING_TRIGGER_FRAMES,
+        )
 
 
 EXPECTED_SUMMARY = soundbank_editor.LmtEditSummary(
-    changed_byte_count=6,
+    changed_byte_count=9,
     edits=(
         soundbank_editor.LmtRequestEdit(
             motion_id=MOTION_ID,
@@ -134,6 +153,39 @@ EXPECTED_SUMMARY = soundbank_editor.LmtEditSummary(
             new_request=WIDE_SWEEP_NEW_REQUEST,
             changed_byte_count=1,
         ),
+        soundbank_editor.LmtRequestEdit(
+            motion_id=CHARGED_SHELLING_MOTION_IDS[0],
+            event_group=CHARGED_SHELLING_EVENT_GROUP,
+            slot=CHARGED_SHELLING_SLOT,
+            request_keyframe_frame=CHARGED_SHELLING_REQUEST_KEYFRAME,
+            trigger_frames=CHARGED_SHELLING_TRIGGER_FRAMES,
+            offset=CHARGED_SHELLING_REQUEST_OFFSETS[0],
+            old_request=CHARGED_SHELLING_OLD_REQUEST,
+            new_request=CHARGED_SHELLING_NEW_REQUEST,
+            changed_byte_count=1,
+        ),
+        soundbank_editor.LmtRequestEdit(
+            motion_id=CHARGED_SHELLING_MOTION_IDS[1],
+            event_group=CHARGED_SHELLING_EVENT_GROUP,
+            slot=CHARGED_SHELLING_SLOT,
+            request_keyframe_frame=CHARGED_SHELLING_REQUEST_KEYFRAME,
+            trigger_frames=CHARGED_SHELLING_TRIGGER_FRAMES,
+            offset=CHARGED_SHELLING_REQUEST_OFFSETS[1],
+            old_request=CHARGED_SHELLING_OLD_REQUEST,
+            new_request=CHARGED_SHELLING_NEW_REQUEST,
+            changed_byte_count=1,
+        ),
+        soundbank_editor.LmtRequestEdit(
+            motion_id=CHARGED_SHELLING_MOTION_IDS[2],
+            event_group=CHARGED_SHELLING_EVENT_GROUP,
+            slot=CHARGED_SHELLING_SLOT,
+            request_keyframe_frame=CHARGED_SHELLING_REQUEST_KEYFRAME,
+            trigger_frames=CHARGED_SHELLING_TRIGGER_FRAMES,
+            offset=CHARGED_SHELLING_REQUEST_OFFSETS[2],
+            old_request=CHARGED_SHELLING_OLD_REQUEST,
+            new_request=CHARGED_SHELLING_NEW_REQUEST,
+            changed_byte_count=1,
+        ),
     ),
 )
 
@@ -144,6 +196,7 @@ PLAN = LmtBuildPlan(
         "wp_gun_cmn.stationary_draw",
         "wp_gun_cmn.overhead_smash",
         "wp_gun_cmn.wide_sweep",
+        "wp07_gun_epvsp_shell.charged_shelling",
     ),
     source="original/lmt/w07_00.lmt",
     target="hm/wp/wp07/mot/w07_00/w07_00.lmt",

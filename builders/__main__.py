@@ -5,7 +5,12 @@ from __future__ import annotations
 from .base import ModBuildPlan, run_all_cli
 from .hm_cm00_epvsp import PLAN as HM_CM00_EPVSP
 from .hm_wp07_snd_ev import PLAN as HM_WP07_SND_EV
-from .integration import OVERHEAD_SMASH_VALIDATOR, STATIONARY_DRAW_VALIDATOR, WIDE_SWEEP_VALIDATOR
+from .integration import (
+    CHARGED_SHELLING_VALIDATOR,
+    OVERHEAD_SMASH_VALIDATOR,
+    STATIONARY_DRAW_VALIDATOR,
+    WIDE_SWEEP_VALIDATOR,
+)
 from .pl_voice import PLAN as PL_VOICE
 from .w07_00 import PLAN as W07_00
 from .wp07_gun_epvsp_shell import PLAN as WP07_GUN_EPVSP_SHELL
@@ -28,7 +33,12 @@ PLANS = ARTIFACT_PLANS
 
 MOD_PLAN = ModBuildPlan(
     artifacts=ARTIFACT_PLANS,
-    validators=(STATIONARY_DRAW_VALIDATOR, OVERHEAD_SMASH_VALIDATOR, WIDE_SWEEP_VALIDATOR),
+    validators=(
+        STATIONARY_DRAW_VALIDATOR,
+        OVERHEAD_SMASH_VALIDATOR,
+        WIDE_SWEEP_VALIDATOR,
+        CHARGED_SHELLING_VALIDATOR,
+    ),
 )
 
 

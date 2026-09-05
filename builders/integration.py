@@ -11,6 +11,13 @@ from tools import soundbank_editor
 
 from .base import BuildError, BundleValidator
 from .hm_wp07_snd_ev import (
+    CHARGED_SHELLING_DONOR_EVENT_ID,
+    CHARGED_SHELLING_DONOR_MODE,
+    CHARGED_SHELLING_DONOR_RECORD_SHA256,
+    CHARGED_SHELLING_DONOR_REQUEST,
+    CHARGED_SHELLING_NEW_EVENT_ID,
+    CHARGED_SHELLING_NEW_RECORD_SHA256,
+    CHARGED_SHELLING_NEW_REQUEST,
     NEW_EVENT_ID,
     NEW_REQUEST,
     OVERHEAD_ORIGINAL_MODE,
@@ -32,6 +39,10 @@ from .pl_voice import (
     NEW_REQUEST as OVERHEAD_REPLACEMENT_REQUEST,
 )
 from .w07_00 import (
+    CHARGED_SHELLING_EVENT_GROUP,
+    CHARGED_SHELLING_MOTION_IDS,
+    CHARGED_SHELLING_NEW_REQUEST as CHARGED_SHELLING_LMT_REQUEST,
+    CHARGED_SHELLING_SLOT,
     EVENT_GROUP,
     LINK_MOTION_ID,
     LINK_SLOT,
@@ -48,6 +59,9 @@ from .w07_00 import (
     WIDE_SWEEP_SLOT,
 )
 from .wp_gun_cmn import (
+    CHARGED_SHELLING_DIVINE_MEDIA_ID,
+    CHARGED_SHELLING_DIVINE_MEDIA_INDEX,
+    CHARGED_SHELLING_EVENT_ID,
     OVERHEAD_DONOR_MEDIA_ID,
     OVERHEAD_DONOR_MEDIA_INDEX,
     OVERHEAD_DONOR_SOUND_ID,
@@ -63,8 +77,14 @@ from .wp_gun_cmn import (
     WIDE_SWEEP_EVENT_ID,
     WIDE_SWEEP_UNUSED_EVENT_IDS,
     validate_overhead_smash_hirc,
+    validate_charged_shelling_divine_hirc,
     validate_stationary_draw_hirc,
     validate_wide_sweep_hirc,
+)
+from .wp07_gun_epvsp_shell import (
+    CHARGED_SHELLING_MEDIA_IDS as CHARGED_SHELLING_BUSTER_MEDIA_IDS,
+    CHARGED_SHELLING_MEDIA_INDICES as CHARGED_SHELLING_BUSTER_MEDIA_INDICES,
+    validate_charged_shelling_hirc,
 )
 
 
@@ -72,6 +92,7 @@ LMT_TARGET = Path("hm/wp/wp07/mot/w07_00/w07_00.lmt")
 WWEV_TARGET = Path("sound/pl/hm_wp07_snd_ev.wwev")
 PL_VOICE_WWEV_TARGET = Path("sound/pl/pl_voice.wwev")
 BANK_TARGET = Path("sound/wwise/Windows/wp_gun_cmn.nbnk")
+SHELL_BANK_TARGET = Path("sound/wwise/Windows/wp07_gun_epvsp_shell.nbnk")
 OBSOLETE_OVERHEAD_REQUEST = 6593
 CONTROL_MOTION_ID = 151
 
@@ -360,7 +381,7 @@ def validate_wide_sweep(staged: Mapping[Path, Path]) -> None:
         45, WIDE_SWEEP_DONOR_MODE, WIDE_SWEEP_NEW_EVENT_ID, WIDE_SWEEP_NEW_RECORD_SHA256
     ):
         raise BuildError("wide-sweep appended WWEV record differs from its complete guard")
-    if len(wwev.records) != 45 or any(wwev.records_for_request(request) for request in (6597, 6598)):
+    if len(wwev.records) != 46 or any(wwev.records_for_request(request) for request in (6597, 6598)):
         raise BuildError("wide-sweep WWEV contains unexpected timing candidates")
     if any(record.event_id in WIDE_SWEEP_UNUSED_EVENT_IDS for record in wwev.records):
         raise BuildError("wide-sweep WWEV still references an unused timing Event")
@@ -417,4 +438,190 @@ WIDE_SWEEP_VALIDATOR = BundleValidator(
     name="wide_sweep_route",
     design_id="wp_gun_cmn.wide_sweep",
     validate=validate_wide_sweep,
+)
+
+
+def _validate_mono_wwise_pcm(
+    bank: soundbank_editor.SoundBankEditor,
+    *,
+    index: int,
+    media_id: int,
+    sample_count: int,
+    label: str,
+) -> None:
+    if bank.media_entry(index=index).media_id != media_id:
+        raise BuildError(f"{label} DIDX #{index} Media ID differs")
+    payload = soundbank_editor.validate_wem(bank.extract_media(index=index))
+    if len(payload) < 12 or payload[:4] != b"RIFF" or payload[8:12] != b"WAVE":
+        raise BuildError(f"{label} is not a RIFF/WAVE WEM")
+
+    chunks: dict[bytes, bytes] = {}
+    position = 12
+    while position + 8 <= len(payload):
+        tag = payload[position : position + 4]
+        size = struct.unpack_from("<I", payload, position + 4)[0]
+        start = position + 8
+        end = start + size
+        if end > len(payload):
+            raise BuildError(f"{label} contains an out-of-bounds RIFF chunk")
+        chunks.setdefault(tag, payload[start:end])
+        position = end + (size & 1)
+
+    expected_fmt = bytes.fromhex(
+        "feff010080bb000000770100020010000600000001410000"
+    )
+    if chunks.get(b"fmt ") != expected_fmt:
+        raise BuildError(
+            f"{label} must be 48 kHz, 16-bit mono Wwise PCM with channel config "
+            "000001410000"
+        )
+    data = chunks.get(b"data")
+    if data is None or len(data) != sample_count * 2:
+        actual = None if data is None else len(data) // 2
+        raise BuildError(
+            f"{label} expected {sample_count} mono PCM samples but found {actual}"
+        )
+
+
+def validate_charged_shelling(staged: Mapping[Path, Path]) -> None:
+    """Require the three charge-start routes and both migrated voice layers."""
+
+    lmt = soundbank_editor.LmtFile.from_file(
+        _path(staged, LMT_TARGET, "charged shelling")
+    )
+    wwev = soundbank_editor.WwevFile.from_file(
+        _path(staged, WWEV_TARGET, "charged shelling")
+    )
+    common_bank = soundbank_editor.SoundBankEditor.from_file(
+        _path(staged, BANK_TARGET, "charged shelling")
+    )
+    shell_bank = soundbank_editor.SoundBankEditor.from_file(
+        _path(staged, SHELL_BANK_TARGET, "charged shelling")
+    )
+
+    if (
+        CHARGED_SHELLING_LMT_REQUEST != CHARGED_SHELLING_NEW_REQUEST
+        or CHARGED_SHELLING_EVENT_ID != CHARGED_SHELLING_NEW_EVENT_ID
+    ):
+        raise BuildError("charged-shelling LMT, WWEV, and Bank IDs diverged")
+
+    donor = wwev.record(CHARGED_SHELLING_DONOR_REQUEST)
+    if (
+        donor.index,
+        donor.mode,
+        donor.event_id,
+        donor.sha256,
+    ) != (
+        17,
+        CHARGED_SHELLING_DONOR_MODE,
+        CHARGED_SHELLING_DONOR_EVENT_ID,
+        CHARGED_SHELLING_DONOR_RECORD_SHA256,
+    ):
+        raise BuildError("charged-shelling original WWEV donor record changed")
+    record = wwev.record(CHARGED_SHELLING_NEW_REQUEST)
+    if (
+        record.index,
+        record.mode,
+        record.event_id,
+        record.sha256,
+    ) != (
+        46,
+        CHARGED_SHELLING_DONOR_MODE,
+        CHARGED_SHELLING_NEW_EVENT_ID,
+        CHARGED_SHELLING_NEW_RECORD_SHA256,
+    ) or len(wwev.records) != 46:
+        raise BuildError("charged-shelling appended WWEV record differs from its guard")
+
+    all_routes = lmt.triggered_requests(wwev)
+    routes = tuple(
+        route
+        for route in all_routes
+        if route.request_no == CHARGED_SHELLING_NEW_REQUEST
+        or route.event_id == CHARGED_SHELLING_NEW_EVENT_ID
+    )
+    expected_routes = tuple(
+        soundbank_editor.TriggeredRequest(
+            motion_id=motion_id,
+            frame_count=frame_count,
+            timl_offset=timl_offset,
+            shared_timl_motions=(motion_id,),
+            event_group=CHARGED_SHELLING_EVENT_GROUP,
+            trigger_frame=1.0,
+            trigger_mask=0x02,
+            slot=CHARGED_SHELLING_SLOT,
+            request_no=CHARGED_SHELLING_NEW_REQUEST,
+            wwev_record=46,
+            wwev_mode=CHARGED_SHELLING_DONOR_MODE,
+            event_id=CHARGED_SHELLING_NEW_EVENT_ID,
+        )
+        for motion_id, frame_count, timl_offset in (
+            (132, 79, 0xFE820),
+            (133, 65, 0x101280),
+            (134, 79, 0x1046A0),
+        )
+    )
+    if CHARGED_SHELLING_MOTION_IDS != (132, 133, 134) or routes != expected_routes:
+        raise BuildError(
+            "charged shelling expected exactly the Motion 132–134 frame-1 Divine "
+            f"routes; found {routes!r}"
+        )
+
+    adjustment_routes = tuple(
+        route
+        for route in all_routes
+        if route.motion_id in (139, 140, 141, 142)
+        and route.event_group == CHARGED_SHELLING_EVENT_GROUP
+        and route.trigger_frame == 1.0
+        and route.slot == CHARGED_SHELLING_SLOT
+    )
+    expected_adjustments = tuple(
+        soundbank_editor.TriggeredRequest(
+            motion_id=motion_id,
+            frame_count=21,
+            timl_offset=timl_offset,
+            shared_timl_motions=(motion_id,),
+            event_group=CHARGED_SHELLING_EVENT_GROUP,
+            trigger_frame=1.0,
+            trigger_mask=0x02,
+            slot=CHARGED_SHELLING_SLOT,
+            request_no=CHARGED_SHELLING_DONOR_REQUEST,
+            wwev_record=17,
+            wwev_mode=CHARGED_SHELLING_DONOR_MODE,
+            event_id=CHARGED_SHELLING_DONOR_EVENT_ID,
+        )
+        for motion_id, timl_offset in (
+            (139, 0x1155B0),
+            (140, 0x1176D0),
+            (141, 0x1199E0),
+            (142, 0x11BB50),
+        )
+    )
+    if adjustment_routes != expected_adjustments:
+        raise BuildError(
+            "charged-shelling Motion 139–142 posture adjustments no longer preserve "
+            f"the original route; found {adjustment_routes!r}"
+        )
+
+    validate_charged_shelling_divine_hirc(common_bank)
+    validate_charged_shelling_hirc(shell_bank)
+    _validate_mono_wwise_pcm(
+        common_bank,
+        index=CHARGED_SHELLING_DIVINE_MEDIA_INDEX,
+        media_id=CHARGED_SHELLING_DIVINE_MEDIA_ID,
+        sample_count=42_000,
+        label="charged-shelling Divine",
+    )
+    _validate_mono_wwise_pcm(
+        shell_bank,
+        index=CHARGED_SHELLING_BUSTER_MEDIA_INDICES[0],
+        media_id=CHARGED_SHELLING_BUSTER_MEDIA_IDS[0],
+        sample_count=54_000,
+        label="charged-shelling Buster",
+    )
+
+
+CHARGED_SHELLING_VALIDATOR = BundleValidator(
+    name="charged_shelling_route",
+    design_id="wp07_gun_epvsp_shell.charged_shelling",
+    validate=validate_charged_shelling,
 )

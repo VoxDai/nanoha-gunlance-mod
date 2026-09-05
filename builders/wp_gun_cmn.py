@@ -1,4 +1,4 @@
-"""Build stationary-draw, overhead-smash, reload, and wide-sweep voice routes."""
+"""Build shared gunlance voice routes, including charged-shelling start."""
 
 from __future__ import annotations
 
@@ -131,6 +131,37 @@ WIDE_SWEEP_RANDOM_SHA256 = (
 )
 WIDE_SWEEP_UNUSED_EVENT_IDS = (1_359_210_849, 2_281_439_929)
 
+CHARGED_SHELLING_DIVINE_MEDIA_ID = 370_615_719
+CHARGED_SHELLING_DIVINE_SOUND_ID = 3_754_878_246
+CHARGED_SHELLING_ORIGINAL_ROUTE_ACTION_ID = 1_005_770_249
+CHARGED_SHELLING_DIVINE_ACTION_ID = 583_060_699
+CHARGED_SHELLING_EVENT_ID = 3_452_820_647
+CHARGED_SHELLING_DIVINE_MEDIA_INDEX = 45
+CHARGED_SHELLING_ORIGINAL_EVENT_SHA256 = (
+    "cdf654b3ef9e93d51971da97cc9479fcfd85ad8baaa6923f1a94bb6784844f15"
+)
+CHARGED_SHELLING_ORIGINAL_ACTION_SHA256 = (
+    "6c8f6ba1362064c06db17ed2248d1f9f288a3f0459caba8c77131d8b487c810a"
+)
+CHARGED_SHELLING_DIVINE_SOUND_SHA256 = (
+    "3fbe7ab23615d1874c72199690b960a83d8e82336f28250e0d81435d8fafae68"
+)
+CHARGED_SHELLING_ORIGINAL_ROUTE_ACTION_SHA256 = (
+    "c87314f918eb3d617c61c98cf8842b0132f85e688d3ad0e8d10da6d1d41bafca"
+)
+CHARGED_SHELLING_DIVINE_ACTION_SHA256 = (
+    "b57a2ba89422dc92d69e34539937d1235313c73ca9e8c608f1ee46e9c7008357"
+)
+CHARGED_SHELLING_EVENT_SHA256 = (
+    "0f68a177b5564488dbf983fc508e4525b34e1cee47ff8b40e8c2f0659a0793b5"
+)
+CHARGED_SHELLING_NATIVE_PARENT_GUARDS = (
+    (soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, 522_283_251, 768_813_060),
+    (soundbank_editor.HIRC_ACTOR_MIXER, 768_813_060, 972_300_144),
+    (soundbank_editor.HIRC_ACTOR_MIXER, 972_300_144, 694_534_885),
+    (soundbank_editor.HIRC_ACTOR_MIXER, 694_534_885, 0),
+)
+
 
 def _guard_stationary_draw_original(bank: soundbank_editor.SoundBankEditor) -> None:
     editor = bank.hirc
@@ -218,8 +249,6 @@ def validate_wide_sweep_hirc(bank: soundbank_editor.SoundBankEditor) -> None:
 
     _guard_wide_sweep_original(bank)
     editor = bank.hirc
-    if len(editor.objects()) != 148 or len(editor.build()) != 8394:
-        raise soundbank_editor.SoundBankError("wide-sweep combined HIRC counts differ")
     random_body = editor.object_body(soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WIDE_SWEEP_RANDOM_ID)
     if (
         hashlib.sha256(random_body).hexdigest() != WIDE_SWEEP_RANDOM_SHA256
@@ -249,6 +278,211 @@ def validate_wide_sweep_hirc(bank: soundbank_editor.SoundBankEditor) -> None:
     ordered = (*WIDE_SWEEP_SOUND_IDS, WIDE_SWEEP_RANDOM_ID, *actions, WIDE_SWEEP_EVENT_ID)
     if any(positions[left] >= positions[right] for left, right in zip(ordered, ordered[1:])):
         raise soundbank_editor.SoundBankError("wide-sweep HIRC serialization order differs")
+
+
+def _event_referenced_stop_targets(
+    editor: soundbank_editor.HircEditor,
+) -> frozenset[int]:
+    event_action_ids = {
+        action_id
+        for item in editor.objects()
+        if item.object_type == soundbank_editor.HIRC_EVENT
+        for action_id in editor.event_actions(item.object_id)
+    }
+    targets: set[int] = set()
+    for item in editor.objects():
+        if (
+            item.object_type != soundbank_editor.HIRC_ACTION
+            or item.object_id not in event_action_ids
+        ):
+            continue
+        body = editor.object_body(soundbank_editor.HIRC_ACTION, item.object_id)
+        if (
+            len(body) >= 10
+            and struct.unpack_from("<H", body, 4)[0]
+            == soundbank_editor.ACTION_STOP
+        ):
+            targets.add(struct.unpack_from("<I", body, 6)[0])
+    return frozenset(targets)
+
+
+def _guard_charged_shelling_divine_original(
+    bank: soundbank_editor.SoundBankEditor,
+) -> None:
+    editor = bank.hirc
+    original_event = editor.object_body(soundbank_editor.HIRC_EVENT, ORIGINAL_EVENT_ID)
+    original_action = editor.object_body(
+        soundbank_editor.HIRC_ACTION, ORIGINAL_EVENT_ACTION_ID
+    )
+    if (
+        bank.media_entry(index=27).media_id != DONOR_MEDIA_ID
+        or editor.event_actions(ORIGINAL_EVENT_ID) != (ORIGINAL_EVENT_ACTION_ID,)
+        or hashlib.sha256(original_event).hexdigest()
+        != CHARGED_SHELLING_ORIGINAL_EVENT_SHA256
+        or hashlib.sha256(original_action).hexdigest()
+        != CHARGED_SHELLING_ORIGINAL_ACTION_SHA256
+        or original_action
+        != editor.create_play_action(
+            ORIGINAL_EVENT_ACTION_ID, STATIONARY_RANDOM_DONOR_ID, bank.bank_id
+        )
+    ):
+        raise soundbank_editor.SoundBankError(
+            "charged-shelling Divine donor Event, Action, or media changed"
+        )
+
+    for object_type, object_id, expected_parent_id in (
+        CHARGED_SHELLING_NATIVE_PARENT_GUARDS
+    ):
+        body = editor.object_body(object_type, object_id)
+        if len(body) < 15 or struct.unpack_from("<I", body, 11)[0] != expected_parent_id:
+            raise soundbank_editor.SoundBankError(
+                f"charged-shelling Divine native parent chain differs at {object_id}"
+            )
+    native_chain = {
+        item
+        for _, object_id, parent_id in CHARGED_SHELLING_NATIVE_PARENT_GUARDS
+        for item in (object_id, parent_id)
+        if item
+    }
+    if _event_referenced_stop_targets(editor) & native_chain:
+        raise soundbank_editor.SoundBankError(
+            "charged-shelling Divine donor route unexpectedly has a matching Stop"
+        )
+
+
+def validate_charged_shelling_divine_hirc(
+    bank: soundbank_editor.SoundBankEditor,
+) -> None:
+    """Verify the isolated charge-start original delegation and Divine overlay."""
+
+    _guard_charged_shelling_divine_original(bank)
+    editor = bank.hirc
+    if len(editor.objects()) != 152 or len(editor.build()) != 8_507:
+        raise soundbank_editor.SoundBankError(
+            "charged-shelling Divine combined HIRC count or payload size differs"
+        )
+
+    sound_body = editor.object_body(
+        soundbank_editor.HIRC_SOUND, CHARGED_SHELLING_DIVINE_SOUND_ID
+    )
+    original_route = editor.object_body(
+        soundbank_editor.HIRC_ACTION, CHARGED_SHELLING_ORIGINAL_ROUTE_ACTION_ID
+    )
+    divine_action = editor.object_body(
+        soundbank_editor.HIRC_ACTION, CHARGED_SHELLING_DIVINE_ACTION_ID
+    )
+    event_body = editor.object_body(
+        soundbank_editor.HIRC_EVENT, CHARGED_SHELLING_EVENT_ID
+    )
+    if (
+        bank.media_entry(index=CHARGED_SHELLING_DIVINE_MEDIA_INDEX).media_id
+        != CHARGED_SHELLING_DIVINE_MEDIA_ID
+        or sound_body
+        != standard_voice_sound_body(
+            CHARGED_SHELLING_DIVINE_SOUND_ID,
+            CHARGED_SHELLING_DIVINE_MEDIA_ID,
+        )
+        or hashlib.sha256(sound_body).hexdigest()
+        != CHARGED_SHELLING_DIVINE_SOUND_SHA256
+        or editor.pitch_settings(
+            soundbank_editor.HIRC_SOUND, CHARGED_SHELLING_DIVINE_SOUND_ID
+        )
+        != soundbank_editor.HircPitchSettings(None, None)
+        or original_route
+        != editor.create_play_event_action(
+            CHARGED_SHELLING_ORIGINAL_ROUTE_ACTION_ID, ORIGINAL_EVENT_ID
+        )
+        or hashlib.sha256(original_route).hexdigest()
+        != CHARGED_SHELLING_ORIGINAL_ROUTE_ACTION_SHA256
+        or divine_action
+        != editor.create_play_action(
+            CHARGED_SHELLING_DIVINE_ACTION_ID,
+            CHARGED_SHELLING_DIVINE_SOUND_ID,
+            bank.bank_id,
+        )
+        or hashlib.sha256(divine_action).hexdigest()
+        != CHARGED_SHELLING_DIVINE_ACTION_SHA256
+        or editor.event_actions(CHARGED_SHELLING_EVENT_ID)
+        != (
+            CHARGED_SHELLING_ORIGINAL_ROUTE_ACTION_ID,
+            CHARGED_SHELLING_DIVINE_ACTION_ID,
+        )
+        or hashlib.sha256(event_body).hexdigest() != CHARGED_SHELLING_EVENT_SHA256
+    ):
+        raise soundbank_editor.SoundBankError(
+            "charged-shelling Divine Sound, Action, Event, or media differs"
+        )
+
+    positions = {item.object_id: item.index for item in editor.objects()}
+    ordered = (
+        CHARGED_SHELLING_DIVINE_SOUND_ID,
+        CHARGED_SHELLING_ORIGINAL_ROUTE_ACTION_ID,
+        CHARGED_SHELLING_DIVINE_ACTION_ID,
+        CHARGED_SHELLING_EVENT_ID,
+        ORIGINAL_EVENT_ID,
+    )
+    if any(positions[left] >= positions[right] for left, right in zip(ordered, ordered[1:])):
+        raise soundbank_editor.SoundBankError(
+            "charged-shelling Divine HIRC serialization order differs"
+        )
+    if CHARGED_SHELLING_DIVINE_SOUND_ID in _event_referenced_stop_targets(editor):
+        raise soundbank_editor.SoundBankError(
+            "charged-shelling Divine unexpectedly received a Stop Action"
+        )
+
+
+def _apply_charged_shelling_divine(
+    bank: soundbank_editor.SoundBankEditor,
+) -> None:
+    editor = bank.hirc
+    if (
+        bank.media_entry(index=CHARGED_SHELLING_DIVINE_MEDIA_INDEX).media_id
+        != CHARGED_SHELLING_DIVINE_MEDIA_ID
+    ):
+        raise soundbank_editor.SoundBankError(
+            "charged-shelling Divine DIDX identity differs"
+        )
+    insert_standard_voice_sound(
+        editor,
+        CHARGED_SHELLING_DIVINE_SOUND_ID,
+        CHARGED_SHELLING_DIVINE_MEDIA_ID,
+        label="insert charged-shelling Divine standard voice Sound",
+    )
+    original_route = editor.create_play_event_action(
+        CHARGED_SHELLING_ORIGINAL_ROUTE_ACTION_ID, ORIGINAL_EVENT_ID
+    )
+    editor.insert_object(
+        soundbank_editor.HIRC_ACTION,
+        CHARGED_SHELLING_ORIGINAL_ROUTE_ACTION_ID,
+        original_route[4:],
+        before=(soundbank_editor.HIRC_EVENT, ORIGINAL_EVENT_ID),
+        label="add charged-shelling original-route PlayEvent Action",
+    )
+    divine_action = editor.create_play_action(
+        CHARGED_SHELLING_DIVINE_ACTION_ID,
+        CHARGED_SHELLING_DIVINE_SOUND_ID,
+        bank.bank_id,
+    )
+    editor.insert_object(
+        soundbank_editor.HIRC_ACTION,
+        CHARGED_SHELLING_DIVINE_ACTION_ID,
+        divine_action[4:],
+        before=(soundbank_editor.HIRC_EVENT, ORIGINAL_EVENT_ID),
+        label="add charged-shelling Divine Play Action",
+    )
+    editor.insert_object(
+        soundbank_editor.HIRC_EVENT,
+        CHARGED_SHELLING_EVENT_ID,
+        struct.pack(
+            "<III",
+            2,
+            CHARGED_SHELLING_ORIGINAL_ROUTE_ACTION_ID,
+            CHARGED_SHELLING_DIVINE_ACTION_ID,
+        ),
+        before=(soundbank_editor.HIRC_EVENT, ORIGINAL_EVENT_ID),
+        label="add isolated charged-shelling start Event",
+    )
+    validate_charged_shelling_divine_hirc(bank)
 
 
 def _apply_wide_sweep(bank: soundbank_editor.SoundBankEditor) -> None:
@@ -287,6 +521,8 @@ def _apply_wide_sweep(bank: soundbank_editor.SoundBankEditor) -> None:
         label="add isolated frame-11 wide-sweep Event",
     )
     validate_wide_sweep_hirc(bank)
+    if len(editor.objects()) != 148 or len(editor.build()) != 8_394:
+        raise soundbank_editor.SoundBankError("wide-sweep combined HIRC counts differ")
 
 
 def _apply_stationary_draw(bank: soundbank_editor.SoundBankEditor) -> None:
@@ -434,8 +670,9 @@ def validate_overhead_smash_hirc(bank: soundbank_editor.SoundBankEditor) -> None
 
 
 def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
-    """Create isolated action routes and append the shared reload Event Action."""
+    """Create the reviewed shared-Bank voice routes in deterministic order."""
 
+    _guard_charged_shelling_divine_original(bank)
     _apply_stationary_draw(bank)
     editor = bank.hirc
 
@@ -638,6 +875,7 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
     )
     _validate_reload_hirc(bank)
     _apply_wide_sweep(bank)
+    _apply_charged_shelling_divine(bank)
 
 
 EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
@@ -654,6 +892,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (42, STATIONARY_MEDIA_IDS[4]),
         (43, STATIONARY_MEDIA_IDS[5]),
         (44, OVERHEAD_MEDIA_IDS[1]),
+        (45, CHARGED_SHELLING_DIVINE_MEDIA_ID),
     ),
     hirc_changed_bytes=21,
     added_hirc_objects=(
@@ -682,11 +921,18 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (soundbank_editor.HIRC_ACTION, WIDE_SWEEP_ORIGINAL_ROUTE_ACTION_ID),
         (soundbank_editor.HIRC_ACTION, WIDE_SWEEP_VOICE_ACTION_ID),
         (soundbank_editor.HIRC_EVENT, WIDE_SWEEP_EVENT_ID),
+        (soundbank_editor.HIRC_SOUND, CHARGED_SHELLING_DIVINE_SOUND_ID),
+        (
+            soundbank_editor.HIRC_ACTION,
+            CHARGED_SHELLING_ORIGINAL_ROUTE_ACTION_ID,
+        ),
+        (soundbank_editor.HIRC_ACTION, CHARGED_SHELLING_DIVINE_ACTION_ID),
+        (soundbank_editor.HIRC_EVENT, CHARGED_SHELLING_EVENT_ID),
     ),
     resized_hirc_objects=(
         (soundbank_editor.HIRC_EVENT, RELOAD_EVENT_ID, 12, 16),
     ),
-    hirc_size_delta=1144,
+    hirc_size_delta=1257,
 )
 
 
@@ -697,6 +943,7 @@ PLAN = SoundBankBuildPlan(
         "wp_gun_cmn.overhead_smash",
         "wp_gun_cmn.reload",
         "wp_gun_cmn.wide_sweep",
+        "wp07_gun_epvsp_shell.charged_shelling",
     ),
     source="original/nbnk/wp_gun_cmn.nbnk",
     target="sound/wwise/Windows/wp_gun_cmn.nbnk",
@@ -775,6 +1022,13 @@ PLAN = SoundBankBuildPlan(
             "audio/wp_gun_cmn/overhead_smash/"
             "nanoha_accel_02(gears_of_destiny.attack_voice.attack_03.1+"
             "movie_2nd_as.nanoha.accel_shooter.1).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            CHARGED_SHELLING_DIVINE_MEDIA_INDEX,
+            CHARGED_SHELLING_DIVINE_MEDIA_ID,
+            "audio/wp07_gun_epvsp_shell/charged_shelling/"
+            "nanoha_divine_01(battle_of_aces.attack_004.1).wav",
             wem_channels=1,
         ),
     ),

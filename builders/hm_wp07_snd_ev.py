@@ -1,4 +1,4 @@
-"""Build isolated stationary-draw and wide-sweep requests, preserving native routes."""
+"""Build reviewed isolated weapon-sound requests, preserving native routes."""
 
 from __future__ import annotations
 
@@ -35,9 +35,19 @@ WIDE_SWEEP_NEW_RECORD_SHA256 = (
     "d4a45c5e6c512f1b9688decbe9ad966e606a5674b7307ad469e6a8c60a9b8637"
 )
 
+CHARGED_SHELLING_DONOR_REQUEST = DONOR_REQUEST
+CHARGED_SHELLING_DONOR_EVENT_ID = DONOR_EVENT_ID
+CHARGED_SHELLING_DONOR_MODE = DONOR_MODE
+CHARGED_SHELLING_DONOR_RECORD_SHA256 = DONOR_RECORD_SHA256
+CHARGED_SHELLING_NEW_REQUEST = 6599
+CHARGED_SHELLING_NEW_EVENT_ID = 3_452_820_647
+CHARGED_SHELLING_NEW_RECORD_SHA256 = (
+    "0b6c6e87c3c78c669ac6bc6cd09112c54445e7bce5401380fc68e2fad136e8ee"
+)
+
 
 def apply_edits(editor: soundbank_editor.WwevEditor) -> None:
-    """Clone both single-record donors and preserve all original records."""
+    """Clone the three reviewed single-record donors and preserve originals."""
 
     editor.append_cloned_record(
         donor_request=DONOR_REQUEST,
@@ -55,12 +65,20 @@ def apply_edits(editor: soundbank_editor.WwevEditor) -> None:
         new_request=WIDE_SWEEP_NEW_REQUEST,
         new_event_id=WIDE_SWEEP_NEW_EVENT_ID,
     )
+    editor.append_cloned_record(
+        donor_request=CHARGED_SHELLING_DONOR_REQUEST,
+        expected_donor_event_id=CHARGED_SHELLING_DONOR_EVENT_ID,
+        expected_donor_mode=CHARGED_SHELLING_DONOR_MODE,
+        expected_donor_sha256=CHARGED_SHELLING_DONOR_RECORD_SHA256,
+        new_request=CHARGED_SHELLING_NEW_REQUEST,
+        new_event_id=CHARGED_SHELLING_NEW_EVENT_ID,
+    )
 
 
 EXPECTED_SUMMARY = soundbank_editor.WwevEditSummary(
     record_count_before=43,
-    record_count_after=45,
-    appended_size=258,
+    record_count_after=46,
+    appended_size=387,
     edits=(
         soundbank_editor.WwevRecordEdit(
             donor_record_index=17,
@@ -80,6 +98,15 @@ EXPECTED_SUMMARY = soundbank_editor.WwevEditSummary(
             new_event_id=WIDE_SWEEP_NEW_EVENT_ID,
             appended_size=129,
         ),
+        soundbank_editor.WwevRecordEdit(
+            donor_record_index=17,
+            donor_request=CHARGED_SHELLING_DONOR_REQUEST,
+            donor_event_id=CHARGED_SHELLING_DONOR_EVENT_ID,
+            added_record_index=46,
+            new_request=CHARGED_SHELLING_NEW_REQUEST,
+            new_event_id=CHARGED_SHELLING_NEW_EVENT_ID,
+            appended_size=129,
+        ),
     ),
 )
 
@@ -90,6 +117,7 @@ PLAN = WwevBuildPlan(
         "wp_gun_cmn.stationary_draw",
         "wp_gun_cmn.overhead_smash",
         "wp_gun_cmn.wide_sweep",
+        "wp07_gun_epvsp_shell.charged_shelling",
     ),
     source="original/wwev/hm_wp07_snd_ev.wwev",
     target="sound/pl/hm_wp07_snd_ev.wwev",
