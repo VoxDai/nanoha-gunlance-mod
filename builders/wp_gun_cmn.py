@@ -50,6 +50,18 @@ POSITIONING_VECTOR_OFFSET = 0x2A
 
 OVERHEAD_VOICE_MEDIA_ID = 1_280_643_898
 OVERHEAD_VOICE_SOUND_ID = 1_643_477_631
+OVERHEAD_MEDIA_IDS = (OVERHEAD_VOICE_MEDIA_ID, 1_779_645_041)
+OVERHEAD_SOUND_IDS = (OVERHEAD_VOICE_SOUND_ID, 3_476_329_532)
+OVERHEAD_MEDIA_INDICES = (35, 44)
+OVERHEAD_RANDOM_ID = 1_487_507_844
+OVERHEAD_PLAYLIST = tuple((sound_id, 50_000) for sound_id in OVERHEAD_SOUND_IDS)
+OVERHEAD_RANDOM_DONOR_ID = 570_218_704
+OVERHEAD_RANDOM_DONOR_SHA256 = (
+    "be0beffcec2f1a026d5bea182c34c2fbfcb2a129b1b4efa8c33146bfeb046427"
+)
+OVERHEAD_RANDOM_SHA256 = (
+    "14d8a2b8bc85006842ce55cc6be9a29941d92baee5047b3ce049baedabada0f8"
+)
 OBSOLETE_OVERHEAD_ORIGINAL_ROUTE_ACTION_ID = 2_557_911_997
 OVERHEAD_VOICE_ACTION_ID = 3_750_542_142
 OVERHEAD_SILENT_PRIME_ACTION_ID = 2_176_868_439
@@ -206,7 +218,7 @@ def validate_wide_sweep_hirc(bank: soundbank_editor.SoundBankEditor) -> None:
 
     _guard_wide_sweep_original(bank)
     editor = bank.hirc
-    if len(editor.objects()) != 146 or len(editor.build()) != 8243:
+    if len(editor.objects()) != 148 or len(editor.build()) != 8394:
         raise soundbank_editor.SoundBankError("wide-sweep combined HIRC counts differ")
     random_body = editor.object_body(soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WIDE_SWEEP_RANDOM_ID)
     if (
@@ -370,6 +382,57 @@ def _validate_reload_hirc(bank: soundbank_editor.SoundBankEditor) -> None:
         )
 
 
+def validate_overhead_smash_hirc(bank: soundbank_editor.SoundBankEditor) -> None:
+    """Verify both Accel choices, inherited Pitch, and silent-prime load order."""
+
+    editor = bank.hirc
+    random_body = editor.object_body(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, OVERHEAD_RANDOM_ID
+    )
+    if (
+            hashlib.sha256(random_body).hexdigest() != OVERHEAD_RANDOM_SHA256
+            or editor.pitch_settings(soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, OVERHEAD_RANDOM_ID)
+            != soundbank_editor.HircPitchSettings(None, (-50.0, 50.0))
+    ):
+        raise soundbank_editor.SoundBankError(
+            "overhead-smash Random weights, repeat, parent, or Pitch differ"
+        )
+    for index, sound_id, media_id in zip(
+            OVERHEAD_MEDIA_INDICES, OVERHEAD_SOUND_IDS, OVERHEAD_MEDIA_IDS, strict=True
+    ):
+        if (
+                bank.media_entry(index=index).media_id != media_id
+                or editor.object_body(soundbank_editor.HIRC_SOUND, sound_id)
+                != standard_voice_sound_body(sound_id, media_id, direct_parent_id=OVERHEAD_RANDOM_ID)
+                or editor.pitch_settings(soundbank_editor.HIRC_SOUND, sound_id)
+                != soundbank_editor.HircPitchSettings(None, None)
+        ):
+            raise soundbank_editor.SoundBankError(
+                "overhead-smash voice Sound, inherited Pitch, or DIDX order differs"
+            )
+    actions = (OVERHEAD_SILENT_PRIME_ACTION_ID, OVERHEAD_VOICE_ACTION_ID)
+    if (
+            editor.event_actions(OVERHEAD_VOICE_EVENT_ID) != actions
+            or editor.event_actions(OVERHEAD_SILENT_EVENT_ID) != ()
+            or editor.object_body(soundbank_editor.HIRC_ACTION, actions[0])
+            != editor.create_play_event_action(actions[0], OVERHEAD_SILENT_EVENT_ID)
+            or editor.object_body(soundbank_editor.HIRC_ACTION, actions[1])
+            != editor.create_play_action(actions[1], OVERHEAD_RANDOM_ID, bank.bank_id)
+            or OBSOLETE_OVERHEAD_ORIGINAL_ROUTE_ACTION_ID in editor.object_ids
+    ):
+        raise soundbank_editor.SoundBankError(
+            "overhead-smash silent prime or Random Play route differs"
+        )
+    positions = {obj.object_id: obj.index for obj in editor.objects()}
+    ordered = (
+        *OVERHEAD_SOUND_IDS, OVERHEAD_RANDOM_ID, OVERHEAD_VOICE_ACTION_ID,
+        OVERHEAD_SILENT_PRIME_ACTION_ID, OVERHEAD_SILENT_EVENT_ID,
+        OVERHEAD_VOICE_EVENT_ID, OVERHEAD_ORIGINAL_EVENT_ID,
+    )
+    if any(positions[left] >= positions[right] for left, right in zip(ordered, ordered[1:])):
+        raise soundbank_editor.SoundBankError("overhead-smash HIRC serialization order differs")
+
+
 def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
     """Create isolated action routes and append the shared reload Event Action."""
 
@@ -417,15 +480,34 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
             "overhead-smash donor Sound topology differs from its design guard"
         )
 
-    insert_standard_voice_sound(
-        editor,
-        OVERHEAD_VOICE_SOUND_ID,
-        OVERHEAD_VOICE_MEDIA_ID,
-        label="insert standard overhead-smash custom-voice Sound",
+    random_donor = editor.object_body(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, OVERHEAD_RANDOM_DONOR_ID
+    )
+    if hashlib.sha256(random_donor).hexdigest() != OVERHEAD_RANDOM_DONOR_SHA256:
+        raise soundbank_editor.SoundBankError("overhead-smash Random donor changed")
+    for sound_id, media_id in zip(OVERHEAD_SOUND_IDS, OVERHEAD_MEDIA_IDS, strict=True):
+        bank.media_entry(media_id=media_id)
+        insert_standard_voice_sound(
+            editor, sound_id, media_id, direct_parent_id=OVERHEAD_RANDOM_ID,
+            label="insert standard overhead-smash custom-voice Sound",
+        )
+    editor.clone_random_sequence_container(
+        OVERHEAD_RANDOM_DONOR_ID, OVERHEAD_RANDOM_ID, OVERHEAD_PLAYLIST,
+        expected_playlist=((647_150_707, 50_000),), expected_avoid_repeat_count=1,
+        avoid_repeat_count=0, label="clone uniform one-shot overhead-smash Random",
+    )
+    editor.patch_u32(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, OVERHEAD_RANDOM_ID, 0x0B,
+        768_813_060, STANDARD_VOICE_PARENT_ID, label="parent overhead-smash Random to voice mixer",
+    )
+    editor.set_pitch(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, OVERHEAD_RANDOM_ID,
+        expected=soundbank_editor.HircPitchSettings(None, (-50.0, 50.0)),
+        random_range_cents=(-50.0, 50.0),
     )
 
     overhead_voice = editor.create_play_action(
-        OVERHEAD_VOICE_ACTION_ID, OVERHEAD_VOICE_SOUND_ID, bank.bank_id
+        OVERHEAD_VOICE_ACTION_ID, OVERHEAD_RANDOM_ID, bank.bank_id
     )
     editor.insert_object(
         soundbank_editor.HIRC_ACTION,
@@ -464,6 +546,7 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
         before=(soundbank_editor.HIRC_EVENT, OVERHEAD_ORIGINAL_EVENT_ID),
         label="add overhead-smash character-voice replacement Event",
     )
+    validate_overhead_smash_hirc(bank)
 
     bank.media_entry(media_id=RELOAD_VOICE_MEDIA_ID)
     if bank.media_entry(index=RELOAD_DONOR_MEDIA_INDEX).media_id != RELOAD_DONOR_MEDIA_ID:
@@ -570,8 +653,9 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (41, STATIONARY_MEDIA_IDS[3]),
         (42, STATIONARY_MEDIA_IDS[4]),
         (43, STATIONARY_MEDIA_IDS[5]),
+        (44, OVERHEAD_MEDIA_IDS[1]),
     ),
-    hirc_changed_bytes=17,
+    hirc_changed_bytes=21,
     added_hirc_objects=(
         (soundbank_editor.HIRC_SOUND, VOICE_SOUND_ID),
         (soundbank_editor.HIRC_SOUND, STATIONARY_SOUND_IDS[1]),
@@ -584,6 +668,8 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (soundbank_editor.HIRC_ACTION, VOICE_ACTION_ID),
         (soundbank_editor.HIRC_EVENT, VOICE_EVENT_ID),
         (soundbank_editor.HIRC_SOUND, OVERHEAD_VOICE_SOUND_ID),
+        (soundbank_editor.HIRC_SOUND, OVERHEAD_SOUND_IDS[1]),
+        (soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, OVERHEAD_RANDOM_ID),
         (soundbank_editor.HIRC_ACTION, OVERHEAD_VOICE_ACTION_ID),
         (soundbank_editor.HIRC_ACTION, OVERHEAD_SILENT_PRIME_ACTION_ID),
         (soundbank_editor.HIRC_EVENT, OVERHEAD_SILENT_EVENT_ID),
@@ -600,7 +686,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
     resized_hirc_objects=(
         (soundbank_editor.HIRC_EVENT, RELOAD_EVENT_ID, 12, 16),
     ),
-    hirc_size_delta=993,
+    hirc_size_delta=1144,
 )
 
 
@@ -682,6 +768,13 @@ PLAN = SoundBankBuildPlan(
             43, STATIONARY_MEDIA_IDS[5],
             "audio/wp_gun_cmn/stationary_draw/"
             "raising_heart_standby_ready_06(movie_1st.raising_heart.standby_ready_05.1).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            44, OVERHEAD_MEDIA_IDS[1],
+            "audio/wp_gun_cmn/overhead_smash/"
+            "nanoha_accel_02(gears_of_destiny.attack_voice.attack_03.1+"
+            "movie_2nd_as.nanoha.accel_shooter.1).wav",
             wem_channels=1,
         ),
     ),

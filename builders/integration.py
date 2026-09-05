@@ -59,15 +59,13 @@ from .wp_gun_cmn import (
     OVERHEAD_SILENT_PRIME_ACTION_ID,
     OVERHEAD_VOICE_ACTION_ID,
     OVERHEAD_VOICE_EVENT_ID,
-    OVERHEAD_VOICE_MEDIA_ID,
-    OVERHEAD_VOICE_SOUND_ID,
     VOICE_EVENT_ID,
     WIDE_SWEEP_EVENT_ID,
     WIDE_SWEEP_UNUSED_EVENT_IDS,
+    validate_overhead_smash_hirc,
     validate_stationary_draw_hirc,
     validate_wide_sweep_hirc,
 )
-from .voice_standard import standard_voice_sound_body
 
 
 LMT_TARGET = Path("hm/wp/wp07/mot/w07_00/w07_00.lmt")
@@ -318,43 +316,7 @@ def validate_overhead_smash(staged: Mapping[Path, Path]) -> None:
     ):
         raise BuildError("overhead smash original DIDX #13 identity changed")
 
-    voice_action = hirc.object_body(
-        soundbank_editor.HIRC_ACTION, OVERHEAD_VOICE_ACTION_ID
-    )
-    expected_voice_action = hirc.create_play_action(
-        OVERHEAD_VOICE_ACTION_ID, OVERHEAD_VOICE_SOUND_ID, bank.bank_id
-    )
-    if voice_action != expected_voice_action:
-        raise BuildError("overhead smash voice Action does not target the new Sound")
-    voice_sound = hirc.object_body(
-        soundbank_editor.HIRC_SOUND, OVERHEAD_VOICE_SOUND_ID
-    )
-    if voice_sound != standard_voice_sound_body(
-        OVERHEAD_VOICE_SOUND_ID, OVERHEAD_VOICE_MEDIA_ID
-    ):
-        raise BuildError("overhead smash voice Sound is not the standard custom-voice body")
-    if bank.media_entry(index=35).media_id != OVERHEAD_VOICE_MEDIA_ID:
-        raise BuildError("overhead smash added DIDX #35 identity changed")
-    if sum(
-        entry.media_id == OVERHEAD_VOICE_MEDIA_ID for entry in bank.entries
-    ) != 1:
-        raise BuildError("overhead smash voice Media ID is not unique")
-
-    positions = {
-        (item.object_type, item.object_id): index
-        for index, item in enumerate(hirc.objects())
-    }
-    if not (
-        positions[(soundbank_editor.HIRC_SOUND, OVERHEAD_VOICE_SOUND_ID)]
-        < positions[(soundbank_editor.HIRC_ACTION, OVERHEAD_VOICE_ACTION_ID)]
-        < positions[
-            (soundbank_editor.HIRC_ACTION, OVERHEAD_SILENT_PRIME_ACTION_ID)
-        ]
-        < positions[(soundbank_editor.HIRC_EVENT, OVERHEAD_SILENT_EVENT_ID)]
-        < positions[(soundbank_editor.HIRC_EVENT, OVERHEAD_VOICE_EVENT_ID)]
-        < positions[(soundbank_editor.HIRC_EVENT, OVERHEAD_ORIGINAL_EVENT_ID)]
-    ):
-        raise BuildError("overhead smash HIRC objects violate Wwise v120 load order")
+    validate_overhead_smash_hirc(soundbank_editor.SoundBankEditor(bank))
 
 
 OVERHEAD_SMASH_VALIDATOR = BundleValidator(
