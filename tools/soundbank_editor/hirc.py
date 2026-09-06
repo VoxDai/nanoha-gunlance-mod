@@ -1233,12 +1233,13 @@ class HircEditor:
             label: Diagnostic context.
 
         Raises:
-            SoundBankError: Version/lookup/guard/duplicate checks fail or whole-body
+            SoundBankError: Version/lookup/guard/duplicate/ownership checks fail or whole-body
                 replacement conflicts with prior Event field patches.
 
         Notes:
             Returns None. Rebuilds only the Event list; does not create/reorder the
-            Action. Bank validation separately checks Action-before-Event order.
+            Action. An Action cannot be shared with another Event in this Bank.
+            Bank validation separately checks ownership and Action-before-Event order.
         """
 
         self._require_v120(label)
@@ -1255,6 +1256,11 @@ class HircEditor:
             raise SoundBankError(
                 f"{label}: Event {event_id} already contains Action {action_id}"
             )
+        for item in self.objects():
+            if item.object_type == HIRC_EVENT and action_id in self.event_actions(item.object_id):
+                raise SoundBankError(
+                    f"{label}: Action {action_id} already belongs to Event {item.object_id}"
+                )
         expected_body = self.object_body(HIRC_EVENT, event_id)
         new_actions = actual_actions + (action_id,)
         replacement = struct.pack("<II", event_id, len(new_actions)) + struct.pack(
@@ -1352,6 +1358,60 @@ class HircEditor:
         body += b"\0"
         body += struct.pack("<B", _check_u8(fade_curve, "fade_curve"))
         body += struct.pack("<I", _check_u32(bank_id, "Bank ID"))
+        return bytes(body)
+
+    def create_stop_action(
+        self,
+        action_id: int,
+        target_id: int,
+        *,
+        delay_ms: int = 0,
+        transition_ms: int | None = None,
+        fade_curve: int = 0x04,
+    ) -> bytes:
+        """Construct a v120 Game Object Stop body with no exceptions.
+
+        Args:
+            action_id: Unsigned-32 Action identity, included in the returned body.
+            target_id: Unsigned-32 playback object identity; not a Media or Event ID.
+            delay_ms: Unsigned-32 delay; zero omits DelayTime.
+            transition_ms: Optional unsigned-32 fade duration in milliseconds.
+                None omits TransitionTime; zero encodes an explicit zero.
+            fade_curve: Wwise interpolation code 0–8; defaults to Linear (4).
+
+        Returns:
+            Complete immutable Stop_E_O (0x0103) body, including ID. The target
+            is not a bus; property randomizers and the exception list are empty.
+
+        Raises:
+            SoundBankError: Unsupported version or invalid numeric parameters.
+
+        Notes:
+            No IDs are reserved and no objects or Event references are inserted.
+            Target existence is checked by Bank validation, with explicit external
+            Stop declarations resolved separately against the actual Bank set.
+            Use clone_stop_action() to retain native donor-specific settings.
+        """
+
+        self._require_v120("create Stop Action")
+        delay_ms = _check_u32(delay_ms, "delay_ms")
+        fade_curve = _check_u8(fade_curve, "fade_curve")
+        if fade_curve > 8:
+            raise SoundBankError("fade_curve must be a Wwise interpolation code 0–8")
+        properties: list[tuple[int, int]] = []
+        if delay_ms:
+            properties.append((0x0F, delay_ms))
+        if transition_ms is not None:
+            properties.append((0x10, _check_u32(transition_ms, "transition_ms")))
+        body = bytearray(struct.pack(
+            "<IHI", _check_u32(action_id, "Action ID"), ACTION_STOP,
+            _check_u32(target_id, "target object ID"),
+        ))
+        body += bytes((0, len(properties)))
+        body += bytes(prop_id for prop_id, _ in properties)
+        for _, value in properties:
+            body += struct.pack("<I", value)
+        body += bytes((0, fade_curve)) + struct.pack("<I", 0)
         return bytes(body)
 
     def clone_stop_action(

@@ -9,7 +9,7 @@ Notes:
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import hashlib
 from pathlib import Path
@@ -34,6 +34,37 @@ from .hirc import (
 
 
 ALIGNMENT = 16
+
+
+@dataclass(frozen=True)
+class ExternalStopReference:
+    """One explicit v120 Stop edge to a Sound in a companion Bank.
+
+    Attributes:
+        action_id: Unsigned-32 Stop Action ID in the declaring Bank.
+        target_bank_id: Unsigned-32 identity of the Bank owning the Sound.
+        target_sound_id: Unsigned-32 identity of that Sound (not its media).
+        expected_body_sha256: Lowercase SHA-256 of the complete target Sound body.
+
+    Construction validates identities and hash syntax, not file availability.
+    Local validation checks the exact edge; validate_external_stop_references()
+    must resolve it against the actual final Bank set before bundle publication.
+    """
+
+    action_id: int
+    target_bank_id: int
+    target_sound_id: int
+    expected_body_sha256: str
+
+    def __post_init__(self) -> None:
+        for name in ("action_id", "target_bank_id", "target_sound_id"):
+            _check_u32(getattr(self, name), name)
+        digest = self.expected_body_sha256
+        if (
+            not isinstance(digest, str) or len(digest) != 64
+            or any(c not in "0123456789abcdef" for c in digest)
+        ):
+            raise SoundBankError("expected_body_sha256 must be 64 lowercase hex characters")
 
 
 @dataclass(frozen=True)
@@ -492,17 +523,32 @@ class SoundBankEditor:
         general rollback transaction. Individual methods document their checks.
     """
 
-    def __init__(self, bank: SoundBank):
+    def __init__(
+        self, bank: SoundBank, *,
+        external_stop_references: Sequence[ExternalStopReference] = (),
+    ):
         """Create independent working media and HIRC state from a parsed Bank.
 
         Args:
             bank: Original SoundBank whose source_path is retained for write protection.
+            external_stop_references: Exact external Stop edges permitted by local
+                validation; resolution against companion Banks remains required.
 
         Raises:
             SoundBankError: HIRC framing or reserved media identities are invalid.
         """
 
         self.original = bank
+        references = tuple(external_stop_references)
+        if any(not isinstance(ref, ExternalStopReference) for ref in references):
+            raise SoundBankError("external_stop_references must contain ExternalStopReference values")
+        if len({ref.action_id for ref in references}) != len(references):
+            raise SoundBankError("duplicate external Stop Action declaration")
+        if any(ref.target_bank_id == bank.bank_id for ref in references):
+            raise SoundBankError("external Stop target Bank must differ from the declaring Bank")
+        if references and bank.version != SUPPORTED_EDIT_VERSION:
+            raise SoundBankError("external Stop references require Wwise v120")
+        self._external_stop_references = references
         self._media = list(bank.entries)
         self._original_media_count = len(bank.entries)
         self._replaced_media: dict[int, bytes] = {}
@@ -514,11 +560,15 @@ class SoundBankEditor:
         )
 
     @classmethod
-    def from_file(cls, path: Path | str) -> SoundBankEditor:
+    def from_file(
+        cls, path: Path | str, *,
+        external_stop_references: Sequence[ExternalStopReference] = (),
+    ) -> SoundBankEditor:
         """Read and parse a file, retaining its resolved path for output protection.
 
         Args:
             path: Path or string filename of the input artifact.
+            external_stop_references: Explicit edges; see the constructor contract.
 
         Returns:
             New SoundBankEditor containing a parsed original and independent working state.
@@ -532,15 +582,19 @@ class SoundBankEditor:
             source_path even when output overwrite is enabled.
         """
 
-        return cls(SoundBank.from_file(path))
+        return cls(SoundBank.from_file(path), external_stop_references=external_stop_references)
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> SoundBankEditor:
+    def from_bytes(
+        cls, data: bytes, *,
+        external_stop_references: Sequence[ExternalStopReference] = (),
+    ) -> SoundBankEditor:
         """Parse immutable input bytes without recording a source filename.
 
         Args:
             data: Complete file as bytes; bytearray/memoryview are not accepted
                 by the underlying parsed-file factory.
+            external_stop_references: Explicit edges; see the constructor contract.
 
         Returns:
             New SoundBankEditor containing a parsed original and independent working state; source_path is None.
@@ -553,7 +607,13 @@ class SoundBankEditor:
             No file I/O occurs; source-path overwrite protection is unavailable.
         """
 
-        return cls(SoundBank.from_bytes(data))
+        return cls(SoundBank.from_bytes(data), external_stop_references=external_stop_references)
+
+    @property
+    def external_stop_references(self) -> tuple[ExternalStopReference, ...]:
+        """Immutable declarations; their presence does not prove external resolution."""
+
+        return self._external_stop_references
 
     @property
     def version(self) -> int:
@@ -939,6 +999,9 @@ class SoundBankEditor:
             No disk writes or editor mutation. Unknown HIRC semantics and all
             existing Container internals are not comprehensively validated. External
             decoding and game acceptance remain separate checks.
+            Explicit external Stop declarations are checked only against this
+            Bank's Actions. Call validate_external_stop_references() on the final
+            Bank set to resolve their Sound identities, ownership and body hashes.
         """
 
         rebuilt = SoundBank.from_bytes(self.build())
@@ -973,9 +1036,17 @@ class SoundBankEditor:
                 if item.object_type == HIRC_EVENT
             }
             object_ids = rebuilt_hirc.object_ids
+            external = {ref.action_id: ref for ref in self.external_stop_references}
+            owners: dict[int, int] = {}
             for item in hirc_objects:
                 if item.object_type == HIRC_EVENT:
                     for action_id in rebuilt_hirc.event_actions(item.object_id):
+                        if action_id in owners:
+                            raise SoundBankError(
+                                f"Action {action_id} already belongs to Event {owners[action_id]}; "
+                                f"cannot also attach to Event {item.object_id}"
+                            )
+                        owners[action_id] = item.object_id
                         if action_id not in action_ids:
                             raise SoundBankError(
                                 f"Event {item.object_id} references missing Action {action_id}"
@@ -990,6 +1061,16 @@ class SoundBankEditor:
                 elif item.object_type == HIRC_ACTION and len(item.body) >= 10:
                     action_type = struct.unpack_from("<H", item.body, 4)[0]
                     target_id = struct.unpack_from("<I", item.body, 6)[0]
+                    if item.object_id in external:
+                        ref = external[item.object_id]
+                        if (
+                            action_type != ACTION_STOP or target_id != ref.target_sound_id
+                            or len(item.body) < 11 or item.body[10] != 0
+                            or target_id in object_ids
+                        ):
+                            raise SoundBankError(
+                                f"external Stop declaration does not match Action {item.object_id}"
+                            )
                     if action_type == ACTION_PLAY_EVENT and target_id not in event_ids:
                         raise SoundBankError(
                             f"PlayEvent Action {item.object_id} references missing Event "
@@ -1000,11 +1081,19 @@ class SoundBankEditor:
                             f"Play Action {item.object_id} references missing object "
                             f"{target_id}"
                         )
-                    if action_type == ACTION_STOP and target_id not in object_ids:
+                    if (
+                        action_type == ACTION_STOP and target_id not in object_ids
+                        and item.object_id not in external
+                    ):
                         raise SoundBankError(
                             f"Stop Action {item.object_id} references missing object "
                             f"{target_id}"
                         )
+            if set(external) - set(owners):
+                raise SoundBankError("external Stop declarations must name Event-owned Actions")
+            for ref in external.values():
+                if len(rebuilt_hirc.object_body(HIRC_ACTION, ref.action_id)) < 11:
+                    raise SoundBankError(f"external Stop Action {ref.action_id} is too short")
             media_ids = {entry.media_id for entry in rebuilt.entries}
             for object_type, object_id in self.hirc.added_objects:
                 body = rebuilt_hirc.object_body(object_type, object_id)
@@ -1100,6 +1189,8 @@ class SoundBankEditor:
             has no source path to protect. The preflight existence check is not
             concurrency-safe exclusive creation; this is not a multi-file transaction
             or an on-disk read-back verification pass.
+            With external Stop declarations this validates the declaring Bank
+            only; joint resolution is required before publishing its bundle.
         """
 
         payload = self.build()
@@ -1112,3 +1203,68 @@ class SoundBankEditor:
             kind="SoundBank",
             error_type=SoundBankError,
         )
+
+
+def validate_external_stop_references(
+    banks: Sequence[SoundBank],
+    references_by_bank: Mapping[int, Sequence[ExternalStopReference]],
+) -> None:
+    """Resolve explicit Stop-to-Sound edges against the actual final Bank set.
+
+    Args:
+        banks: Parsed final Banks; each Bank ID must occur exactly once.
+        references_by_bank: Declaring Bank ID to its exact external Stop declarations.
+            Keys must be present in banks. Unlisted Banks have no declarations.
+
+    Raises:
+        SoundBankError: A Bank/declaration is missing, duplicated or malformed;
+            local validation fails; the target is not a unique Sound owned by the
+            declared Bank; its complete body hash or embedded media is incorrect.
+
+    Notes:
+        Read-only. Runs normal local validation with each Bank's declarations,
+        then resolves all declared edges. Bidirectional references are allowed;
+        this is not a build-order graph. It verifies packaged data, not runtime
+        loading, Game Object identity, or audible interruption. Every external
+        Stop must be declared; no generic missing-reference bypass is provided.
+    """
+
+    by_id: dict[int, SoundBank] = {}
+    for bank in banks:
+        if not isinstance(bank, SoundBank):
+            raise SoundBankError("banks must contain parsed SoundBank values")
+        if bank.bank_id in by_id:
+            raise SoundBankError(f"duplicate Bank ID {bank.bank_id} in Stop reference set")
+        by_id[bank.bank_id] = bank
+    for bank_id in references_by_bank:
+        _check_u32(bank_id, "declaring Bank ID")
+        if bank_id not in by_id:
+            raise SoundBankError(f"declaring Bank {bank_id} is missing")
+    editors = {
+        bank_id: SoundBankEditor(
+            bank, external_stop_references=references_by_bank.get(bank_id, ()),
+        )
+        for bank_id, bank in by_id.items()
+    }
+    for editor in editors.values():
+        editor.validate()
+    definitions: dict[int, list[tuple[int, int]]] = {}
+    for bank_id, editor in editors.items():
+        for obj in editor.hirc.objects():
+            definitions.setdefault(obj.object_id, []).append((bank_id, obj.object_type))
+    for editor in editors.values():
+        for ref in editor.external_stop_references:
+            if ref.target_bank_id not in by_id:
+                raise SoundBankError(f"external Stop target Bank {ref.target_bank_id} is missing")
+            if definitions.get(ref.target_sound_id) != [(ref.target_bank_id, HIRC_SOUND)]:
+                raise SoundBankError(
+                    f"external Stop target {ref.target_sound_id} must be a unique Sound "
+                    f"in Bank {ref.target_bank_id}"
+                )
+            target = editors[ref.target_bank_id].hirc.object_body(HIRC_SOUND, ref.target_sound_id)
+            if hashlib.sha256(target).hexdigest() != ref.expected_body_sha256:
+                raise SoundBankError(f"external Stop target {ref.target_sound_id} body SHA-256 differs")
+            if len(target) < 13:
+                raise SoundBankError(f"external Stop target Sound {ref.target_sound_id} is too short")
+            source_id = struct.unpack_from("<I", target, 9)[0]
+            by_id[ref.target_bank_id].media_entry(media_id=source_id)

@@ -33,6 +33,14 @@ Media ID is not a unique playback route: multiple Sounds, Events, or Containers
 can use the same media with different inherited settings. Trace all users
 before selecting a donor or target.
 
+For MHW v120 authoring, each Action must belong to one Event at most within a
+Bank. Multiple Events may use distinct Actions that target the same Sound; do
+not reuse an Action ID across Events. In the charged-shelling runtime test,
+sharing one Stop among three Events caused a loading crash; using independent
+Actions removed the crash while retaining cross-Bank targets and zero
+transition. This establishes the project constraint, not the engine-internal
+crash mechanism or a rule for other Wwise versions.
+
 ## Trace and Bound the Change
 
 Create a wwiser dump in the task's temporary directory using the main skill's
@@ -107,7 +115,28 @@ original Event rather than accidentally selecting one descendant Sound. For
 interruption, trace the native Stop route and clone its reviewed behavior to
 the new playback object, preserving scope, transitions, and unknown fields.
 Verify the new Action is attached to the correct Event and exercise the
-interruption in game.
+interruption in game. If the user explicitly requests a Stop with no matching
+native route, construct the reviewed scope, delay, transition and exceptions
+through the Stop API instead. A transition is the old voice’s fade duration,
+not a delay before another Action: a 50 ms Stop with no delay can overlap a
+new Play for that fade window. Preserve native donor behavior when no change
+was requested.
+
+For a Stop targeting another Bank, declare the exact Action → Bank/Sound edge
+and the reviewed target Sound body hash. Keep media and Sound ownership in
+their intended Bank. Local validation checks the declaration against the
+Action; joint validation of the actual final Banks must resolve the target,
+its unique ownership, body hash, and media. Do not treat a declaration as
+proof that the target exists, and do not turn an external-target error into
+a generic missing-reference exemption. Bidirectional edges do not imply a
+build-order dependency.
+
+Keep parsing, joint structural validation, and runtime evidence distinct.
+wwiser may parse a Bank that crashes during MHW loading. Confirm loading
+before playback tests, then verify the intended Game Object, both Stop
+directions, transition timing, negative triggers, and multiplayer scope.
+Record only the cases actually exercised; successful zero-transition testing
+does not establish a later 50 ms transition’s in-game result.
 
 ## Validation and Handoff Evidence
 

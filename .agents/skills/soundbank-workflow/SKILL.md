@@ -32,7 +32,8 @@ Motion / TIML assignment + trigger
 
 Not every Event originates in an LMT. Requests can expand to multiple WWEV
 records, several Motions can share TIML, and one Media ID can serve multiple
-playback paths. Determine the actual affected routes before choosing an edit.
+playback paths. Determine the actual affected routes before choosing an edit. For v120 authoring, every Action must have at most
+one owning Event in its Bank; create separate Actions when Events share a Sound.
 
 Read [format-and-troubleshooting.md](references/format-and-troubleshooting.md)
 for binary layouts, preservation rules, WEM encoding, or LMT/WWEV analysis.
@@ -72,7 +73,8 @@ structures are preserved or rejected instead of being guessed.
    node inheritance and object serialization order.
 3. **Fix the intended change and guards.** Record reviewed old values,
    complete donor bodies/records where required, affected references, and
-   explicit collision-checked new IDs. Persistent guards come from reviewed
+   explicit collision-checked new IDs. For external Stops, also fix the exact
+   Action, target Bank/Sound, and target-body guard. Persistent guards come from reviewed
    original evidence, not from an unreviewed live target during a build.
 4. **Apply the supported operation in memory.** Consult the README for
    [media APIs](../../../tools/soundbank_editor/README.md#nbnk-and-media),
@@ -80,13 +82,16 @@ structures are preserved or rejected instead of being guessed.
    [LMT/WWEV APIs](../../../tools/soundbank_editor/README.md#lmt-and-wwev).
    Use object-relative guarded HIRC edits and high-level LMT/WWEV edits;
    never patch absolute file offsets. Preserve all undeclared data and create
-   dependencies before attaching their new users.
+   dependencies before attaching their new users. Clone a native Stop to retain
+   its behavior; use an explicit Stop constructor when the user requests a new
+   stop behavior or a different transition. Keep one Action per Event.
 5. **Verify the result and preservation.** Compare the edit summary and diff
    with the reviewed intent; build, reparse, and validate. For NBNK, also run
    wwiser and re-extract, inspect, and decode every changed WEM. For a rebuilt
    LMT/WWEV pair, resolve the routes again and compare the intended rows and
-   unaffected routes. Structural checks do not verify loudness or runtime
-   behavior.
+   unaffected routes. For declared external Stops, validate the actual final Bank set after local
+   checks; declaration-only validation does not resolve companion targets.
+   Structural checks do not verify loudness, runtime loading, or playback behavior.
 6. **Write and report only the requested artifact.** Prefer in-memory results.
    Write a single artifact only when requested, to a new authorized output path
    that cannot overwrite its input. See

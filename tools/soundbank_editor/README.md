@@ -24,7 +24,7 @@ Import public names from this package. Its `__all__` is the public API list;
 
 | API family | Public entry points and source docstrings |
 |---|---|
-| NBNK | [SoundBank, SoundBankEditor, Chunk, MediaEntry, SoundBankEditSummary, SoundBankDiff, validate_wem, wwise_fnv1](soundbank.py) |
+| NBNK | [SoundBank, SoundBankEditor, ExternalStopReference, validate_external_stop_references, Chunk, MediaEntry, SoundBankEditSummary, SoundBankDiff, validate_wem, wwise_fnv1](soundbank.py) |
 | HIRC | [HircEditor, HircObject, SwitchContainerTopology, SwitchNodeParams](hirc.py); [HircPitchSettings](_pitch.py) |
 | LMT/TIML | [LmtFile, LmtEditor, LmtAction, TimlType, TimlTransform, TimlKeyframe, TriggeredRequest, LmtRequestEdit, LmtEditSummary](lmt.py) |
 | WWEV | [WwevFile, WwevEditor, WwevRecord, WwevRecordEdit, WwevEditSummary](wwev.py) |
@@ -94,7 +94,7 @@ accepts a HIRC chunk payload and explicit version/reserved IDs.
 | Reserve new media IDs | `reserve_id()`; normally coordinated by `SoundBankEditor.append_media()` |
 | Patch a field | `patch_bytes()`, `patch_u8()`, `patch_u16()`, `patch_u32()`, `patch_float()` |
 | Replace/insert a body | `replace_object_body()`, `insert_object()` |
-| Assemble Actions | `create_play_action()`, `create_play_event_action()`, `append_event_action()` |
+| Assemble Actions | `create_play_action()`, `create_play_event_action()`, `create_stop_action()`, `append_event_action()` |
 | Clone | `clone_sound()`, `clone_stop_action()`, `clone_random_sequence_container()`, `clone_switch_container()`, `clone_switch_container_with_topology()` |
 | Inspect changes | `changed_byte_count`, `added_objects`, `patched_objects`, `rebuilt_objects`, `resized_objects`, `build()` |
 
@@ -105,7 +105,7 @@ including the leading four-byte object ID; field patches cannot alter that ID.
 Use inspected offsets and expected old bytes, not offsets copied from a different
 node. Exact patch/rebuild composition rules are in the method docstrings.
 
-`create_play_action()` and `create_play_event_action()` return complete bodies,
+`create_play_action()`, `create_play_event_action()`, and `create_stop_action()` return complete bodies,
 including the ID, without inserting or reserving anything. `insert_object()`
 accepts the body **after** those four ID bytes. Attaching an Action to an Event
 is another operation. The Bank-level convenience methods compose these steps.
@@ -168,7 +168,9 @@ def add_reviewed_one_shot(
 For other compositions, use the following entry points and their docstrings:
 
 - `add_play_event_action()` attaches a new PlayEvent Action to an existing
-  Event. `clone_stop_action()` inserts a guarded Stop clone before the selected
+  Event. Each Action may belong to only one Event in a v120 Bank; create a
+  distinct Action per Event even when their target Sound is shared.
+  `clone_stop_action()` inserts a guarded Stop clone before the selected
   Event; attach it separately with `append_event_action()`.
 - `clone_random_sequence_container()` requires an exact donor playlist and
   avoid-repeat guard, existing unique replacement children, and a Random-mode
@@ -185,6 +187,42 @@ Inspect topology and body hashes during review, then persist those values for
 reproducible edits. Do not compute a persistent expected guard from the live
 donor during the build. New IDs must be explicit; `wwise_fnv1(name)` computes a
 deterministic ID but does not reserve it or guarantee collision freedom.
+
+### Explicit Stop and companion Banks
+
+Use `clone_stop_action()` to preserve a native donor's scope, transitions,
+exceptions, and unknown fields. For an explicitly requested new Stop,
+`create_stop_action(action_id, target_id, delay_ms=0, transition_ms=None,
+fade_curve=4)` constructs v120 `Stop_E_O`: Game Object scope, a non-bus target,
+and an empty exception list. `None` omits TransitionTime; `0` writes zero;
+`50` writes a 50 ms fade. Delay and fade are separate: a zero-delay Stop can
+begin fading an old voice while a Play in the same Event starts a new voice.
+Insertion, guarded Event-list editing, and reference validation remain separate.
+
+An external target must be a Sound with a reviewed complete body hash. Declare
+each exact edge with `ExternalStopReference(action_id, target_bank_id,
+target_sound_id, expected_body_sha256)`. Pass the declarations through the
+`external_stop_references=` keyword on `SoundBankEditor`, `from_file()`, or
+`from_bytes()`. Declarations are immutable and must name Event-owned Stop
+Actions targeting a different Bank. They cannot authorize Play/PlayEvent,
+local targets, missing Actions, or a generic set of unresolved IDs.
+
+`validate()`, `diff()`, and `write_atomic()` check the declaring Bank and its
+exact declarations; they do **not** establish that companion targets exist.
+Before publishing a set containing external Stops, call:
+
+```python
+def validate_stop_bundle(final_banks, declarations_by_bank_id):
+    se.validate_external_stop_references(final_banks, declarations_by_bank_id)
+```
+
+Pass parsed **final** `SoundBank` values and a mapping from declaring Bank ID
+to its reviewed declaration tuple. The joint check repeats local validation,
+requires unique Bank identities and target Sound ownership, checks the target
+body hash and embedded media, and rejects undeclared external Stops. Both
+directions may refer to each other; this does not impose a build order or prove
+runtime loading and Game Object identity. Single-artifact diagnostics with
+declarations must report that joint resolution is still outstanding.
 
 ## LMT and WWEV
 
@@ -273,7 +311,9 @@ All three file editors expose the following; `summary` is a property:
 editors expose summaries and byte-preservation checks instead. A standalone
 `HircEditor.build()` returns only the HIRC payload and does not perform Bank-level
 validation. SoundBank validation checks declared HIRC changes, v120 Event/Action
-references and order, and newly added Sound/Container references. It does not
+references, single-Event Action ownership and order, and newly added
+Sound/Container references. External Stops require the separate joint check
+described above. It does not
 semantically validate every unknown field or every existing Container.
 
 Here is an optional temporary-file round trip using the `lmt_editor` above:
