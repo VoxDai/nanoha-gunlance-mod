@@ -215,6 +215,7 @@ class SoundBankBuildPlan:
     media_replacements: tuple[MediaReplacement, ...] = ()
     media_additions: tuple[MediaAddition, ...] = ()
     reference_inputs: tuple[ReferenceInput, ...] = ()
+    external_stop_references: tuple[soundbank_editor.ExternalStopReference, ...] = ()
 
     def __post_init__(self) -> None:
         _plan_identity(self.name, self.design_ids, self.apply_edits)
@@ -246,6 +247,16 @@ class SoundBankBuildPlan:
             not isinstance(item, ReferenceInput) for item in self.reference_inputs
         ):
             raise TypeError("reference_inputs must be a tuple of ReferenceInput")
+        if not isinstance(self.external_stop_references, tuple) or any(
+            not isinstance(item, soundbank_editor.ExternalStopReference)
+            for item in self.external_stop_references
+        ):
+            raise TypeError("external_stop_references must be a tuple of ExternalStopReference")
+        external_ids = [ref.action_id for ref in self.external_stop_references]
+        if len(external_ids) != len(set(external_ids)):
+            raise ValueError(f"{self.name}: duplicate external Stop Action declaration")
+        if any(ref.target_bank_id == self.expected_bank_id for ref in self.external_stop_references):
+            raise ValueError(f"{self.name}: external Stop target Bank must differ")
         replacement_indices = [item.index for item in self.media_replacements]
         addition_indices = [item.expected_index for item in self.media_additions]
         media_ids = [item.media_id for item in self.media_additions]
@@ -572,7 +583,9 @@ def _verify_declared_soundbank_media(
 def _preview_soundbank(
     plan: SoundBankBuildPlan, bank: soundbank_editor.SoundBank
 ) -> soundbank_editor.SoundBankEditSummary:
-    editor = soundbank_editor.SoundBankEditor(bank)
+    editor = soundbank_editor.SoundBankEditor(
+        bank, external_stop_references=plan.external_stop_references,
+    )
     try:
         for replacement in plan.media_replacements:
             editor.replace_media(
@@ -676,6 +689,18 @@ def validate_registry(mod_plan: ModBuildPlan) -> None:
             duplicate = next(value for value in values if values.count(value) > 1)
             raise BuildError(f"Duplicate {label}: {duplicate}")
     validator_names = [item.name for item in mod_plan.validators]
+    bank_owners: dict[int, list[SoundBankBuildPlan]] = {}
+    for plan in artifacts:
+        if isinstance(plan, SoundBankBuildPlan):
+            bank_owners.setdefault(plan.expected_bank_id, []).append(plan)
+    for plan in artifacts:
+        if isinstance(plan, SoundBankBuildPlan):
+            for ref in plan.external_stop_references:
+                if len(bank_owners.get(ref.target_bank_id, ())) != 1:
+                    raise BuildError(
+                        f"{plan.name}: external Stop target Bank {ref.target_bank_id} "
+                        "must have exactly one registered artifact owner"
+                    )
     if len(validator_names) != len(set(validator_names)):
         duplicate = next(name for name in validator_names if validator_names.count(name) > 1)
         raise BuildError(f"Duplicate bundle validator: {duplicate}")
@@ -904,7 +929,9 @@ def build_plan(
             payloads = _convert_media(
                 prepared, converted_dir, project_root, tools
             )
-            editor = soundbank_editor.SoundBankEditor(prepared.original)
+            editor = soundbank_editor.SoundBankEditor(
+                prepared.original, external_stop_references=plan.external_stop_references,
+            )
             for replacement in plan.media_replacements:
                 source = _resolve_declared(project_root, replacement.source_audio, "source audio")
                 editor.replace_media(
@@ -1089,6 +1116,11 @@ def build_one(
             project_root,
             tools,
         )
+        if isinstance(plan, SoundBankBuildPlan) and plan.external_stop_references:
+            print(
+                "External Stop declarations checked locally; companion targets "
+                "require the complete Mod build's joint reference validation."
+            )
         if dry_run:
             print("Dry run complete; full temporary build passed and no output was published.")
             return None
@@ -1140,6 +1172,19 @@ def build_all(
                 project_root,
                 tools,
             )
+        try:
+            soundbank_editor.validate_external_stop_references(
+                tuple(
+                    soundbank_editor.SoundBank.from_file(staged_paths[item.plan.target])
+                    for item in prepared if isinstance(item.plan, SoundBankBuildPlan)
+                ),
+                {
+                    item.plan.expected_bank_id: item.plan.external_stop_references
+                    for item in prepared if isinstance(item.plan, SoundBankBuildPlan)
+                },
+            )
+        except soundbank_editor.EditorError as error:
+            raise BuildError(f"External Stop reference validation failed: {error}") from error
         for validator in mod_plan.validators:
             try:
                 validator.validate(staged_paths)

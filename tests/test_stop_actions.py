@@ -7,8 +7,12 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
+from unittest import mock
 
 from tools import soundbank_editor as se
+from builders.base import (
+    BuildError, ModBuildPlan, SoundBankBuildPlan, build_all, prepare_plan, validate_registry,
+)
 from ._soundbank_fixtures import make_test_soundbank
 
 
@@ -160,3 +164,44 @@ class ExternalStopTests(unittest.TestCase):
         b.hirc.insert_object(4, 41, struct.pack("<II", 1, 31))
         b_ref = se.ExternalStopReference(31, 1, 10, hashlib.sha256(a.hirc.object_body(2, 10)).hexdigest())
         se.validate_external_stop_references((a_bank, se.SoundBank.from_bytes(b.build())), {1: (self.ref,), 2: (b_ref,)})
+
+
+class StopBuildIntegrationTests(unittest.TestCase):
+    def test_registry_and_joint_failure_preserve_existing_release(self) -> None:
+        source, target = source_bank(), sound_bank(2, 20)
+        bad_ref = replace(reference(target), expected_body_sha256="0" * 64)
+        empty = se.SoundBankEditSummary((), (), 0, (), (), 0)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            plans = []
+            for i, bank in enumerate((source, target), 1):
+                path = root / f"original/nbnk/b{i}.nbnk"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(bank.to_bytes())
+                plans.append(SoundBankBuildPlan(
+                    name=f"b{i}", design_ids=("test.synthetic",), source=path.relative_to(root),
+                    target=f"sound/b{i}.nbnk", expected_source_sha256=hashlib.sha256(bank.to_bytes()).hexdigest(),
+                    expected_bank_id=bank.bank_id, apply_edits=lambda _e: None, expected_summary=empty,
+                    external_stop_references=(bad_ref,) if i == 1 else (),
+                ))
+            with self.assertRaisesRegex(BuildError, "registered artifact owner"):
+                validate_registry(ModBuildPlan((plans[0],)))
+            with self.assertRaisesRegex(ValueError, "duplicate"):
+                replace(plans[0], external_stop_references=(bad_ref, bad_ref))
+            with self.assertRaisesRegex(ValueError, "must differ"):
+                replace(plans[0], external_stop_references=(replace(bad_ref, target_bank_id=1),))
+            self.assertEqual(prepare_plan(plans[0], root).preview_summary, empty)
+            release = root / "release/nativePC"
+            release.mkdir(parents=True)
+            marker = release / "existing.bin"
+            marker.write_bytes(b"existing release")
+            with (
+                mock.patch("builders.base.make_tool_paths", return_value=object()),
+                mock.patch("builders.base._validate_soundbank_stage"),
+                mock.patch("builders.base.publish_release_tree") as publish,
+                self.assertRaisesRegex(BuildError, "External Stop reference validation.*SHA-256"),
+            ):
+                build_all(ModBuildPlan(tuple(plans)), root=root, force=True)
+            publish.assert_not_called()
+            self.assertEqual(marker.read_bytes(), b"existing release")
+            self.assertEqual(list(release.iterdir()), [marker])

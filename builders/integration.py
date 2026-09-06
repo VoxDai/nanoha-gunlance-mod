@@ -59,6 +59,7 @@ from .w07_00 import (
     WIDE_SWEEP_SLOT,
 )
 from .wp_gun_cmn import (
+    CHARGED_SHELLING_EXTERNAL_STOPS as COMMON_EXTERNAL_STOPS,
     CHARGED_SHELLING_DIVINE_MEDIA_ID,
     CHARGED_SHELLING_DIVINE_MEDIA_INDEX,
     CHARGED_SHELLING_EVENT_ID,
@@ -82,6 +83,7 @@ from .wp_gun_cmn import (
     validate_wide_sweep_hirc,
 )
 from .wp07_gun_epvsp_shell import (
+    CHARGED_SHELLING_EXTERNAL_STOPS as SHELL_EXTERNAL_STOPS,
     CHARGED_SHELLING_MEDIA_IDS as CHARGED_SHELLING_BUSTER_MEDIA_IDS,
     CHARGED_SHELLING_MEDIA_INDICES as CHARGED_SHELLING_BUSTER_MEDIA_INDICES,
     validate_charged_shelling_hirc,
@@ -493,10 +495,12 @@ def validate_charged_shelling(staged: Mapping[Path, Path]) -> None:
         _path(staged, WWEV_TARGET, "charged shelling")
     )
     common_bank = soundbank_editor.SoundBankEditor.from_file(
-        _path(staged, BANK_TARGET, "charged shelling")
+        _path(staged, BANK_TARGET, "charged shelling"),
+        external_stop_references=COMMON_EXTERNAL_STOPS,
     )
     shell_bank = soundbank_editor.SoundBankEditor.from_file(
-        _path(staged, SHELL_BANK_TARGET, "charged shelling")
+        _path(staged, SHELL_BANK_TARGET, "charged shelling"),
+        external_stop_references=SHELL_EXTERNAL_STOPS,
     )
 
     if (
@@ -604,6 +608,13 @@ def validate_charged_shelling(staged: Mapping[Path, Path]) -> None:
 
     validate_charged_shelling_divine_hirc(common_bank)
     validate_charged_shelling_hirc(shell_bank)
+    soundbank_editor.validate_external_stop_references(
+        (common_bank.validate(), shell_bank.validate()),
+        {
+            common_bank.bank_id: COMMON_EXTERNAL_STOPS,
+            shell_bank.bank_id: SHELL_EXTERNAL_STOPS,
+        },
+    )
     _validate_mono_wwise_pcm(
         common_bank,
         index=CHARGED_SHELLING_DIVINE_MEDIA_INDEX,
