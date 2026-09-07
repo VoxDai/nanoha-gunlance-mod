@@ -60,8 +60,8 @@ from .w07_00 import (
 )
 from .wp_gun_cmn import (
     CHARGED_SHELLING_EXTERNAL_STOPS as COMMON_EXTERNAL_STOPS,
-    CHARGED_SHELLING_DIVINE_MEDIA_ID,
-    CHARGED_SHELLING_DIVINE_MEDIA_INDEX,
+    CHARGED_SHELLING_DIVINE_MEDIA_IDS,
+    CHARGED_SHELLING_DIVINE_MEDIA_INDICES,
     CHARGED_SHELLING_EVENT_ID,
     OVERHEAD_DONOR_MEDIA_ID,
     OVERHEAD_DONOR_MEDIA_INDEX,
@@ -615,20 +615,25 @@ def validate_charged_shelling(staged: Mapping[Path, Path]) -> None:
             shell_bank.bank_id: SHELL_EXTERNAL_STOPS,
         },
     )
-    _validate_mono_wwise_pcm(
-        common_bank,
-        index=CHARGED_SHELLING_DIVINE_MEDIA_INDEX,
-        media_id=CHARGED_SHELLING_DIVINE_MEDIA_ID,
-        sample_count=42_000,
-        label="charged-shelling Divine",
-    )
-    _validate_mono_wwise_pcm(
-        shell_bank,
-        index=CHARGED_SHELLING_BUSTER_MEDIA_INDICES[0],
-        media_id=CHARGED_SHELLING_BUSTER_MEDIA_IDS[0],
-        sample_count=54_000,
-        label="charged-shelling Buster",
-    )
+    for index, media_id, samples in zip(
+            CHARGED_SHELLING_DIVINE_MEDIA_INDICES,
+            CHARGED_SHELLING_DIVINE_MEDIA_IDS,
+            (42_000, 48_000),
+            strict=True,
+    ):
+        _validate_mono_wwise_pcm(
+            common_bank, index=index, media_id=media_id, sample_count=samples,
+            label=f"charged-shelling Divine DIDX #{index}",
+        )
+    for index, media_id in zip(
+            CHARGED_SHELLING_BUSTER_MEDIA_INDICES,
+            CHARGED_SHELLING_BUSTER_MEDIA_IDS,
+            strict=True,
+    ):
+        _validate_mono_wwise_pcm(
+            shell_bank, index=index, media_id=media_id, sample_count=60_000,
+            label=f"charged-shelling Buster DIDX #{index}",
+        )
 
 
 CHARGED_SHELLING_VALIDATOR = BundleValidator(
