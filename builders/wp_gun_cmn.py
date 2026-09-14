@@ -132,6 +132,17 @@ WIDE_SWEEP_RANDOM_SHA256 = (
 WIDE_SWEEP_UNUSED_EVENT_IDS = (1_359_210_849, 2_281_439_929)
 
 CHARGED_SHELLING_DIVINE_MEDIA_ID = 370_615_719
+FIRING_VOICE_EVENT_ID = 2_825_008_231
+FIRING_SILENT_ACTION_ID = 3_500_432_807
+FIRING_SILENT_EVENT_ID = 3_344_928_599
+FIRING_SILENT_BODY_GUARDS = (
+    (soundbank_editor.HIRC_ACTION, FIRING_SILENT_ACTION_ID,
+     "373a8565c017faed8e9dbe7e0d0bc985c74f7fff140e96be452760fb387de9ed"),
+    (soundbank_editor.HIRC_EVENT, FIRING_SILENT_EVENT_ID,
+     "b690ca747f5c2f83d75a560d068fbd86abaa6f20ce8a6eeacb4d669ce978277c"),
+    (soundbank_editor.HIRC_EVENT, FIRING_VOICE_EVENT_ID,
+     "4d0ae624d720e9762e04c1e6bd78afb8045cd44b78d323fe32db3af2563ac1c5"),
+)
 CHARGED_SHELLING_DIVINE_SOUND_ID = 3_754_878_246
 CHARGED_SHELLING_ORIGINAL_ROUTE_ACTION_ID = 1_005_770_249
 CHARGED_SHELLING_DIVINE_ACTION_ID = 583_060_699
@@ -390,6 +401,43 @@ def _guard_charged_shelling_divine_original(
         )
 
 
+def validate_firing_silence_hirc(bank: soundbank_editor.SoundBankEditor) -> None:
+    """Require the exact same-Bank silent wrapper, without playable media."""
+    hirc = bank.hirc
+    for kind, ident, digest in FIRING_SILENT_BODY_GUARDS:
+        if hashlib.sha256(hirc.object_body(kind, ident)).hexdigest() != digest:
+            raise soundbank_editor.SoundBankError("firing silence HIRC body differs")
+    if (hirc.event_actions(FIRING_VOICE_EVENT_ID) != (FIRING_SILENT_ACTION_ID,)
+            or hirc.event_actions(FIRING_SILENT_EVENT_ID) != ()
+            or hirc.object_body(soundbank_editor.HIRC_ACTION, FIRING_SILENT_ACTION_ID)
+            != hirc.create_play_event_action(FIRING_SILENT_ACTION_ID, FIRING_SILENT_EVENT_ID)):
+        raise soundbank_editor.SoundBankError("firing silence wrapper route differs")
+    positions = {obj.object_id: obj.index for obj in hirc.objects()}
+    ordered = (CHARGED_SHELLING_EVENT_ID, FIRING_SILENT_ACTION_ID,
+               FIRING_SILENT_EVENT_ID, FIRING_VOICE_EVENT_ID, ORIGINAL_EVENT_ID)
+    if any(positions[a] >= positions[b] for a, b in zip(ordered, ordered[1:])):
+        raise soundbank_editor.SoundBankError("firing silence serialization order differs")
+
+
+def _apply_firing_silence(bank: soundbank_editor.SoundBankEditor) -> None:
+    hirc = bank.hirc
+    before = tuple((obj.object_type, obj.object_id, obj.body) for obj in hirc.objects())
+    bodies = (
+        (soundbank_editor.HIRC_ACTION, FIRING_SILENT_ACTION_ID,
+         hirc.create_play_event_action(FIRING_SILENT_ACTION_ID, FIRING_SILENT_EVENT_ID)[4:]),
+        (soundbank_editor.HIRC_EVENT, FIRING_SILENT_EVENT_ID, struct.pack("<I", 0)),
+        (soundbank_editor.HIRC_EVENT, FIRING_VOICE_EVENT_ID, struct.pack("<II", 1, FIRING_SILENT_ACTION_ID)),
+    )
+    for kind, ident, body in bodies:
+        hirc.insert_object(kind, ident, body, before=(soundbank_editor.HIRC_EVENT, ORIGINAL_EVENT_ID),
+                           label="add ordinary/charged firing silence")
+    added = {ident for _, ident, _ in bodies}
+    if tuple((obj.object_type, obj.object_id, obj.body) for obj in hirc.objects()
+             if obj.object_id not in added) != before:
+        raise soundbank_editor.SoundBankError("firing silence changed an existing object")
+    validate_firing_silence_hirc(bank)
+
+
 def validate_charged_shelling_divine_hirc(
     bank: soundbank_editor.SoundBankEditor,
 ) -> None:
@@ -397,10 +445,11 @@ def validate_charged_shelling_divine_hirc(
 
     _guard_charged_shelling_divine_original(bank)
     editor = bank.hirc
-    if len(editor.objects()) != 156 or len(editor.build()) != 8_722:
+    if len(editor.objects()) != 159 or len(editor.build()) != 8_770:
         raise soundbank_editor.SoundBankError(
             "charged-shelling Divine combined HIRC count or payload size differs"
         )
+    validate_firing_silence_hirc(bank)
 
     for index, sound_id, media_id, body_sha256 in zip(
             CHARGED_SHELLING_DIVINE_MEDIA_INDICES,
@@ -573,6 +622,7 @@ def _apply_charged_shelling_divine(
         before=(soundbank_editor.HIRC_EVENT, ORIGINAL_EVENT_ID),
         label="add isolated charged-shelling start Event",
     )
+    _apply_firing_silence(bank)
     validate_charged_shelling_divine_hirc(bank)
 
 
@@ -1024,11 +1074,14 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (soundbank_editor.HIRC_ACTION, CHARGED_SHELLING_STOP_BUSTER_ACTION_IDS[1]),
         (soundbank_editor.HIRC_ACTION, CHARGED_SHELLING_DIVINE_ACTION_ID),
         (soundbank_editor.HIRC_EVENT, CHARGED_SHELLING_EVENT_ID),
+        (soundbank_editor.HIRC_ACTION, FIRING_SILENT_ACTION_ID),
+        (soundbank_editor.HIRC_EVENT, FIRING_SILENT_EVENT_ID),
+        (soundbank_editor.HIRC_EVENT, FIRING_VOICE_EVENT_ID),
     ),
     resized_hirc_objects=(
         (soundbank_editor.HIRC_EVENT, RELOAD_EVENT_ID, 12, 16),
     ),
-    hirc_size_delta=1472,
+    hirc_size_delta=1520,
 )
 
 

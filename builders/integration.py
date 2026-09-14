@@ -32,6 +32,10 @@ from .hm_wp07_snd_ev import (
     WIDE_SWEEP_NEW_REQUEST,
 )
 from .pl_voice import (
+    FIRING_VOICE_REQUEST,
+    FIRING_VOICE_EVENT_ID,
+    FIRING_VOICE_RECORD_SHA256,
+    DONOR_RECORD_SHA256 as FIRING_DONOR_RECORD_SHA256,
     DONOR_EVENT_ID as ORIGINAL_GRUNT_EVENT_ID,
     DONOR_REQUEST as ORIGINAL_GRUNT_REQUEST,
     NEW_EVENT_ID as OVERHEAD_REPLACEMENT_EVENT_ID,
@@ -39,6 +43,8 @@ from .pl_voice import (
     NEW_REQUEST as OVERHEAD_REPLACEMENT_REQUEST,
 )
 from .w07_00 import (
+    FIRING_VOICE_REQUEST as FIRING_LMT_REQUEST,
+    FIRING_VOICE_MOTIONS,
     CHARGED_SHELLING_EVENT_GROUP,
     CHARGED_SHELLING_MOTION_IDS,
     CHARGED_SHELLING_NEW_REQUEST as CHARGED_SHELLING_LMT_REQUEST,
@@ -59,6 +65,8 @@ from .w07_00 import (
     WIDE_SWEEP_SLOT,
 )
 from .wp_gun_cmn import (
+    FIRING_VOICE_EVENT_ID as FIRING_BANK_EVENT_ID,
+    FIRING_SILENT_BODY_GUARDS,
     CHARGED_SHELLING_EXTERNAL_STOPS as COMMON_EXTERNAL_STOPS,
     CHARGED_SHELLING_DIVINE_MEDIA_IDS,
     CHARGED_SHELLING_DIVINE_MEDIA_INDICES,
@@ -486,7 +494,7 @@ def _validate_mono_wwise_pcm(
 
 
 def validate_charged_shelling(staged: Mapping[Path, Path]) -> None:
-    """Require the three charge-start routes and both migrated voice layers."""
+    """Require charge-start overlays and exactly three firing-silence routes."""
 
     lmt = soundbank_editor.LmtFile.from_file(
         _path(staged, LMT_TARGET, "charged shelling")
@@ -502,6 +510,58 @@ def validate_charged_shelling(staged: Mapping[Path, Path]) -> None:
         _path(staged, SHELL_BANK_TARGET, "charged shelling"),
         external_stop_references=SHELL_EXTERNAL_STOPS,
     )
+    voice = soundbank_editor.WwevFile.from_file(
+        _path(staged, PL_VOICE_WWEV_TARGET, "charged shelling")
+    )
+    if (FIRING_LMT_REQUEST != FIRING_VOICE_REQUEST
+            or FIRING_BANK_EVENT_ID != FIRING_VOICE_EVENT_ID):
+        raise BuildError("firing silence LMT/WWEV/Bank IDs diverged")
+    record = voice.record(FIRING_VOICE_REQUEST)
+    donor = voice.record(1409)
+    original_grunt = voice.record(1305)
+    if (len(voice.records) != 102
+            or (record.index, record.mode, record.event_id, record.sha256)
+            != (102, 4, FIRING_VOICE_EVENT_ID, FIRING_VOICE_RECORD_SHA256)
+            or (donor.index, donor.mode, donor.event_id, donor.sha256)
+            != (20, 4, 967571325, FIRING_DONOR_RECORD_SHA256)
+            or (original_grunt.index, original_grunt.mode, original_grunt.event_id)
+            != (17, 4, 281150953)):
+        raise BuildError("firing silence WWEV donor, original or appended record differs")
+    voice_routes = lmt.triggered_requests(voice)
+    firing = tuple(r for r in voice_routes
+                   if r.request_no == FIRING_VOICE_REQUEST or r.event_id == FIRING_VOICE_EVENT_ID)
+    expected_firing = tuple(
+        soundbank_editor.TriggeredRequest(
+            motion_id=motion, frame_count=frames, timl_offset=timl,
+            shared_timl_motions=(motion,), event_group="EventGroup02",
+            trigger_frame=5.0, trigger_mask=1, slot="A", request_no=6608,
+            wwev_record=102, wwev_mode=4, event_id=2825008231,
+        ) for motion, frames, timl in ((101, 85, 603840), (102, 89, 624896), (103, 95, 645968))
+    )
+    selected = tuple(r for r in voice_routes if r.motion_id in FIRING_VOICE_MOTIONS
+                     and r.event_group == "EventGroup02")
+    if FIRING_VOICE_MOTIONS != (101, 102, 103) or firing != expected_firing or selected != expected_firing:
+        raise BuildError("expected exactly Motion 101–103 frame-5 firing silence")
+    weapon_routes = tuple((r.motion_id, r.slot, r.trigger_frame, r.trigger_mask, r.request_no)
+                          for r in lmt.triggered_requests()
+                          if r.motion_id in FIRING_VOICE_MOTIONS and r.event_group == "EventGroup06")
+    expected_weapon_routes = tuple(
+        (motion, slot, frame, mask, request)
+        for motion in FIRING_VOICE_MOTIONS
+        for slot, frame, mask, request in (("D", 8.0, 8, 6460), ("A", 43.0, 1, 6456), ("C", 58.0, 4, 6400))
+    )
+    if weapon_routes != expected_weapon_routes:
+        raise BuildError("firing silence changed native weapon requests")
+    for event, action in ((2629885944, 667354318), (1888950507, 680466555), (192028055, 511124205)):
+        if shell_bank.hirc.event_actions(event) != (action,):
+            raise BuildError("normal shelling must not receive a voice restoration Action")
+    # All new silent objects must be owned by Common, never duplicated in another Bank.
+    silent_ids = {ident for _, ident, _ in FIRING_SILENT_BODY_GUARDS}
+    for target, path in staged.items():
+        if target.suffix == ".nbnk" and target != BANK_TARGET:
+            bank = soundbank_editor.SoundBank.from_file(path)
+            if silent_ids & soundbank_editor.HircEditor(bank.hirc_payload).object_ids:
+                raise BuildError("firing silence HIRC ownership is not unique")
 
     if (
         CHARGED_SHELLING_LMT_REQUEST != CHARGED_SHELLING_NEW_REQUEST

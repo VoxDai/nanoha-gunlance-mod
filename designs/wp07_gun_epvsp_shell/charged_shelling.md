@@ -3,6 +3,7 @@ design_id: wp07_gun_epvsp_shell.charged_shelling
 target_artifacts:
   - hm/wp/wp07/mot/w07_00/w07_00.lmt
   - sound/pl/hm_wp07_snd_ev.wwev
+  - sound/pl/pl_voice.wwev
   - sound/wwise/Windows/wp_gun_cmn.nbnk
   - sound/wwise/Windows/wp07_gun_epvsp_shell.nbnk
 ---
@@ -12,7 +13,7 @@ target_artifacts:
 ## 描述
 
 保留三种炮击类型的原版蓄力、姿态调整与蓄力爆炸声；进入水平、斜上或垂直蓄力动作时立即等概率随机叠加两条奈叶「Divine」之一，蓄力过程中调整炮口姿态不重复播放，实际完成蓄力炮击并爆炸时同步等概率随机叠加两条「Buster」之一。两阶段独立选择，允许连续重复且不绑定素材来源；每次播放产生
-±50 cents 随机音调偏移。每次 Divine 或 Buster 开始时，当前游戏对象上尚未结束的对侧语音在 50 ms 内线性淡出停止；新语音立即播放，允许淡出期间短暂重叠。
+±50 cents 随机音调偏移。每次 Divine 或 Buster 开始时，当前游戏对象上尚未结束的对侧语音在 50 ms 内线性淡出停止；新语音立即播放，允许淡出期间短暂重叠。关闭三种类型、三个方向的普通炮击与蓄力完成后发射时的原人物“哼”声；保留全部原武器音效，不改动蓄力开始时的声音，也不补回普通炮击人物语音。
 
 | 名称                       | 动作或状态                             | 预期行为                                                                                                       |
 |----------------------------|----------------------------------------|----------------------------------------------------------------------------------------------------------------|
@@ -25,7 +26,9 @@ target_artifacts:
 | 通常型蓄力炮击             | 完成蓄力并触发通常型爆炸               | 保留原版爆炸声，同步额外播放一次「Buster」，同时将尚未结束的「Divine」在 50 ms 内淡出停止                      |
 | 蓄力中断                   | 已触发蓄力后取消或被中断               | 不触发「Buster」；不额外发出 Stop，已开始的「Divine」自然结束                                                  |
 | 连续独立蓄力与炮击         | 再次开始蓄力或实际爆炸                 | 每个阶段独立重新选择一条语音，各候选概率 50%，允许与上次相同；Divine 与 Buster 不绑定同一来源                  |
-| 未蓄力炮击、空弹与其它动作 | 未进入蓄力或非蓄力炮击                 | 不播放本设计的追加语音                                                                                         |
+| 蓄力炮击发射人物语音 | 通常、放射、扩散型以水平、斜上或垂直方向完成蓄力并发射 | 原人物“哼”声静音；原武器音效及本设计 Buster 保持不变 |
+| 普通炮击 | 三种类型、三个方向的未蓄力炮击 | 原人物“哼”声静音，保留原武器音效；不补回人物语音，不新增 Divine/Buster |
+| 空弹与其它动作 | 空弹、全弹发射及其它铳枪动作 | 不播放本设计追加语音；保持各动作既有声音设计，不扩大人物静音范围 |
 
 ## 音频
 
@@ -44,7 +47,7 @@ target_artifacts:
 
 ## 实现契约
 
-- 动画与请求原件为 `original/lmt/w07_00.lmt`（LMT v95）和 `original/wwev/hm_wp07_snd_ev.wwev`（WWEV v19）。
+- 动画与请求原件为 `original/lmt/w07_00.lmt`（LMT v95）、`original/wwev/hm_wp07_snd_ev.wwev` 和 `original/wwev/pl_voice.wwev`（均为 WWEV v19）。
 - Divine 目标 Bank 为 `original/nbnk/wp_gun_cmn.nbnk`，Wwise v120，Bank ID `939294496`。
 
 | 名称             | Event ID         | 原 Action ID | Container ID           | donor Sound / Media ID | DIDX / 原 Media ID | 新 Action ID | 新 Sound ID             |
@@ -81,9 +84,30 @@ target_artifacts:
   `522283251 → 768813060 → 972300144 → 694534885`，原 `wp_gun_cmn.nbnk` 未发现由 Event 引用且命中该链的 Stop
   Action；本设计按用户指定行为新增双向 Stop，不将其作为原生中断路由的克隆。
 - Divine 路由单独新增 2 个 Sound、1 个 Random、4 个 Action、1 个 Event，HIRC 对象 `123→131`、payload
-  `7250→7578`，增量 `+328`、changed-byte count 为 `4`。与该 Bank 现有设计合并后媒体共 46 项、HIRC 对象
+  `7250→7578`，增量 `+328`、changed-byte count 为 `4`。不含下述发射人物静音对象时，与该 Bank 现有设计合并后媒体共 46 项、HIRC 对象
   `123→156`、payload `7250→8722`，总增量 `+1472`、changed-byte count 为 `25`；既有 reload Event
-  `3476627122` 仍是唯一扩长的原对象。除 DIDX/DATA 追加和上述 8 个新对象外，本设计不改变该 Bank 的原对象或其它 chunk。
+  `3476627122` 仍是唯一扩长的原对象。除 DIDX/DATA 追加、上述 8 个新对象及下述 3 个静音对象外，本设计不改变该 Bank 的原对象或其它 chunk。
+
+| 名称 | Event ID | 原 Action ID | Container ID | donor Sound / Media ID | DIDX / 原 Media ID | 新 Action ID | 新 Sound ID |
+|------|----------|--------------|--------------|------------------------|--------------------|--------------|-------------|
+| 普通与蓄力炮击发射人物静音包装 | 2825008231（新） | — | — | — | — | 3500432807 | — |
+| 静音 PlayEvent 目标 | 3344928599（新） | — | — | — | — | — | — |
+
+- 两个静音 Event 与 Action 均新增于 `original/nbnk/wp_gun_cmn.nbnk` 所构建的 Bank `939294496`。
+  Event `2825008231` 的完整 Action 列表为 `(3500432807,)`；Action `3500432807` 为无 delay 的 13-byte PlayEvent，
+  仅委托同 Bank 的零 Action Event `3344928599`，后者完整列表为 `()`。不新增媒体、Sound、Container、Play 或 Stop，
+  不引用原人物 Event `281150953`，不修改原人物 Bank 或共享混音父级。静音路线没有可播放根，不增加对应 Stop。
+- 序列化顺序固定为 Action `3500432807` → 零 Action Event `3344928599` → 包装 Event `2825008231` →
+  原 Event `3567942167`；保持此前所有对象的相对顺序和 body 不变。三份完整 body SHA-256 依次为
+  `373a8565c017faed8e9dbe7e0d0bc985c74f7fff140e96be452760fb387de9ed`、
+  `b690ca747f5c2f83d75a560d068fbd86abaa6f20ce8a6eeacb4d669ce978277c`、
+  `4d0ae624d720e9762e04c1e6bd78afb8045cd44b78d323fe32db3af2563ac1c5`。
+- 静音路线独立新增 1 个 Action、2 个 Event：HIRC 对象 `123→126`、payload `7250→7298`，增量 `+48`，
+  changed-byte count 为 `0`。连同本设计 Divine 路由单独应用为 `123→134`、`7250→7626`，增量 `+376`、
+  changed-byte count 为 `4`；与 Common Bank 全部现有设计合并后媒体仍为 46 项，HIRC 对象 `123→159`、
+  payload `7250→8770`，总增量 `+1520`、changed-byte count 仍为 `25`。不改变 DIDX/DATA、既有媒体或其它 chunk。
+- ReqNo `6608` 与三个静音 HIRC ID 沿用已实机测试的局部静音路线，不重新分配；已复核原版 8 个参考 Bank、
+  当前 design／builder 数值及原版 WWEV 请求和 Event 均无冲突。此路线不需要跨 Bank PlayEvent API。
 
 - Buster 目标 Bank 为 `original/nbnk/wp07_gun_epvsp_shell.nbnk`，Wwise v120，Bank ID `3273965928`。
 
@@ -174,10 +198,14 @@ target_artifacts:
 | 水平蓄力开始 | `original/lmt/w07_00.lmt` | 132 | EventGroup06 | B | 0 | 6470 | 6599 | 1 |
 | 斜上蓄力开始 | `original/lmt/w07_00.lmt` | 133 | EventGroup06 | B | 0 | 6470 | 6599 | 1 |
 | 垂直蓄力开始 | `original/lmt/w07_00.lmt` | 134 | EventGroup06 | B | 0 | 6470 | 6599 | 1 |
+| 水平普通／蓄力炮击发射人物静音 | `original/lmt/w07_00.lmt` | 101 | EventGroup02 | A | 0 | 1305 | 6608 | 5 |
+| 斜上普通／蓄力炮击发射人物静音 | `original/lmt/w07_00.lmt` | 102 | EventGroup02 | A | 0 | 1305 | 6608 | 5 |
+| 垂直普通／蓄力炮击发射人物静音 | `original/lmt/w07_00.lmt` | 103 | EventGroup02 | A | 0 | 1305 | 6608 | 5 |
 
 | 名称 | WWEV | donor ReqNo | donor Event ID | mode | record SHA-256 | 新 ReqNo | 新 Event ID |
 |------|------|-------------|----------------|------|----------------|----------|-------------|
 | 三种蓄力起始姿态共享 Divine | `original/wwev/hm_wp07_snd_ev.wwev` | 6470 | 3567942167 | 2 | `1c6fd120501ce70925b00d8ab0166a38b132934e220a1095506424024a33e53f` | 6599 | 3452820647 |
+| 普通／蓄力炮击发射人物静音 | `original/wwev/pl_voice.wwev` | 1409 | 967571325 | 4 | `73c0de66cceb0d4c467d1652296537e0a63b53490620542d1b9174df7a3da507` | 6608 | 2825008231 |
 
 - `original/lmt/w07_00.lmt` 中 Motion 132 / 133 / 134 分别为 79 / 65 / 79 帧，TIML 分别位于
   `0xFE820` / `0x101280` / `0x1046A0`，均仅由自身 Motion 使用。只允许将 EventGroup06 槽 B 的赋值帧 0 请求由
@@ -185,8 +213,23 @@ target_artifacts:
   帧触发，单独 changed-byte count 为 `3`，文件长度不变。
 - 姿态调整 Motion 139–142 均为 21 帧且使用独立 TIML；EventGroup06 槽 B 必须继续在第 1 帧以 trigger mask `0x02`
   触发原 ReqNo `6470`，不得改为 `6599`。端到端读回必须仅产生 Motion 132–134 三条 Divine 路由，姿态调整只解析到原
-  Event `3567942167`。与现有 Motion 2、128、131、143 修改合并后，LMT changed-byte count 为 `9`；其它 Motion、TIML、
-  赋值、触发与文件内容保持 byte-exact。
+  Event `3567942167`。Divine 与现有 Motion 2、128、131、143 修改合并为 `9` 个变化字节，再加下述 Motion 101–103
+  静音修改后，LMT changed-byte count 为 `15`；未声明的 Motion、TIML、赋值、触发与文件内容保持 byte-exact。
+- Motion 101／102／103 原长度为 85／89／95 帧，TIML 分别位于十进制偏移 `603840`／`624896`／`645968`，
+  均仅由自身 Motion 使用。只替换上表 EventGroup02/A 的赋值帧 0 请求，赋值位置分别为十进制偏移
+  `606048`／`627200`／`648272`；保留第 5 帧触发和 mask `0x01`。使用 guarded 请求替换，不直接按文件偏移写入。
+  三条请求各改变 2 字节，静音独立 changed-byte count 为 `6`，文件长度不变；本设计六条 LMT 修改单独合计为 `9`。
+  原 ReqNo `1305` 唯一解析为 `pl_voice.wwev` #17、mode `4`、Event `281150953`；保留原记录不变，只改变这三个 Motion 的路由。
+  端到端读回必须三条且仅三条 `Motion 101–103 → ReqNo 6608 → Event 2825008231`；所有未选请求保持原样，
+  包括三者 EventGroup06/D 的 ReqNo `6460`、第 8 帧武器触发，以及 Motion 132–134、139–142 与下砸路线。
+- `original/wwev/pl_voice.wwev` 的 donor ReqNo `1409` 唯一解析为原记录 #20、mode `4`、Event `967571325`、
+  大小 `129` 字节，完整 raw hash 见上表。完整克隆，仅将 ReqNo／Event ID 改为 `6608`／`2825008231`；
+  新记录 raw SHA-256 为 `2b21f2a836c096e164751adfcad860aa8f919fea0a857f11fa64ac4de40798c4`。
+  单独应用时为 #101，记录 `100→101`、追加 `129` 字节；与下砸 ReqNo `6595` 的 #101 合并后追加为 #102，
+  总记录 `100→102`、总追加 `258` 字节。原 100 条记录、四个依赖字符串、既有下砸记录、未知字段与边界全部保持 byte-exact，
+  只允许更新记录计数及尾部追加。
+- 普通炮击通常／放射／扩散 Event `2629885944`／`1888950507`／`192028055` 的 Action 列表保持
+  `(667354318,)`／`(680466555,)`／`(511124205,)`；不添加人物补回 Action，也不改变普通或蓄力爆炸媒体。
 - `original/wwev/hm_wp07_snd_ev.wwev` 的 ReqNo `6470` 唯一解析为原记录 #17、mode `2`、Event `3567942167`、大小
   `129` 字节及上表完整 raw hash。完整克隆该记录，只替换 ReqNo 和 Event ID；新增记录 raw SHA-256 为
   `0b6c6e87c3c78c669ac6bc6cd09112c54445e7bce5401380fc68e2fad136e8ee`。单独应用时追加为 #44；与现有 ReqNo
@@ -199,10 +242,13 @@ target_artifacts:
   `3489806140` 与 Action `858972567` / `4053288866` / `3259504927` 分别沿用 `buster_01_media`、
   `buster_01_sound`、`buster_01_wide_action` / `buster_01_long_action` / `buster_01_normal_action`。ReqNo `6599` 和两个
   新 HIRC ID 已对原始 4550 个 NBNK、1300 个 WWEV 及现有自定义 ID 完成碰撞检查；Divine 三个稳定 ID 是对现有契约的迁移，
-  不分配新值，并且在最终四件套中只能存在一次。
+  不分配新值，并且在最终五个目标 artifact 中只能存在一次。
 - 游戏内按描述表验收：覆盖三种炮击类型和三种初始炮口姿态；在一次蓄力中执行水平→斜上→垂直及反向多次调整，只允许首次进入
   蓄力时播放一次 Divine；蓄力取消不触发 Buster，连续两次独立蓄力各播放一次 Divine，三种爆炸各只追加一次 Buster，普通炮击、
-  空弹和其它铳枪动作不播放本设计语音。两方向均要求目标语音尚未结束时，在新语音开始后 50 ms 内线性淡出，允许该淡出窗口内重叠；原声和其它语音不被停止。
+  空弹和其它铳枪动作不播放本设计语音。普通与蓄力炮击分别覆盖三种类型、三个方向，发射时均不得出现原人物“哼”声；
+  普通炮击不补回人声，也不播放 Divine/Buster。对照测试空弹、全弹、连续炮击、取消与姿态调整，确认静音不扩散且全部武器音效保留。
+  既有局部静音实测覆盖三种类型的蓄力发射；普通炮击仅通常型三个方向已有实测，其它类型仍需验收，不能外推为通过。
+  两方向均要求目标语音尚未结束时，在新语音开始后 50 ms 内线性淡出，允许该淡出窗口内重叠；除上述发射人物请求静音外，原声和其它语音不被停止。
   独立 Action 的零过渡测试已获用户确认可加载且蓄力炮击能 Stop；本次 50 ms 听感、Divine 停止上一发 Buster、
   两组全部候选组合、随机重复、±50 cents 听感、三种类型与姿态的完整覆盖及多人隔离仍需游戏验收。 不得把结构验证或既有零过渡反馈记作随机容器或
   50 ms 实机通过。

@@ -53,10 +53,13 @@ CHARGED_SHELLING_TRIGGER_FRAMES = (1.0,)
 CHARGED_SHELLING_OLD_REQUEST = 6470
 CHARGED_SHELLING_NEW_REQUEST = 6599
 CHARGED_SHELLING_REQUEST_OFFSETS = (0xFEDF0, 0x101850, 0x104C70)
+FIRING_VOICE_MOTIONS = (101, 102, 103)
+FIRING_VOICE_REQUEST = 6608
+FIRING_VOICE_OFFSETS = (606048, 627200, 648272)
 
 
 def apply_edits(editor: soundbank_editor.LmtEditor) -> None:
-    """Guard and replace the seven reviewed animation request assignments."""
+    """Guard and replace the ten reviewed animation request assignments."""
 
     editor.replace_request(
         motion_id=MOTION_ID,
@@ -104,10 +107,16 @@ def apply_edits(editor: soundbank_editor.LmtEditor) -> None:
             replacement_request=CHARGED_SHELLING_NEW_REQUEST,
             expected_trigger_frames=CHARGED_SHELLING_TRIGGER_FRAMES,
         )
+    for motion_id in FIRING_VOICE_MOTIONS:
+        editor.replace_request(
+            motion_id=motion_id, event_group="EventGroup02", slot="A",
+            request_keyframe_frame=0.0, expected_request=1305,
+            replacement_request=FIRING_VOICE_REQUEST, expected_trigger_frames=(5.0,),
+        )
 
 
 EXPECTED_SUMMARY = soundbank_editor.LmtEditSummary(
-    changed_byte_count=9,
+    changed_byte_count=15,
     edits=(
         soundbank_editor.LmtRequestEdit(
             motion_id=MOTION_ID,
@@ -186,6 +195,13 @@ EXPECTED_SUMMARY = soundbank_editor.LmtEditSummary(
             new_request=CHARGED_SHELLING_NEW_REQUEST,
             changed_byte_count=1,
         ),
+    ) + tuple(
+        soundbank_editor.LmtRequestEdit(
+            motion_id=motion, event_group="EventGroup02", slot="A",
+            request_keyframe_frame=0.0, trigger_frames=(5.0,), offset=offset,
+            old_request=1305, new_request=FIRING_VOICE_REQUEST, changed_byte_count=2,
+        )
+        for motion, offset in zip(FIRING_VOICE_MOTIONS, FIRING_VOICE_OFFSETS, strict=True)
     ),
 )
 
