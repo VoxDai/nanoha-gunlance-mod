@@ -1,4 +1,4 @@
-"""Build the complete seven-artifact design-driven release."""
+"""Build the complete eight-artifact design-driven release."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from .integration import (
     STATIONARY_DRAW_VALIDATOR,
     WIDE_SWEEP_VALIDATOR,
 )
+from .pl_prop_cmn import PLAN as PL_PROP_CMN
 from .pl_voice import PLAN as PL_VOICE
 from .w07_00 import PLAN as W07_00
 from .wp07_gun_epvsp_shell import PLAN as WP07_GUN_EPVSP_SHELL
@@ -25,6 +26,7 @@ ARTIFACT_PLANS = (
     HM_CM00_EPVSP,
     W07_00,
     HM_WP07_SND_EV,
+    PL_PROP_CMN,
     PL_VOICE,
 )
 
