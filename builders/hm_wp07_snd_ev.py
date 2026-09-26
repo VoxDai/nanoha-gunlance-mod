@@ -45,6 +45,23 @@ CHARGED_SHELLING_NEW_RECORD_SHA256 = (
     "0b6c6e87c3c78c669ac6bc6cd09112c54445e7bce5401380fc68e2fad136e8ee"
 )
 
+WYR_STAKE_ROUTES = (
+    (6456, 2_798_914_977, 100,
+     "0cd7f3f60ba152c1d3a4e0ed7cba9c0256734fb9175fd7bcfff06cd5ed3202d7",
+     6610, 2_456_922_025),
+    (6570, 1_517_840_452, 100,
+     "031bca6cf48747ae66243e53702d31b824a8a4fe4f01f7d31a9a2ed6476057b1",
+     6611, 4_272_667_772),
+    (6525, 2_279_772_715, 200,
+     "e60a91a79ea0e6c8488818862ab9ea9ade123cd9e8599668ec29b75fa0def7cb",
+     6612, 3_413_751_962),
+)
+WYR_STAKE_NEW_RECORD_SHA256S = (
+    "318a4299d8c16e1450dfa072e3cfd9080f2de1c45b5a610289209bcb8dccc2db",
+    "94447d2580119dbb23821e040464b0e457b6e84eacabbc39ebb208dcea03f62a",
+    "c473b030f54c3b11d63f1dac581dda3a524eeb0c412f62bded65539a7ed15ecf",
+)
+
 
 def apply_edits(editor: soundbank_editor.WwevEditor) -> None:
     """Clone the three reviewed single-record donors and preserve originals."""
@@ -73,12 +90,21 @@ def apply_edits(editor: soundbank_editor.WwevEditor) -> None:
         new_request=CHARGED_SHELLING_NEW_REQUEST,
         new_event_id=CHARGED_SHELLING_NEW_EVENT_ID,
     )
+    for donor_request, donor_event, mode, digest, new_request, new_event in WYR_STAKE_ROUTES:
+        editor.append_cloned_record(
+            donor_request=donor_request,
+            expected_donor_event_id=donor_event,
+            expected_donor_mode=mode,
+            expected_donor_sha256=digest,
+            new_request=new_request,
+            new_event_id=new_event,
+        )
 
 
 EXPECTED_SUMMARY = soundbank_editor.WwevEditSummary(
     record_count_before=43,
-    record_count_after=46,
-    appended_size=387,
+    record_count_after=49,
+    appended_size=774,
     edits=(
         soundbank_editor.WwevRecordEdit(
             donor_record_index=17,
@@ -107,6 +133,9 @@ EXPECTED_SUMMARY = soundbank_editor.WwevEditSummary(
             new_event_id=CHARGED_SHELLING_NEW_EVENT_ID,
             appended_size=129,
         ),
+        soundbank_editor.WwevRecordEdit(13, 6456, 2_798_914_977, 47, 6610, 2_456_922_025, 129),
+        soundbank_editor.WwevRecordEdit(38, 6570, 1_517_840_452, 48, 6611, 4_272_667_772, 129),
+        soundbank_editor.WwevRecordEdit(10, 6525, 2_279_772_715, 49, 6612, 3_413_751_962, 129),
     ),
 )
 
@@ -118,6 +147,7 @@ PLAN = WwevBuildPlan(
         "wp_gun_cmn.overhead_smash",
         "wp_gun_cmn.wide_sweep",
         "wp07_gun_epvsp_shell.charged_shelling",
+        "wp07_gun_epvsp_shell.wyrmstake_cannon",
     ),
     source="original/wwev/hm_wp07_snd_ev.wwev",
     target="sound/pl/hm_wp07_snd_ev.wwev",

@@ -9,7 +9,27 @@ import struct
 
 from tools import soundbank_editor
 
-from .base import BuildError, BundleValidator
+from .base import BuildError, BundleValidator, HircBank
+from .pl_wp_par_op_event_structure import (
+    PLAN as WYR_STAKE_STRUCTURE_PLAN,
+    WRAPPERS as WYR_STAKE_WRAPPERS,
+    validate_wyrmstake_wrappers,
+)
+from .hm_wp07_snd_ev import WYR_STAKE_NEW_RECORD_SHA256S, WYR_STAKE_ROUTES
+from .w07_00 import (
+    WYR_STAKE_EDITS,
+    WYR_STAKE_VOICE_MUTE_EDITS,
+    WYR_STAKE_VOICE_MUTE_REQUEST,
+)
+from .wp_gun_cmn import (
+    WYR_STAKE_EVENT_IDS,
+    WYR_STAKE_MEDIA_IDS,
+    WYR_STAKE_SOUND_IDS,
+    validate_wyrmstake_voice_hirc,
+    validate_wyrmstake_original_voice_mute_hirc,
+    WYR_STAKE_MUTE_EMPTY_EVENT_ID,
+    WYR_STAKE_MUTE_ROUTE_EVENT_ID,
+)
 from .hm_wp07_snd_ev import (
     CHARGED_SHELLING_DONOR_EVENT_ID,
     CHARGED_SHELLING_DONOR_MODE,
@@ -35,6 +55,9 @@ from .pl_voice import (
     FIRING_VOICE_REQUEST,
     FIRING_VOICE_EVENT_ID,
     FIRING_VOICE_RECORD_SHA256,
+    WYR_STAKE_MUTE_REQUEST,
+    WYR_STAKE_MUTE_EVENT_ID,
+    WYR_STAKE_MUTE_RECORD_SHA256,
     DONOR_RECORD_SHA256 as FIRING_DONOR_RECORD_SHA256,
     DONOR_EVENT_ID as ORIGINAL_GRUNT_EVENT_ID,
     DONOR_REQUEST as ORIGINAL_GRUNT_REQUEST,
@@ -95,6 +118,10 @@ from .wp07_gun_epvsp_shell import (
     CHARGED_SHELLING_MEDIA_IDS as CHARGED_SHELLING_BUSTER_MEDIA_IDS,
     CHARGED_SHELLING_MEDIA_INDICES as CHARGED_SHELLING_BUSTER_MEDIA_INDICES,
     validate_charged_shelling_hirc,
+    WYR_STAKE_STRIKE_EVENT_ID,
+    WYR_STAKE_STRIKE_MEDIA_ID,
+    WYR_STAKE_ACS_STANDBY_MEDIA_ID,
+    validate_wyrmstake_hit_release_hirc,
 )
 
 
@@ -103,8 +130,156 @@ WWEV_TARGET = Path("sound/pl/hm_wp07_snd_ev.wwev")
 PL_VOICE_WWEV_TARGET = Path("sound/pl/pl_voice.wwev")
 BANK_TARGET = Path("sound/wwise/Windows/wp_gun_cmn.nbnk")
 SHELL_BANK_TARGET = Path("sound/wwise/Windows/wp07_gun_epvsp_shell.nbnk")
+EVENT_STRUCTURE_TARGET = WYR_STAKE_STRUCTURE_PLAN.target
 OBSOLETE_OVERHEAD_REQUEST = 6593
 CONTROL_MOTION_ID = 151
+WYR_STAKE_ORIGINAL_VOICE_EVENTS = {
+    1129: 2_509_923_097,
+    1105: 365_584_827,
+    1019: 1_121_077_459,
+    1309: 3_262_711_103,
+    1119: 1_510_209_164,
+    1109: 2_158_071_957,
+    1009: 3_779_993_687,
+}
+
+
+def validate_wyrmstake_cannon(staged: Mapping[Path, Path]) -> None:
+    """Resolve weapon overlays and all twelve original-voice mute routes."""
+
+    lmt = soundbank_editor.LmtFile.from_file(_path(staged, LMT_TARGET, "Wyrmstake"))
+    wwev = soundbank_editor.WwevFile.from_file(_path(staged, WWEV_TARGET, "Wyrmstake"))
+    common = soundbank_editor.SoundBankEditor.from_file(_path(staged, BANK_TARGET, "Wyrmstake"))
+    structure = HircBank.from_bytes(_path(staged, EVENT_STRUCTURE_TARGET, "Wyrmstake").read_bytes())
+    shirc = soundbank_editor.HircEditor(structure.hirc_payload, version=structure.version)
+    validate_wyrmstake_voice_hirc(common)
+    validate_wyrmstake_original_voice_mute_hirc(common)
+    validate_wyrmstake_wrappers(shirc)
+    shell = soundbank_editor.SoundBankEditor.from_file(
+        _path(staged, SHELL_BANK_TARGET, "Wyrmstake Strike Flame"),
+        external_stop_references=SHELL_EXTERNAL_STOPS,
+    )
+    validate_wyrmstake_hit_release_hirc(shell)
+
+    requests = {r[4]: (r[0], r[1], r[2], r[3]) for r in WYR_STAKE_ROUTES}
+    for index, (donor_request, donor_event, mode, digest, request, expected_event) in enumerate(WYR_STAKE_ROUTES, 47):
+        donor = wwev.record(donor_request)
+        record = wwev.record(request)
+        if (
+                donor.event_id != donor_event or donor.mode != mode or donor.sha256 != digest
+                or record.index != index or record.event_id != expected_event or record.mode != mode
+                or record.sha256 != WYR_STAKE_NEW_RECORD_SHA256S[index - 47]
+                or len([r for r in wwev.records if r.request_no == request]) != 1
+        ):
+            raise BuildError(f"Wyrmstake WWEV request {request} differs from its donor clone")
+
+    actual = [r for r in lmt.triggered_requests(wwev) if r.request_no in requests]
+    expected = {(motion, group, slot, frame, request, requests[request][2],
+                 next(e for old, _, _, _, new, e in WYR_STAKE_ROUTES if new == request))
+                for motion, group, slot, _, request, frames, _ in WYR_STAKE_EDITS
+                for frame in frames}
+    observed = {(r.motion_id, r.event_group, r.slot, r.trigger_frame,
+                 r.request_no, r.wwev_mode, r.event_id) for r in actual}
+    if observed != expected or len(actual) != len(expected):
+        raise BuildError(f"Wyrmstake LMT/WWEV route differs: {actual!r}")
+    motion310_acs = tuple(
+        r for r in lmt.triggered_requests(wwev)
+        if r.motion_id == 310 and r.event_group == "EventGroup07" and r.slot == "A"
+    )
+    expected_motion310_acs = soundbank_editor.TriggeredRequest(
+        motion_id=310, frame_count=59, timl_offset=2_689_312,
+        shared_timl_motions=(310,), event_group="EventGroup07",
+        trigger_frame=3.0, trigger_mask=0x01, slot="A", request_no=6611,
+        wwev_record=48, wwev_mode=100, event_id=4_272_667_772,
+    )
+    if motion310_acs != (expected_motion310_acs,):
+        raise BuildError("Wyrmstake Motion 310 frame-3 ACS route differs")
+
+    event_owners = {}
+    for bank_name, hirc in (("common", common.hirc), ("structure", shirc),
+                            ("shell", shell.hirc)):
+        for item in hirc.objects():
+            if item.object_type == soundbank_editor.HIRC_EVENT:
+                event_owners.setdefault(item.object_id, []).append(bank_name)
+    for wrapper_event, _, _, original_event, voice_event in WYR_STAKE_WRAPPERS:
+        if (event_owners.get(wrapper_event) != ["structure"]
+                or len(event_owners.get(original_event, ())) != 1
+                or event_owners.get(voice_event) != ["common"]):
+            raise BuildError(f"Wyrmstake wrapper {wrapper_event} has ambiguous cross-Bank targets")
+    if any(common.media_entry(index=i).media_id != media
+           for i, media in enumerate(WYR_STAKE_MEDIA_IDS, 47)):
+        raise BuildError("Wyrmstake voice media order differs")
+    if len(WYR_STAKE_SOUND_IDS) != len(WYR_STAKE_EVENT_IDS):
+        raise BuildError("Wyrmstake voice Sound/Event counts differ")
+    if event_owners.get(WYR_STAKE_STRIKE_EVENT_ID) != ["shell"]:
+        raise BuildError("Wyrmstake hit-release Event has ambiguous ownership")
+    _validate_mono_wwise_pcm(
+        shell, index=52, media_id=WYR_STAKE_STRIKE_MEDIA_ID,
+        sample_count=54_000, label="Wyrmstake Strike Flame DIDX #52",
+    )
+    _validate_mono_wwise_pcm(
+        shell, index=53, media_id=WYR_STAKE_ACS_STANDBY_MEDIA_ID,
+        sample_count=78_000, label="Wyrmstake ACS Standby DIDX #53",
+    )
+
+    voice = soundbank_editor.WwevFile.from_file(
+        _path(staged, PL_VOICE_WWEV_TARGET, "Wyrmstake voice mute")
+    )
+    if (
+            WYR_STAKE_VOICE_MUTE_REQUEST != WYR_STAKE_MUTE_REQUEST
+            or WYR_STAKE_MUTE_EVENT_ID != WYR_STAKE_MUTE_ROUTE_EVENT_ID
+    ):
+        raise BuildError("Wyrmstake voice-mute request or Event IDs diverged")
+    donor = voice.record(ORIGINAL_GRUNT_REQUEST)
+    mute = voice.record(WYR_STAKE_MUTE_REQUEST)
+    if (
+            donor.event_id != ORIGINAL_GRUNT_EVENT_ID
+            or donor.mode != 4
+            or donor.sha256 != FIRING_DONOR_RECORD_SHA256
+            or mute.index != 103
+            or mute.event_id != WYR_STAKE_MUTE_EVENT_ID
+            or mute.mode != 4
+            or mute.sha256 != WYR_STAKE_MUTE_RECORD_SHA256
+            or len(voice.records_for_request(WYR_STAKE_MUTE_REQUEST)) != 1
+    ):
+        raise BuildError("Wyrmstake voice-mute WWEV donor or clone differs")
+    for request, original_event in WYR_STAKE_ORIGINAL_VOICE_EVENTS.items():
+        records = voice.records_for_request(request)
+        if len(records) != 1 or records[0].mode != 4 or records[0].event_id != original_event:
+            raise BuildError(f"Wyrmstake original voice request {request} changed")
+
+    voice_routes = lmt.triggered_requests(voice)
+    selected_motions = {motion for motion, _, _, _, _ in WYR_STAKE_VOICE_MUTE_EDITS}
+    selected = tuple(
+        row for row in voice_routes
+        if row.motion_id in selected_motions and row.event_group == "EventGroup02"
+    )
+    expected_voice = {
+        (motion, "EventGroup02", slot, frame, WYR_STAKE_MUTE_REQUEST,
+         103, 4, WYR_STAKE_MUTE_EVENT_ID)
+        for motion, slot, _, frame, _ in WYR_STAKE_VOICE_MUTE_EDITS
+    }
+    actual_voice = {
+        (row.motion_id, row.event_group, row.slot, row.trigger_frame,
+         row.request_no, row.wwev_record, row.wwev_mode, row.event_id)
+        for row in selected
+    }
+    if actual_voice != expected_voice or len(selected) != len(expected_voice):
+        raise BuildError("Wyrmstake selected Motion voice routes differ")
+    if tuple(row for row in voice_routes if row.request_no == WYR_STAKE_MUTE_REQUEST) != selected:
+        raise BuildError("Wyrmstake mute request leaks into an unselected Motion")
+    if (
+            event_owners.get(WYR_STAKE_MUTE_ROUTE_EVENT_ID) != ["common"]
+            or event_owners.get(WYR_STAKE_MUTE_EMPTY_EVENT_ID) != ["common"]
+    ):
+        raise BuildError("Wyrmstake mute Event has ambiguous cross-Bank ownership")
+
+
+WYR_STAKE_VALIDATOR = BundleValidator(
+    name="wyrmstake_cannon_route",
+    design_id="wp07_gun_epvsp_shell.wyrmstake_cannon",
+    validate=validate_wyrmstake_cannon,
+)
 
 
 def _path(staged: Mapping[Path, Path], target: Path, route: str) -> Path:
@@ -391,7 +566,7 @@ def validate_wide_sweep(staged: Mapping[Path, Path]) -> None:
         45, WIDE_SWEEP_DONOR_MODE, WIDE_SWEEP_NEW_EVENT_ID, WIDE_SWEEP_NEW_RECORD_SHA256
     ):
         raise BuildError("wide-sweep appended WWEV record differs from its complete guard")
-    if len(wwev.records) != 46 or any(wwev.records_for_request(request) for request in (6597, 6598)):
+    if len(wwev.records) != 49 or any(wwev.records_for_request(request) for request in (6597, 6598)):
         raise BuildError("wide-sweep WWEV contains unexpected timing candidates")
     if any(record.event_id in WIDE_SWEEP_UNUSED_EVENT_IDS for record in wwev.records):
         raise BuildError("wide-sweep WWEV still references an unused timing Event")
@@ -519,7 +694,7 @@ def validate_charged_shelling(staged: Mapping[Path, Path]) -> None:
     record = voice.record(FIRING_VOICE_REQUEST)
     donor = voice.record(1409)
     original_grunt = voice.record(1305)
-    if (len(voice.records) != 102
+    if (len(voice.records) != 103
             or (record.index, record.mode, record.event_id, record.sha256)
             != (102, 4, FIRING_VOICE_EVENT_ID, FIRING_VOICE_RECORD_SHA256)
             or (donor.index, donor.mode, donor.event_id, donor.sha256)
@@ -559,8 +734,11 @@ def validate_charged_shelling(staged: Mapping[Path, Path]) -> None:
     silent_ids = {ident for _, ident, _ in FIRING_SILENT_BODY_GUARDS}
     for target, path in staged.items():
         if target.suffix == ".nbnk" and target != BANK_TARGET:
-            bank = soundbank_editor.SoundBank.from_file(path)
-            if silent_ids & soundbank_editor.HircEditor(bank.hirc_payload).object_ids:
+            if target == EVENT_STRUCTURE_TARGET:
+                payload = HircBank.from_bytes(path.read_bytes()).hirc_payload
+            else:
+                payload = soundbank_editor.SoundBank.from_file(path).hirc_payload
+            if silent_ids & soundbank_editor.HircEditor(payload).object_ids:
                 raise BuildError("firing silence HIRC ownership is not unique")
 
     if (
@@ -593,7 +771,7 @@ def validate_charged_shelling(staged: Mapping[Path, Path]) -> None:
         CHARGED_SHELLING_DONOR_MODE,
         CHARGED_SHELLING_NEW_EVENT_ID,
         CHARGED_SHELLING_NEW_RECORD_SHA256,
-    ) or len(wwev.records) != 46:
+    ) or len(wwev.records) != 49:
         raise BuildError("charged-shelling appended WWEV record differs from its guard")
 
     all_routes = lmt.triggered_requests(wwev)

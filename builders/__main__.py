@@ -10,7 +10,9 @@ from .integration import (
     OVERHEAD_SMASH_VALIDATOR,
     STATIONARY_DRAW_VALIDATOR,
     WIDE_SWEEP_VALIDATOR,
+    WYR_STAKE_VALIDATOR,
 )
+from .pl_wp_par_op_event_structure import PLAN as PL_WP_PAR_OP_EVENT_STRUCTURE
 from .pl_prop_cmn import PLAN as PL_PROP_CMN
 from .pl_voice import PLAN as PL_VOICE
 from .w07_00 import PLAN as W07_00
@@ -23,6 +25,7 @@ ARTIFACT_PLANS = (
     WP07_GUN_EPVSP_SHELL,
     WP_CMN_EPVSP,
     WP_GUN_CMN,
+    PL_WP_PAR_OP_EVENT_STRUCTURE,
     HM_CM00_EPVSP,
     W07_00,
     HM_WP07_SND_EV,
@@ -40,6 +43,7 @@ MOD_PLAN = ModBuildPlan(
         OVERHEAD_SMASH_VALIDATOR,
         WIDE_SWEEP_VALIDATOR,
         CHARGED_SHELLING_VALIDATOR,
+        WYR_STAKE_VALIDATOR,
     ),
 )
 

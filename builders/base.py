@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -30,6 +31,8 @@ __all__ = (
     "BuildError",
     "BuildResult",
     "BundleValidator",
+    "HircBankBuildPlan",
+    "HircBankEditSummary",
     "LmtBuildPlan",
     "MediaAddition",
     "MediaReplacement",
@@ -274,6 +277,106 @@ class SoundBankBuildPlan:
 
 
 @dataclass(frozen=True)
+class HircBankEditSummary:
+    """Exact edit report for a media-less v120 event Bank."""
+
+    added_hirc_objects: tuple[tuple[int, int], ...]
+    changed_byte_count: int
+    resized_hirc_objects: tuple[tuple[int, int, int, int], ...]
+    hirc_size_delta: int
+
+
+@dataclass(frozen=True)
+class HircBankBuildPlan:
+    """Build a BKHD/HIRC-only Bank while retaining every original chunk."""
+
+    name: str
+    design_ids: tuple[str, ...]
+    source: Path
+    target: Path
+    expected_source_sha256: str
+    expected_bank_id: int
+    apply_edits: Callable[[soundbank_editor.HircEditor], None]
+    expected_summary: HircBankEditSummary
+
+    def __post_init__(self) -> None:
+        _plan_identity(self.name, self.design_ids, self.apply_edits)
+        object.__setattr__(self, "source", _declared_path(self.source, "source Bank", suffix=".nbnk"))
+        object.__setattr__(self, "target", _declared_path(self.target, "target Bank", suffix=".nbnk", target=True))
+        object.__setattr__(self, "expected_source_sha256",
+                           _sha256_guard(self.expected_source_sha256, "source Bank SHA-256"))
+        _u32(self.expected_bank_id, "expected Bank ID")
+        if not isinstance(self.expected_summary, HircBankEditSummary):
+            raise TypeError("expected_summary must be HircBankEditSummary")
+
+
+@dataclass(frozen=True)
+class HircBank:
+    """Losslessly parsed media-less Bank; only its HIRC chunk may change."""
+
+    chunks: tuple[soundbank_editor.Chunk, ...]
+    version: int
+    bank_id: int
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> HircBank:
+        chunks = []
+        position = 0
+        while position < len(data):
+            if position + 8 > len(data):
+                raise BuildError("media-less Bank has a truncated chunk header")
+            tag, size = struct.unpack_from("<4sI", data, position)
+            end = position + 8 + size
+            if end > len(data):
+                raise BuildError(f"media-less Bank chunk {tag!r} exceeds file length")
+            chunks.append(soundbank_editor.Chunk(tag, position, data[position + 8:end], data[position:end]))
+            position = end
+        if tuple(chunk.tag for chunk in chunks) != (b"BKHD", b"HIRC"):
+            raise BuildError("media-less Bank must contain exactly BKHD and HIRC chunks")
+        if len(chunks[0].payload) < 8:
+            raise BuildError("media-less Bank BKHD is too short")
+        version, bank_id = struct.unpack_from("<II", chunks[0].payload)
+        if version != soundbank_editor.SUPPORTED_EDIT_VERSION:
+            raise BuildError(f"media-less Bank requires Wwise v120, found v{version}")
+        soundbank_editor.HircEditor(chunks[1].payload, version=version)
+        return cls(tuple(chunks), version, bank_id)
+
+    @property
+    def hirc_payload(self) -> bytes:
+        return self.chunks[1].payload
+
+    def with_hirc(self, payload: bytes) -> bytes:
+        return self.chunks[0].raw + b"HIRC" + struct.pack("<I", len(payload)) + payload
+
+
+def _edit_hirc_bank(
+        plan: HircBankBuildPlan, original: HircBank,
+) -> tuple[bytes, HircBankEditSummary]:
+    editor = soundbank_editor.HircEditor(original.hirc_payload, version=original.version)
+    original_objects = tuple((o.object_type, o.object_id, o.body) for o in editor.objects())
+    plan.apply_edits(editor)
+    payload = editor.build()
+    rebuilt = HircBank.from_bytes(original.with_hirc(payload))
+    reread = soundbank_editor.HircEditor(rebuilt.hirc_payload, version=rebuilt.version)
+    added = set(editor.added_objects)
+    retained = tuple((o.object_type, o.object_id, o.body) for o in reread.objects()
+                     if (o.object_type, o.object_id) not in added)
+    if retained != original_objects:
+        raise BuildError(f"{plan.name}: original HIRC objects changed or reordered")
+    if rebuilt.chunks[0].raw != original.chunks[0].raw:
+        raise BuildError(f"{plan.name}: original BKHD changed")
+    if tuple((o.object_type, o.object_id, o.body) for o in reread.objects()) != tuple(
+            (o.object_type, o.object_id, o.body) for o in editor.objects()
+    ):
+        raise BuildError(f"{plan.name}: HIRC read-back differs")
+    summary = HircBankEditSummary(editor.added_objects, editor.changed_byte_count,
+                                  editor.resized_objects, len(payload) - len(original.hirc_payload))
+    if summary != plan.expected_summary:
+        raise _summary_mismatch(plan.name, plan.expected_summary, summary)
+    return original.with_hirc(payload), summary
+
+
+@dataclass(frozen=True)
 class LmtBuildPlan:
     """Complete build contract for one MHW LMT v95 artifact."""
 
@@ -335,9 +438,10 @@ class WwevBuildPlan:
             raise TypeError("expected_summary must be WwevEditSummary")
 
 
-ArtifactBuildPlan = SoundBankBuildPlan | LmtBuildPlan | WwevBuildPlan
+ArtifactBuildPlan = SoundBankBuildPlan | HircBankBuildPlan | LmtBuildPlan | WwevBuildPlan
 ArtifactSummary = (
     soundbank_editor.SoundBankEditSummary
+    | HircBankEditSummary
     | soundbank_editor.LmtEditSummary
     | soundbank_editor.WwevEditSummary
 )
@@ -372,7 +476,7 @@ class ModBuildPlan:
         if not isinstance(self.artifacts, tuple) or not self.artifacts:
             raise TypeError("artifacts must be a non-empty tuple")
         if any(
-            not isinstance(item, (SoundBankBuildPlan, LmtBuildPlan, WwevBuildPlan))
+                not isinstance(item, (SoundBankBuildPlan, HircBankBuildPlan, LmtBuildPlan, WwevBuildPlan))
             for item in self.artifacts
         ):
             raise TypeError("artifacts contains an unsupported plan")
@@ -399,6 +503,7 @@ class PreparedArtifact:
     source: Path
     original: (
         soundbank_editor.SoundBank
+        | HircBank
         | soundbank_editor.LmtFile
         | soundbank_editor.WwevFile
     )
@@ -655,6 +760,11 @@ def prepare_plan(plan: ArtifactBuildPlan, project_root: Path) -> PreparedArtifac
                     f"{plan.name}: added Media ID already exists: {collisions[0]}"
                 )
             summary = _preview_soundbank(plan, original)
+        elif isinstance(plan, HircBankBuildPlan):
+            original = HircBank.from_bytes(source.read_bytes())
+            if original.bank_id != plan.expected_bank_id:
+                raise BuildError(f"{plan.name}: expected Bank ID {plan.expected_bank_id} but found {original.bank_id}")
+            _, summary = _edit_hirc_bank(plan, original)
         elif isinstance(plan, LmtBuildPlan):
             original = soundbank_editor.LmtFile.from_file(source)
             editor = soundbank_editor.LmtEditor(original)
@@ -954,6 +1064,19 @@ def build_plan(
             _validate_soundbank_stage(
                 prepared, editor, stage, validation_dir, project_root, tools
             )
+        elif isinstance(plan, HircBankBuildPlan):
+            if not isinstance(prepared.original, HircBank):
+                raise BuildError(f"{plan.name}: prepared source is not a media-less Bank")
+            payload, summary = _edit_hirc_bank(plan, prepared.original)
+            if summary != prepared.preview_summary:
+                raise _summary_mismatch(plan.name, prepared.preview_summary, summary)
+            atomic_write(stage, payload)
+            if stage.read_bytes() != payload:
+                raise BuildError(f"{plan.name}: staged Bank failed byte-exact read-back")
+            if tools is not None:
+                validation_dir.mkdir(parents=True, exist_ok=True)
+                run_tool([sys.executable, str(tools.wwiser), "-d", "none", str(stage)],
+                         f"wwiser {stage.name}", validation_dir)
         elif isinstance(plan, LmtBuildPlan):
             if not isinstance(prepared.original, soundbank_editor.LmtFile):
                 raise BuildError(f"{plan.name}: prepared source is not an LMT")
@@ -1104,7 +1227,7 @@ def build_one(
         raise BuildError(
             f"Output already exists; add --force after confirming overwrite: {target}"
         )
-    tools = make_tool_paths(project_root) if isinstance(plan, SoundBankBuildPlan) else None
+    tools = make_tool_paths(project_root) if isinstance(plan, (SoundBankBuildPlan, HircBankBuildPlan)) else None
 
     with tempfile.TemporaryDirectory(prefix=f"builder-{plan.name}.") as directory:
         task_dir = Path(directory)
@@ -1153,7 +1276,7 @@ def build_all(
         )
     tools = (
         make_tool_paths(project_root)
-        if any(isinstance(item.plan, SoundBankBuildPlan) for item in prepared)
+        if any(isinstance(item.plan, (SoundBankBuildPlan, HircBankBuildPlan)) for item in prepared)
         else None
     )
 

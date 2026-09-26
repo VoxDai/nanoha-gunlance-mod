@@ -23,10 +23,15 @@ FIRING_VOICE_EVENT_ID = 2_825_008_231
 FIRING_VOICE_RECORD_SHA256 = (
     "2b21f2a836c096e164751adfcad860aa8f919fea0a857f11fa64ac4de40798c4"
 )
+WYR_STAKE_MUTE_REQUEST = 6750
+WYR_STAKE_MUTE_EVENT_ID = 2_846_173_097
+WYR_STAKE_MUTE_RECORD_SHA256 = (
+    "c44060757af7fe2b1ba1c5bc505e738d20342f68cd5754d7184283bca6432f00"
+)
 
 
 def apply_edits(editor: soundbank_editor.WwevEditor) -> None:
-    """Clone the original grunt request for Accel and isolated firing silence."""
+    """Clone the original grunt request for Accel and isolated voice silence."""
 
     editor.append_cloned_record(
         donor_request=DONOR_REQUEST,
@@ -43,12 +48,19 @@ def apply_edits(editor: soundbank_editor.WwevEditor) -> None:
     )
     if record.sha256 != FIRING_VOICE_RECORD_SHA256:
         raise soundbank_editor.WwevError("firing silence record body differs")
+    mute = editor.append_cloned_record(
+        donor_request=DONOR_REQUEST, expected_donor_event_id=DONOR_EVENT_ID,
+        expected_donor_mode=DONOR_MODE, expected_donor_sha256=DONOR_RECORD_SHA256,
+        new_request=WYR_STAKE_MUTE_REQUEST, new_event_id=WYR_STAKE_MUTE_EVENT_ID,
+    )
+    if mute.sha256 != WYR_STAKE_MUTE_RECORD_SHA256:
+        raise soundbank_editor.WwevError("Wyrmstake voice-mute record body differs")
 
 
 EXPECTED_SUMMARY = soundbank_editor.WwevEditSummary(
     record_count_before=100,
-    record_count_after=102,
-    appended_size=258,
+    record_count_after=103,
+    appended_size=387,
     edits=(
         soundbank_editor.WwevRecordEdit(
             donor_record_index=20,
@@ -65,13 +77,20 @@ EXPECTED_SUMMARY = soundbank_editor.WwevEditSummary(
             new_request=FIRING_VOICE_REQUEST, new_event_id=FIRING_VOICE_EVENT_ID,
             appended_size=129,
         ),
+        soundbank_editor.WwevRecordEdit(
+            donor_record_index=20, donor_request=DONOR_REQUEST,
+            donor_event_id=DONOR_EVENT_ID, added_record_index=103,
+            new_request=WYR_STAKE_MUTE_REQUEST, new_event_id=WYR_STAKE_MUTE_EVENT_ID,
+            appended_size=129,
+        ),
     ),
 )
 
 
 PLAN = WwevBuildPlan(
     name="pl_voice",
-    design_ids=("wp_gun_cmn.overhead_smash", "wp07_gun_epvsp_shell.charged_shelling"),
+    design_ids=("wp_gun_cmn.overhead_smash", "wp07_gun_epvsp_shell.charged_shelling",
+                "wp07_gun_epvsp_shell.wyrmstake_cannon"),
     source="original/wwev/pl_voice.wwev",
     target="sound/pl/pl_voice.wwev",
     expected_source_sha256=(

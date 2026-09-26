@@ -57,9 +57,36 @@ FIRING_VOICE_MOTIONS = (101, 102, 103)
 FIRING_VOICE_REQUEST = 6608
 FIRING_VOICE_OFFSETS = (606048, 627200, 648272)
 
+WYR_STAKE_VOICE_MUTE_REQUEST = 6750
+WYR_STAKE_VOICE_MUTE_EDITS = (
+    (144, "A", 1129, 27.0, 1_222_880),
+    (145, "B", 1105, 80.0, 1_261_120),
+    (145, "C", 1019, 183.0, 1_261_152),
+    (178, "A", 1309, 19.0, 2_055_696),
+    (179, "B", 1119, 2.0, 2_093_728),
+    (179, "A", 1109, 68.0, 2_093_696),
+    (179, "C", 1009, 176.0, 2_093_760),
+    (181, "A", 1309, 34.0, 2_135_488),
+    (182, "B", 1119, 4.0, 2_174_160),
+    (182, "A", 1109, 65.0, 2_174_128),
+    (182, "C", 1009, 184.0, 2_174_192),
+    (310, "A", 1309, 53.0, 2_691_040),
+)
+
+
+WYR_STAKE_EDITS = (
+    (144, "EventGroup06", "G", 6456, 6610, (2.0,), 1_223_392),
+    (178, "EventGroup07", "A", 6570, 6611, (1.0,), 2_056_144),
+    (181, "EventGroup07", "A", 6570, 6611, (1.0,), 2_135_936),
+    (310, "EventGroup07", "A", 6570, 6611, (3.0,), 2_691_488),
+    (145, "EventGroup06", "H", 6525, 6612, (1.0,), 1_261_552),
+    (179, "EventGroup06", "G", 6525, 6612, (1.0,), 2_094_144),
+    (182, "EventGroup06", "G", 6525, 6612, (1.0,), 2_174_576),
+)
+
 
 def apply_edits(editor: soundbank_editor.LmtEditor) -> None:
-    """Guard and replace the ten reviewed animation request assignments."""
+    """Guard and replace the reviewed animation and voice request assignments."""
 
     editor.replace_request(
         motion_id=MOTION_ID,
@@ -113,10 +140,23 @@ def apply_edits(editor: soundbank_editor.LmtEditor) -> None:
             request_keyframe_frame=0.0, expected_request=1305,
             replacement_request=FIRING_VOICE_REQUEST, expected_trigger_frames=(5.0,),
         )
+    for motion, group, slot, old_request, new_request, frames, _ in WYR_STAKE_EDITS:
+        editor.replace_request(
+            motion_id=motion, event_group=group, slot=slot,
+            request_keyframe_frame=0.0, expected_request=old_request,
+            replacement_request=new_request, expected_trigger_frames=frames,
+        )
+    for motion, slot, old_request, frame, _ in WYR_STAKE_VOICE_MUTE_EDITS:
+        editor.replace_request(
+            motion_id=motion, event_group="EventGroup02", slot=slot,
+            request_keyframe_frame=0.0, expected_request=old_request,
+            replacement_request=WYR_STAKE_VOICE_MUTE_REQUEST,
+            expected_trigger_frames=(frame,),
+        )
 
 
 EXPECTED_SUMMARY = soundbank_editor.LmtEditSummary(
-    changed_byte_count=15,
+    changed_byte_count=46,
     edits=(
         soundbank_editor.LmtRequestEdit(
             motion_id=MOTION_ID,
@@ -202,6 +242,22 @@ EXPECTED_SUMMARY = soundbank_editor.LmtEditSummary(
             old_request=1305, new_request=FIRING_VOICE_REQUEST, changed_byte_count=2,
         )
         for motion, offset in zip(FIRING_VOICE_MOTIONS, FIRING_VOICE_OFFSETS, strict=True)
+    ) + tuple(
+        soundbank_editor.LmtRequestEdit(
+            motion_id=motion, event_group=group, slot=slot,
+            request_keyframe_frame=0.0, trigger_frames=frames,
+            offset=offset, old_request=old_request, new_request=new_request,
+            changed_byte_count=1,
+        )
+        for motion, group, slot, old_request, new_request, frames, offset in WYR_STAKE_EDITS
+    ) + tuple(
+        soundbank_editor.LmtRequestEdit(
+            motion_id=motion, event_group="EventGroup02", slot=slot,
+            request_keyframe_frame=0.0, trigger_frames=(frame,),
+            offset=offset, old_request=old_request,
+            new_request=WYR_STAKE_VOICE_MUTE_REQUEST, changed_byte_count=2,
+        )
+        for motion, slot, old_request, frame, offset in WYR_STAKE_VOICE_MUTE_EDITS
     ),
 )
 
@@ -213,6 +269,7 @@ PLAN = LmtBuildPlan(
         "wp_gun_cmn.overhead_smash",
         "wp_gun_cmn.wide_sweep",
         "wp07_gun_epvsp_shell.charged_shelling",
+        "wp07_gun_epvsp_shell.wyrmstake_cannon",
     ),
     source="original/lmt/w07_00.lmt",
     target="hm/wp/wp07/mot/w07_00/w07_00.lmt",

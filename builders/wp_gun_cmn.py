@@ -15,6 +15,166 @@ from .voice_standard import (
     standard_voice_sound_body,
 )
 
+WYR_STAKE_MEDIA_IDS = (1_484_632_890, 3_113_081_405)
+WYR_STAKE_SOUND_IDS = (1_847_466_623, 573_906_608)
+WYR_STAKE_EVENT_IDS = (1_289_400_830, 1_358_515_313)
+WYR_STAKE_ACTION_IDS = (2_004_285_408, 551_409_861)
+WYR_STAKE_PITCH = soundbank_editor.HircPitchSettings(None, (-50.0, 50.0))
+WYR_STAKE_SOUND_SHA256S = (
+    "56f69bfb7ca7002283351feba3c2beb81e6f19dabbdda69c0cc78078bcbd0a70",
+    "564dfecdf7e2054a3e86eea6f2768a8a31da359cb6c912d9c2bebd8c3e613fb6",
+)
+WYR_STAKE_MUTE_EMPTY_EVENT_ID = 3_938_800_881
+WYR_STAKE_MUTE_PLAY_ACTION_ID = 1_604_422_970
+WYR_STAKE_MUTE_ROUTE_EVENT_ID = 2_846_173_097
+WYR_STAKE_MUTE_BODY_GUARDS = (
+    (soundbank_editor.HIRC_EVENT, WYR_STAKE_MUTE_EMPTY_EVENT_ID,
+     "21525a5823a2687ce13e25a0e09d58d97909bbf80da668325e915651bfcfc040"),
+    (soundbank_editor.HIRC_ACTION, WYR_STAKE_MUTE_PLAY_ACTION_ID,
+     "7ef8b289c598aab00f84deb221ff22cd47921220296f54848e173f257a172bb9"),
+    (soundbank_editor.HIRC_EVENT, WYR_STAKE_MUTE_ROUTE_EVENT_ID,
+     "4685644e360014eb448b4937e8c353f5a9359e0d50dea3bb0e649baace7cca04"),
+)
+
+
+WYR_STAKE_ORIGINAL_ROUTES = (
+    (2_798_914_977, 193_548_488, 564_339_955,
+     "92c0853b4112e8fe3e1a476d2225950c728ea8441e5014ee6d4083b6dbc89a80",
+     "bc6d45828f7dba59fa6068d9aaf4420cb961a3765ee868c600384da0f3740e6b"),
+    (2_279_772_715, 479_984_650, 68_493_596,
+     "0d24089543173b9f1f9a9200a11ab8e05169362751754b03483004a6d11e207c",
+     "f4c3e1d1071787fd47d9e83cf385309fac8b92f397164d50e4c83022487fde63"),
+)
+
+
+def validate_wyrmstake_voice_hirc(bank: soundbank_editor.SoundBankEditor) -> None:
+    """Guard original common routes and the two independent custom voices."""
+
+    hirc = bank.hirc
+    for event, action, target, event_sha, action_sha in WYR_STAKE_ORIGINAL_ROUTES:
+        if (
+                hirc.event_actions(event) != (action,)
+                or hashlib.sha256(hirc.object_body(soundbank_editor.HIRC_EVENT, event)).hexdigest() != event_sha
+                or hashlib.sha256(hirc.object_body(soundbank_editor.HIRC_ACTION, action)).hexdigest() != action_sha
+                or struct.unpack_from("<I", hirc.object_body(soundbank_editor.HIRC_ACTION, action), 6)[0] != target
+        ):
+            raise soundbank_editor.SoundBankError("original Wyrmstake common Event changed")
+    positions = {item.object_id: item.index for item in hirc.objects()}
+    for index, (media, sound, event, action, sound_sha256) in enumerate(zip(
+            WYR_STAKE_MEDIA_IDS, WYR_STAKE_SOUND_IDS,
+            WYR_STAKE_EVENT_IDS, WYR_STAKE_ACTION_IDS,
+            WYR_STAKE_SOUND_SHA256S, strict=True
+    ), 47):
+        sound_body = hirc.object_body(soundbank_editor.HIRC_SOUND, sound)
+        if (
+                bank.media_entry(index=index).media_id != media
+                or len(sound_body) != 55
+                or hashlib.sha256(sound_body).hexdigest() != sound_sha256
+                or hirc.pitch_settings(soundbank_editor.HIRC_SOUND, sound)
+                != WYR_STAKE_PITCH
+                or hirc.event_actions(event) != (action,)
+                or hirc.object_body(soundbank_editor.HIRC_ACTION, action)
+                != hirc.create_play_action(action, sound, bank.bank_id)
+                or not positions[sound] < positions[action] < positions[event]
+        ):
+            raise soundbank_editor.SoundBankError("Wyrmstake custom voice route differs")
+
+
+def _apply_wyrmstake_voice(bank: soundbank_editor.SoundBankEditor) -> None:
+    hirc = bank.hirc
+    for event, action, target, event_sha, action_sha in WYR_STAKE_ORIGINAL_ROUTES:
+        if (
+                hirc.event_actions(event) != (action,)
+                or hashlib.sha256(hirc.object_body(soundbank_editor.HIRC_EVENT, event)).hexdigest() != event_sha
+                or hashlib.sha256(hirc.object_body(soundbank_editor.HIRC_ACTION, action)).hexdigest() != action_sha
+                or struct.unpack_from("<I", hirc.object_body(soundbank_editor.HIRC_ACTION, action), 6)[0] != target
+        ):
+            raise soundbank_editor.SoundBankError("original Wyrmstake common donor differs")
+    for media, sound, event, action in zip(
+            WYR_STAKE_MEDIA_IDS, WYR_STAKE_SOUND_IDS,
+            WYR_STAKE_EVENT_IDS, WYR_STAKE_ACTION_IDS, strict=True
+    ):
+        insert_standard_voice_sound(hirc, sound, media,
+                                    label="insert Wyrmstake canonical voice Sound")
+        hirc.set_pitch(
+            soundbank_editor.HIRC_SOUND, sound,
+            expected=soundbank_editor.HircPitchSettings(None, None),
+            random_range_cents=WYR_STAKE_PITCH.random_range_cents,
+            label="set Wyrmstake custom voice random Pitch",
+        )
+        hirc.insert_object(soundbank_editor.HIRC_ACTION, action,
+                           hirc.create_play_action(action, sound, bank.bank_id)[4:],
+                           label="insert Wyrmstake voice Play Action")
+        hirc.insert_object(soundbank_editor.HIRC_EVENT, event,
+                           struct.pack("<II", 1, action),
+                           label="insert Wyrmstake voice Event")
+    validate_wyrmstake_voice_hirc(bank)
+
+
+def validate_wyrmstake_original_voice_mute_hirc(
+        bank: soundbank_editor.SoundBankEditor,
+) -> None:
+    """Require the media-free, single-owner Wyrmstake voice-mute route."""
+
+    hirc = bank.hirc
+    for kind, ident, digest in WYR_STAKE_MUTE_BODY_GUARDS:
+        if hashlib.sha256(hirc.object_body(kind, ident)).hexdigest() != digest:
+            raise soundbank_editor.SoundBankError("Wyrmstake mute HIRC body differs")
+    if (
+            hirc.event_actions(WYR_STAKE_MUTE_EMPTY_EVENT_ID) != ()
+            or hirc.event_actions(WYR_STAKE_MUTE_ROUTE_EVENT_ID)
+            != (WYR_STAKE_MUTE_PLAY_ACTION_ID,)
+            or hirc.object_body(soundbank_editor.HIRC_ACTION, WYR_STAKE_MUTE_PLAY_ACTION_ID)
+            != hirc.create_play_event_action(
+        WYR_STAKE_MUTE_PLAY_ACTION_ID, WYR_STAKE_MUTE_EMPTY_EVENT_ID
+    )
+    ):
+        raise soundbank_editor.SoundBankError("Wyrmstake mute Event chain differs")
+    objects = hirc.objects()
+    positions = {item.object_id: item.index for item in objects}
+    if not (
+            positions[WYR_STAKE_MUTE_EMPTY_EVENT_ID]
+            < positions[WYR_STAKE_MUTE_PLAY_ACTION_ID]
+            < positions[WYR_STAKE_MUTE_ROUTE_EVENT_ID]
+    ):
+        raise soundbank_editor.SoundBankError("Wyrmstake mute HIRC order differs")
+    owners = tuple(
+        item.object_id for item in objects
+        if item.object_type == soundbank_editor.HIRC_EVENT
+        and WYR_STAKE_MUTE_PLAY_ACTION_ID in hirc.event_actions(item.object_id)
+    )
+    if owners != (WYR_STAKE_MUTE_ROUTE_EVENT_ID,):
+        raise soundbank_editor.SoundBankError("Wyrmstake mute Action owner differs")
+
+
+def _apply_wyrmstake_original_voice_mute(
+        bank: soundbank_editor.SoundBankEditor,
+) -> None:
+    hirc = bank.hirc
+    previous = tuple((obj.object_type, obj.object_id, obj.body) for obj in hirc.objects())
+    hirc.insert_object(
+        soundbank_editor.HIRC_EVENT, WYR_STAKE_MUTE_EMPTY_EVENT_ID,
+        struct.pack("<I", 0), label="insert Wyrmstake zero-Action Event",
+    )
+    hirc.insert_object(
+        soundbank_editor.HIRC_ACTION, WYR_STAKE_MUTE_PLAY_ACTION_ID,
+        hirc.create_play_event_action(
+            WYR_STAKE_MUTE_PLAY_ACTION_ID, WYR_STAKE_MUTE_EMPTY_EVENT_ID
+        )[4:], after=(soundbank_editor.HIRC_EVENT, WYR_STAKE_MUTE_EMPTY_EVENT_ID),
+        label="insert Wyrmstake voice-mute PlayEvent Action",
+    )
+    hirc.insert_object(
+        soundbank_editor.HIRC_EVENT, WYR_STAKE_MUTE_ROUTE_EVENT_ID,
+        struct.pack("<II", 1, WYR_STAKE_MUTE_PLAY_ACTION_ID),
+        after=(soundbank_editor.HIRC_ACTION, WYR_STAKE_MUTE_PLAY_ACTION_ID),
+        label="insert Wyrmstake voice-mute route Event",
+    )
+    added = {ident for _, ident, _ in WYR_STAKE_MUTE_BODY_GUARDS}
+    if tuple((obj.object_type, obj.object_id, obj.body) for obj in hirc.objects()
+             if obj.object_id not in added) != previous:
+        raise soundbank_editor.SoundBankError("Wyrmstake mute changed an existing HIRC object")
+    validate_wyrmstake_original_voice_mute_hirc(bank)
+
 
 VOICE_MEDIA_ID = 863_865_614
 VOICE_SOUND_ID = 700_212_875
@@ -445,7 +605,16 @@ def validate_charged_shelling_divine_hirc(
 
     _guard_charged_shelling_divine_original(bank)
     editor = bank.hirc
-    if len(editor.objects()) != 159 or len(editor.build()) != 8_770:
+    with_wyrmstake = WYR_STAKE_EVENT_IDS[0] in editor.object_ids
+    with_wyrmstake_mute = WYR_STAKE_MUTE_ROUTE_EVENT_ID in editor.object_ids
+    if with_wyrmstake_mute and not with_wyrmstake:
+        raise soundbank_editor.SoundBankError("Wyrmstake mute route lacks custom voice route")
+    expected_count, expected_size = (
+        (168, 9_018) if with_wyrmstake_mute
+        else (165, 8_970) if with_wyrmstake
+        else (159, 8_770)
+    )
+    if len(editor.objects()) != expected_count or len(editor.build()) != expected_size:
         raise soundbank_editor.SoundBankError(
             "charged-shelling Divine combined HIRC count or payload size differs"
         )
@@ -1017,6 +1186,8 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
     _validate_reload_hirc(bank)
     _apply_wide_sweep(bank)
     _apply_charged_shelling_divine(bank)
+    _apply_wyrmstake_voice(bank)
+    _apply_wyrmstake_original_voice_mute(bank)
 
 
 EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
@@ -1035,8 +1206,10 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (44, OVERHEAD_MEDIA_IDS[1]),
         (45, CHARGED_SHELLING_DIVINE_MEDIA_ID),
         (46, CHARGED_SHELLING_DIVINE_MEDIA_IDS[1]),
+        (47, WYR_STAKE_MEDIA_IDS[0]),
+        (48, WYR_STAKE_MEDIA_IDS[1]),
     ),
-    hirc_changed_bytes=25,
+    hirc_changed_bytes=41,
     added_hirc_objects=(
         (soundbank_editor.HIRC_SOUND, VOICE_SOUND_ID),
         (soundbank_editor.HIRC_SOUND, STATIONARY_SOUND_IDS[1]),
@@ -1077,11 +1250,20 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (soundbank_editor.HIRC_ACTION, FIRING_SILENT_ACTION_ID),
         (soundbank_editor.HIRC_EVENT, FIRING_SILENT_EVENT_ID),
         (soundbank_editor.HIRC_EVENT, FIRING_VOICE_EVENT_ID),
+        (soundbank_editor.HIRC_SOUND, WYR_STAKE_SOUND_IDS[0]),
+        (soundbank_editor.HIRC_ACTION, WYR_STAKE_ACTION_IDS[0]),
+        (soundbank_editor.HIRC_EVENT, WYR_STAKE_EVENT_IDS[0]),
+        (soundbank_editor.HIRC_SOUND, WYR_STAKE_SOUND_IDS[1]),
+        (soundbank_editor.HIRC_ACTION, WYR_STAKE_ACTION_IDS[1]),
+        (soundbank_editor.HIRC_EVENT, WYR_STAKE_EVENT_IDS[1]),
+        (soundbank_editor.HIRC_EVENT, WYR_STAKE_MUTE_EMPTY_EVENT_ID),
+        (soundbank_editor.HIRC_ACTION, WYR_STAKE_MUTE_PLAY_ACTION_ID),
+        (soundbank_editor.HIRC_EVENT, WYR_STAKE_MUTE_ROUTE_EVENT_ID),
     ),
     resized_hirc_objects=(
         (soundbank_editor.HIRC_EVENT, RELOAD_EVENT_ID, 12, 16),
     ),
-    hirc_size_delta=1520,
+    hirc_size_delta=1768,
 )
 
 
@@ -1093,6 +1275,7 @@ PLAN = SoundBankBuildPlan(
         "wp_gun_cmn.reload",
         "wp_gun_cmn.wide_sweep",
         "wp07_gun_epvsp_shell.charged_shelling",
+        "wp07_gun_epvsp_shell.wyrmstake_cannon",
     ),
     source="original/nbnk/wp_gun_cmn.nbnk",
     target="sound/wwise/Windows/wp_gun_cmn.nbnk",
@@ -1185,6 +1368,18 @@ PLAN = SoundBankBuildPlan(
             46, CHARGED_SHELLING_DIVINE_MEDIA_IDS[1],
             "audio/wp07_gun_epvsp_shell/charged_shelling/"
             "nanoha_divine_02(gears_of_destiny.attack_voice.attack_04.1).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            47, WYR_STAKE_MEDIA_IDS[0],
+            "audio/wp07_gun_epvsp_shell/wyrmstake_cannon/"
+            "nanoha_acs_01(gears_of_destiny.attack_voice.attack_02.1).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            48, WYR_STAKE_MEDIA_IDS[1],
+            "audio/wp07_gun_epvsp_shell/wyrmstake_cannon/"
+            "nanoha_drive_01(gears_of_destiny.attack_voice.attack_02.2).wav",
             wem_channels=1,
         ),
     ),

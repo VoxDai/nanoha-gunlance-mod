@@ -49,6 +49,53 @@ CHARGED_SHELLING_SOUND_SHA256S = (
     "2e5a7e3eb467114ad41a2a742e5204f51a5dcf9bf45bc0a011f8c1a3cd8663a4",
 )
 CHARGED_SHELLING_MEDIA_INDICES = (50, 51)
+WYR_STAKE_STRIKE_MEDIA_ID = 949_600_199
+WYR_STAKE_STRIKE_SOUND_ID = 38_895_430
+WYR_STAKE_STRIKE_ACTION_ID = 1_821_689_211
+WYR_STAKE_STRIKE_EVENT_ID = 1_581_859_410
+WYR_STAKE_STRIKE_ORIGINAL_ACTION_ID = 705_609_317
+WYR_STAKE_STRIKE_ORIGINAL_CONTAINER_ID = 75_663_767
+WYR_STAKE_STRIKE_ORIGINAL_SOUND_ID = 151_638_268
+WYR_STAKE_STRIKE_ORIGINAL_MEDIA_ID = 629_066_097
+WYR_STAKE_ACS_STANDBY_MEDIA_ID = 938_668_400
+WYR_STAKE_ACS_STANDBY_SOUND_ID = 1_727_570_929
+WYR_STAKE_HIT_RANDOM_ID = 2_393_951_905
+WYR_STAKE_HIT_RANDOM_DONOR_ID = 58_172_267
+WYR_STAKE_HIT_RANDOM_DONOR_SHA256 = "53ce24846e01ef33e99c2c66575a9e50e367730b25231c53289fc2e772c4aff7"
+WYR_STAKE_HIT_PLAYLIST = (
+    (WYR_STAKE_STRIKE_SOUND_ID, 50_000),
+    (WYR_STAKE_ACS_STANDBY_SOUND_ID, 50_000),
+)
+WYR_STAKE_STRIKE_SOUND_SHA256 = "05b6321f093b39b5a0ebd59c8bf0208b117680a6541d60eabd1d64868f38ca3b"
+WYR_STAKE_ACS_STANDBY_SOUND_SHA256 = "ad97250dde54b4126721605eca752ca090b214d0ec40b135cf930ee07bd8528c"
+WYR_STAKE_HIT_RANDOM_SHA256 = "7a018ec43f7d5f17ff03bddb144b2f8237f5d04d108ecc04a5bf68b7045dd95c"
+WYR_STAKE_HIT_PITCH = soundbank_editor.HircPitchSettings(None, (-50.0, 50.0))
+WYR_STAKE_STRIKE_ACTION_SHA256 = "5f4a3da7a272d283668687ca5cc137ce3cc3d1e7b9944ca2ccde2f95a6005d78"
+WYR_STAKE_STRIKE_EVENT_SHA256 = "a47d26b6238ffb6d0552bd9b3438dfb2cba86a15cc59a266d1f6d5b412ce7fa6"
+WYR_STAKE_STRIKE_NATIVE_GUARDS = (
+    (28, WYR_STAKE_STRIKE_ORIGINAL_MEDIA_ID, WYR_STAKE_STRIKE_EVENT_ID,
+     WYR_STAKE_STRIKE_ORIGINAL_ACTION_ID, WYR_STAKE_STRIKE_ORIGINAL_CONTAINER_ID,
+     "5e098d73a0645fc0d81188cadafe728e3325fd9eda7c67230d85579676e9b26d",
+     "29045c6ed5c13a286828f7c6e351b3b75a6f8b781539a59861b0cde3aa700521"),
+    (38, 858_252_802, 3_115_395_173, 951_626_294, 1_049_048_275,
+     "fe73b26bcad55501da8c1dcbc4298069cf4e3748d81e12589b61b203089b1340",
+     "d4e189a50744ef1b00b429df4ee15fc90e93a466089d139c4f519d2313e29c19"),
+    (40, 932_229_979, 1_465_516_383, 208_572_495, 969_725_659,
+     "2c7b630cdd0276e580e69fcbe8a751ff13f4faee6df765cf87887cdc75fd1962",
+     "62d140af4d2431b7da43e4ca08246271d73da2d2cc544b7d78bd8839c9452450"),
+)
+WYR_STAKE_STRIKE_CONTAINER_SHA256 = "43f44064e18427629d77e5a482d03f415822739ce82b138d07a4372a74cfceb8"
+WYR_STAKE_STRIKE_ORIGINAL_SOUND_SHA256 = "a1208fe2fdb8a16dd7ec60f1c904ff593922a5d6d06e892a19ea0bbe6192f8b5"
+WYR_STAKE_STRIKE_NATIVE_PARENT_CHAIN = (
+    (soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, 75_663_767, 717_111_903),
+    (soundbank_editor.HIRC_ACTOR_MIXER, 717_111_903, 972_300_144),
+    (soundbank_editor.HIRC_ACTOR_MIXER, 972_300_144, 694_534_885),
+    (soundbank_editor.HIRC_ACTOR_MIXER, 694_534_885, 0),
+)
+WYR_STAKE_STRIKE_NATIVE_STOP_TARGETS = {
+    60_034_062, 662_442_083, 1_054_468_797, 956_375_262, 599_243_561,
+}
+
 CHARGED_SHELLING_RANDOM_ID = 2_510_752_860
 CHARGED_SHELLING_RANDOM_DONOR_ID = 58_172_267
 CHARGED_SHELLING_RANDOM_DONOR_SHA256 = (
@@ -672,7 +719,9 @@ def validate_charged_shelling_hirc(
 ) -> None:
     _guard_charged_shelling_charge_event(bank)
     editor = bank.hirc
-    if len(editor.objects()) != 211 or len(editor.build()) != 12_326:
+    with_hit_release_voice = WYR_STAKE_STRIKE_ACTION_ID in editor.object_ids
+    expected_count, expected_size = (215, 12_555) if with_hit_release_voice else (211, 12_326)
+    if len(editor.objects()) != expected_count or len(editor.build()) != expected_size:
         raise soundbank_editor.SoundBankError(
             "charged-shelling combined HIRC count or payload size differs"
         )
@@ -793,6 +842,207 @@ def validate_charged_shelling_hirc(
         )
 
 
+def _guard_wyrmstake_strike_native(bank: soundbank_editor.SoundBankEditor) -> None:
+    """Lock the hit release, miss release, explosion, and Stop branches."""
+
+    hirc = bank.hirc
+    for index, media, event, action, container, event_sha, action_sha in WYR_STAKE_STRIKE_NATIVE_GUARDS:
+        if (
+            bank.media_entry(index=index).media_id != media
+            or hirc.event_actions(event) != (action,)
+            or hashlib.sha256(hirc.object_body(soundbank_editor.HIRC_EVENT, event)).hexdigest()
+            != event_sha
+            or hashlib.sha256(hirc.object_body(soundbank_editor.HIRC_ACTION, action)).hexdigest()
+            != action_sha
+            or hirc.object_body(soundbank_editor.HIRC_ACTION, action)
+            != hirc.create_play_action(action, container, bank.bank_id)
+        ):
+            raise soundbank_editor.SoundBankError(
+                f"Wyrmstake native DIDX #{index} route differs"
+            )
+    container = hirc.object_body(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+        WYR_STAKE_STRIKE_ORIGINAL_CONTAINER_ID,
+    )
+    original_sound = hirc.object_body(
+        soundbank_editor.HIRC_SOUND, WYR_STAKE_STRIKE_ORIGINAL_SOUND_ID,
+    )
+    if (
+        hashlib.sha256(container).hexdigest() != WYR_STAKE_STRIKE_CONTAINER_SHA256
+        or hashlib.sha256(original_sound).hexdigest()
+        != WYR_STAKE_STRIKE_ORIGINAL_SOUND_SHA256
+        or struct.unpack_from("<I", original_sound, 9)[0]
+        != WYR_STAKE_STRIKE_ORIGINAL_MEDIA_ID
+        or struct.unpack_from("<I", original_sound, 25)[0]
+        != WYR_STAKE_STRIKE_ORIGINAL_CONTAINER_ID
+    ):
+        raise soundbank_editor.SoundBankError("Wyrmstake native hit-release Sound differs")
+    for kind, ident, parent in WYR_STAKE_STRIKE_NATIVE_PARENT_CHAIN:
+        body = hirc.object_body(kind, ident)
+        if struct.unpack_from("<I", body, 11)[0] != parent:
+            raise soundbank_editor.SoundBankError("Wyrmstake hit-release parent chain differs")
+    stop_targets = _event_referenced_stop_targets(hirc)
+    if not WYR_STAKE_STRIKE_NATIVE_STOP_TARGETS.issubset(stop_targets):
+        raise soundbank_editor.SoundBankError("Wyrmstake native Stop audit differs")
+    native_chain = {
+        WYR_STAKE_STRIKE_ORIGINAL_SOUND_ID,
+        *(ident for _, ident, _ in WYR_STAKE_STRIKE_NATIVE_PARENT_CHAIN),
+    }
+    if native_chain & stop_targets:
+        raise soundbank_editor.SoundBankError("Wyrmstake native Stop reaches hit release")
+
+
+def validate_wyrmstake_hit_release_hirc(
+    bank: soundbank_editor.SoundBankEditor,
+) -> None:
+    """Require one equal-weight random voice on the native hit-release Event."""
+
+    hirc = bank.hirc
+    for index, media, event, action, container, event_sha, action_sha in WYR_STAKE_STRIKE_NATIVE_GUARDS[1:]:
+        if (
+            bank.media_entry(index=index).media_id != media
+            or hirc.event_actions(event) != (action,)
+            or hashlib.sha256(hirc.object_body(soundbank_editor.HIRC_EVENT, event)).hexdigest()
+            != event_sha
+            or hashlib.sha256(hirc.object_body(soundbank_editor.HIRC_ACTION, action)).hexdigest()
+            != action_sha
+            or hirc.object_body(soundbank_editor.HIRC_ACTION, action)
+            != hirc.create_play_action(action, container, bank.bank_id)
+        ):
+            raise soundbank_editor.SoundBankError("Wyrmstake miss release or explosion route changed")
+    original_container = hirc.object_body(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER,
+        WYR_STAKE_STRIKE_ORIGINAL_CONTAINER_ID,
+    )
+    original_sound = hirc.object_body(
+        soundbank_editor.HIRC_SOUND, WYR_STAKE_STRIKE_ORIGINAL_SOUND_ID,
+    )
+    original_action = hirc.object_body(
+        soundbank_editor.HIRC_ACTION, WYR_STAKE_STRIKE_ORIGINAL_ACTION_ID
+    )
+    action = hirc.object_body(soundbank_editor.HIRC_ACTION, WYR_STAKE_STRIKE_ACTION_ID)
+    event = hirc.object_body(soundbank_editor.HIRC_EVENT, WYR_STAKE_STRIKE_EVENT_ID)
+    if (
+            hashlib.sha256(original_container).hexdigest()
+        != WYR_STAKE_STRIKE_CONTAINER_SHA256
+        or hashlib.sha256(original_sound).hexdigest()
+        != WYR_STAKE_STRIKE_ORIGINAL_SOUND_SHA256
+        or original_action != hirc.create_play_action(
+            WYR_STAKE_STRIKE_ORIGINAL_ACTION_ID,
+            WYR_STAKE_STRIKE_ORIGINAL_CONTAINER_ID, bank.bank_id,
+        )
+        or hashlib.sha256(original_action).hexdigest()
+        != WYR_STAKE_STRIKE_NATIVE_GUARDS[0][6]
+        or action != hirc.create_play_action(
+        WYR_STAKE_STRIKE_ACTION_ID, WYR_STAKE_HIT_RANDOM_ID, bank.bank_id
+        )
+        or hashlib.sha256(action).hexdigest() != WYR_STAKE_STRIKE_ACTION_SHA256
+        or hirc.event_actions(WYR_STAKE_STRIKE_EVENT_ID)
+        != (WYR_STAKE_STRIKE_ORIGINAL_ACTION_ID, WYR_STAKE_STRIKE_ACTION_ID)
+        or hashlib.sha256(event).hexdigest() != WYR_STAKE_STRIKE_EVENT_SHA256
+    ):
+        raise soundbank_editor.SoundBankError("Wyrmstake hit-release Event route differs")
+    for index, media, sound_id, body_sha in (
+            (52, WYR_STAKE_STRIKE_MEDIA_ID, WYR_STAKE_STRIKE_SOUND_ID,
+             WYR_STAKE_STRIKE_SOUND_SHA256),
+            (53, WYR_STAKE_ACS_STANDBY_MEDIA_ID, WYR_STAKE_ACS_STANDBY_SOUND_ID,
+             WYR_STAKE_ACS_STANDBY_SOUND_SHA256),
+    ):
+        sound = hirc.object_body(soundbank_editor.HIRC_SOUND, sound_id)
+        if (
+                bank.media_entry(index=index).media_id != media
+                or sound != standard_voice_sound_body(
+            sound_id, media, direct_parent_id=WYR_STAKE_HIT_RANDOM_ID
+        )
+                or hashlib.sha256(sound).hexdigest() != body_sha
+                or hirc.pitch_settings(soundbank_editor.HIRC_SOUND, sound_id)
+                != soundbank_editor.HircPitchSettings(None, None)
+        ):
+            raise soundbank_editor.SoundBankError(
+                f"Wyrmstake hit-release Sound {sound_id} differs"
+            )
+    random_body = hirc.object_body(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WYR_STAKE_HIT_RANDOM_ID
+    )
+    if (
+            len(random_body) != 95
+            or hashlib.sha256(random_body).hexdigest() != WYR_STAKE_HIT_RANDOM_SHA256
+            or hirc.pitch_settings(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WYR_STAKE_HIT_RANDOM_ID
+    ) != WYR_STAKE_HIT_PITCH
+    ):
+        raise soundbank_editor.SoundBankError("Wyrmstake hit-release Random differs")
+    objects = hirc.objects()
+    positions = {item.object_id: item.index for item in objects}
+    if not (
+            max(positions[sound_id] for sound_id, _ in WYR_STAKE_HIT_PLAYLIST)
+            < positions[WYR_STAKE_HIT_RANDOM_ID]
+        < positions[WYR_STAKE_STRIKE_ACTION_ID]
+        < positions[WYR_STAKE_STRIKE_EVENT_ID]
+    ):
+        raise soundbank_editor.SoundBankError("Wyrmstake hit-release Random order differs")
+    owners = tuple(
+        item.object_id for item in objects
+        if item.object_type == soundbank_editor.HIRC_EVENT
+        and WYR_STAKE_STRIKE_ACTION_ID in hirc.event_actions(item.object_id)
+    )
+    if owners != (WYR_STAKE_STRIKE_EVENT_ID,):
+        raise soundbank_editor.SoundBankError("Wyrmstake hit-release Action owner differs")
+
+
+def _apply_wyrmstake_hit_release(bank: soundbank_editor.SoundBankEditor) -> None:
+    _guard_wyrmstake_strike_native(bank)
+    hirc = bank.hirc
+    for sound_id, media_id in (
+            (WYR_STAKE_STRIKE_SOUND_ID, WYR_STAKE_STRIKE_MEDIA_ID),
+            (WYR_STAKE_ACS_STANDBY_SOUND_ID, WYR_STAKE_ACS_STANDBY_MEDIA_ID),
+    ):
+        bank.media_entry(media_id=media_id)
+        insert_standard_voice_sound(
+            hirc, sound_id, media_id,
+            direct_parent_id=WYR_STAKE_HIT_RANDOM_ID,
+            label=f"insert Wyrmstake hit-release Sound {sound_id}",
+        )
+    donor = hirc.object_body(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WYR_STAKE_HIT_RANDOM_DONOR_ID
+    )
+    if hashlib.sha256(donor).hexdigest() != WYR_STAKE_HIT_RANDOM_DONOR_SHA256:
+        raise soundbank_editor.SoundBankError("Wyrmstake hit-release Random donor changed")
+    hirc.clone_random_sequence_container(
+        WYR_STAKE_HIT_RANDOM_DONOR_ID, WYR_STAKE_HIT_RANDOM_ID,
+        WYR_STAKE_HIT_PLAYLIST,
+        expected_playlist=((46_149_961, 50_000),),
+        expected_avoid_repeat_count=1,
+        avoid_repeat_count=0,
+        label="clone equal-weight Wyrmstake hit-release Random",
+    )
+    hirc.patch_u32(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WYR_STAKE_HIT_RANDOM_ID,
+        0x0B, 717_111_903, STANDARD_VOICE_PARENT_ID,
+        label="parent Wyrmstake hit-release Random to voice mixer",
+    )
+    hirc.set_pitch(
+        soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WYR_STAKE_HIT_RANDOM_ID,
+        expected=WYR_STAKE_HIT_PITCH,
+        random_range_cents=WYR_STAKE_HIT_PITCH.random_range_cents,
+        label="guard Wyrmstake hit-release Random Pitch",
+    )
+    action = hirc.create_play_action(
+        WYR_STAKE_STRIKE_ACTION_ID, WYR_STAKE_HIT_RANDOM_ID, bank.bank_id
+    )
+    hirc.insert_object(
+        soundbank_editor.HIRC_ACTION, WYR_STAKE_STRIKE_ACTION_ID, action[4:],
+        before=(soundbank_editor.HIRC_EVENT, WYR_STAKE_STRIKE_EVENT_ID),
+        label="add Wyrmstake hit-release Random Play Action",
+    )
+    hirc.append_event_action(
+        WYR_STAKE_STRIKE_EVENT_ID, WYR_STAKE_STRIKE_ACTION_ID,
+        expected_actions=(WYR_STAKE_STRIKE_ORIGINAL_ACTION_ID,),
+        label="append Random voice to Wyrmstake hit-release Event",
+    )
+    validate_wyrmstake_hit_release_hirc(bank)
+
+
 def _apply_charged_shelling(bank: soundbank_editor.SoundBankEditor) -> None:
     editor = bank.hirc
     for index, sound_id, media_id in zip(
@@ -854,7 +1104,7 @@ def _apply_charged_shelling(bank: soundbank_editor.SoundBankEditor) -> None:
 
 
 def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
-    """Apply the three reviewed designs in deterministic serialization order."""
+    """Apply the four reviewed designs in deterministic serialization order."""
 
     if bank.hirc.event_actions(WYVERN_LEFT_EVENT_ID) != (
         WYVERN_LEFT_ORIGINAL_ACTION_ID,
@@ -869,6 +1119,7 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
     for route in WYVERNS_FIRE_STOP_ROUTES:
         _add_stop_route(bank, route)
     _apply_charged_shelling(bank)
+    _apply_wyrmstake_hit_release(bank)
 
 
 EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
@@ -883,8 +1134,10 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (49, FULL_BURST_MEDIA_IDS[3]),
         (50, CHARGED_SHELLING_MEDIA_IDS[0]),
         (51, CHARGED_SHELLING_MEDIA_IDS[1]),
+        (52, WYR_STAKE_STRIKE_MEDIA_ID),
+        (53, WYR_STAKE_ACS_STANDBY_MEDIA_ID),
     ),
-    hirc_changed_bytes=27,
+    hirc_changed_bytes=32,
     added_hirc_objects=(
         (soundbank_editor.HIRC_SOUND, 960_803_121),
         (soundbank_editor.HIRC_SOUND, 479_969_098),
@@ -916,12 +1169,17 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (soundbank_editor.HIRC_ACTION, 728_690_884),
         (soundbank_editor.HIRC_ACTION, 1_267_644_869),
         (soundbank_editor.HIRC_ACTION, 3_259_504_927),
+        (soundbank_editor.HIRC_SOUND, WYR_STAKE_STRIKE_SOUND_ID),
+        (soundbank_editor.HIRC_SOUND, WYR_STAKE_ACS_STANDBY_SOUND_ID),
+        (soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WYR_STAKE_HIT_RANDOM_ID),
+        (soundbank_editor.HIRC_ACTION, WYR_STAKE_STRIKE_ACTION_ID),
     ),
     resized_hirc_objects=(
         (soundbank_editor.HIRC_EVENT, 302_768_804, 12, 20),
         (soundbank_editor.HIRC_EVENT, 461_444_626, 12, 20),
         (soundbank_editor.HIRC_EVENT, 680_296_805, 12, 16),
         (soundbank_editor.HIRC_EVENT, 1_124_197_610, 12, 16),
+        (soundbank_editor.HIRC_EVENT, WYR_STAKE_STRIKE_EVENT_ID, 12, 16),
         (soundbank_editor.HIRC_EVENT, 1_765_608_260, 12, 16),
         (soundbank_editor.HIRC_EVENT, 1_962_814_816, 12, 24),
         (soundbank_editor.HIRC_EVENT, 2_187_565_051, 12, 24),
@@ -930,7 +1188,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (soundbank_editor.HIRC_EVENT, 3_325_567_640, 12, 24),
         (soundbank_editor.HIRC_EVENT, 3_655_102_100, 12, 16),
     ),
-    hirc_size_delta=1236,
+    hirc_size_delta=1465,
 )
 
 
@@ -940,6 +1198,7 @@ PLAN = SoundBankBuildPlan(
         "wp07_gun_epvsp_shell.full_burst",
         "wp07_gun_epvsp_shell.wyverns_fire",
         "wp07_gun_epvsp_shell.charged_shelling",
+        "wp07_gun_epvsp_shell.wyrmstake_cannon",
     ),
     source="original/nbnk/wp07_gun_epvsp_shell.nbnk",
     target="sound/wwise/Windows/wp07_gun_epvsp_shell.nbnk",
@@ -1012,6 +1271,20 @@ PLAN = SoundBankBuildPlan(
             CHARGED_SHELLING_MEDIA_IDS[1],
             "audio/wp07_gun_epvsp_shell/charged_shelling/"
             "nanoha_buster_02(gears_of_destiny.attack_voice.attack_04.2).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            52,
+            WYR_STAKE_STRIKE_MEDIA_ID,
+            "audio/wp07_gun_epvsp_shell/wyrmstake_cannon/"
+            "raising_heart_strike_flame_01(movie_2nd_as.raising_heart.strike_flame.1).wav",
+            wem_channels=1,
+        ),
+        MediaAddition(
+            53,
+            WYR_STAKE_ACS_STANDBY_MEDIA_ID,
+            "audio/wp07_gun_epvsp_shell/wyrmstake_cannon/"
+            "raising_heart_acs_standby_01(movie_2nd_as.raising_heart.acs_standby.1).wav",
             wem_channels=1,
         ),
     ),
