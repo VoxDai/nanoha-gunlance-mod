@@ -235,6 +235,7 @@ declarations must report that joint resolution is still outstanding.
 | Require one matching record | `WwevFile.record()` → `WwevRecord` |
 | Inspect a record guard | `WwevRecord.raw`, `size`, `sha256` |
 | Append a full donor clone | `WwevEditor.append_cloned_record()` → appended `WwevRecord` |
+| Clone a complete multi-record request | `WwevEditor.append_cloned_request()` → ordered appended `WwevRecord` tuple; full-record hash guards for every donor, one unused Event per record, one unused shared ReqNo; atomic commit |
 
 ```python
 lmt = se.LmtFile.from_file("original/lmt/w07_00.lmt")

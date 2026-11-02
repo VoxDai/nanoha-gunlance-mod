@@ -512,6 +512,73 @@ class WwevEditor:
         self._edits.append(edit)
         return appended
 
+    def append_cloned_request(
+        self,
+        *,
+        donor_request: int,
+        expected_donor_sha256s: tuple[str, ...],
+        new_request: int,
+        new_event_ids: tuple[int, ...],
+    ) -> tuple[WwevRecord, ...]:
+        """Atomically clone every record of a request, retaining expansion order.
+
+        Args:
+            donor_request: Positive signed-16 request with at least one record.
+            expected_donor_sha256s: Full record hashes in serialization order;
+                guards the exact count, modes, Events and all command bytes.
+            new_request: Positive signed-16 request unused in working records.
+            new_event_ids: One distinct unused unsigned-32 Event per donor record,
+                in the same order as the hashes.
+
+        Returns:
+            All appended records, sharing new_request, in serialization order.
+
+        Raises:
+            WwevError: Ranges, count/hash guards, collisions or read-back fail.
+
+        Notes:
+            Copies every byte except each record's ReqNo and Event ID. Checks the
+            whole candidate before committing any record. Collision checks are
+            local; callers must resolve Events and check companion artifacts.
+            Existing records, dependencies and expansion modes are preserved.
+        """
+        donor_request = check_positive_i16(donor_request, "donor request", WwevError)
+        new_request = check_positive_i16(new_request, "new request", WwevError)
+        if not isinstance(expected_donor_sha256s, tuple) or not isinstance(new_event_ids, tuple):
+            raise WwevError("request clone guards and Event IDs must be tuples")
+        donors = self.records_for_request(donor_request)
+        if not donors or len(donors) != len(expected_donor_sha256s) or len(donors) != len(new_event_ids):
+            raise WwevError("request clone donor count does not match guards and Event IDs")
+        hashes = tuple(_normalize_sha256(h, "expected donor record SHA-256") for h in expected_donor_sha256s)
+        events = tuple(_check_u32(e, "new Event ID") for e in new_event_ids)
+        if tuple(d.sha256 for d in donors) != hashes:
+            raise WwevError("request clone donor SHA-256 guards failed")
+        if self.records_for_request(new_request):
+            raise WwevError(f"new request already exists: {new_request}")
+        if len(set(events)) != len(events) or set(events) & {r.event_id for r in self._records}:
+            raise WwevError("request clone new Event IDs collide")
+        clones = []
+        for donor, event in zip(donors, events):
+            body = bytearray(donor.raw)
+            struct.pack_into("<h", body, 0, new_request)
+            struct.pack_into("<I", body, 4, event)
+            clones.append(bytes(body))
+        candidate = WwevFile.from_bytes(self._build((*self._appended, *clones)))
+        if candidate.records[:len(self._records)] != tuple(self._records):
+            raise WwevError("request clone changed existing records")
+        appended = candidate.records[len(self._records):]
+        if len(appended) != len(clones) or any(r.raw != b for r, b in zip(appended, clones)):
+            raise WwevError("request clone failed read-back verification")
+        edits = [WwevRecordEdit(
+            donor_record_index=d.index, donor_request=d.request_no,
+            donor_event_id=d.event_id, added_record_index=r.index,
+            new_request=new_request, new_event_id=r.event_id, appended_size=r.size,
+        ) for d, r in zip(donors, appended)]
+        self._appended.extend(clones)
+        self._records.extend(appended)
+        self._edits.extend(edits)
+        return appended
+
     def _build(self, appended: tuple[bytes, ...] | list[bytes]) -> bytes:
         output = bytearray(self.original.to_bytes())
         struct.pack_into(

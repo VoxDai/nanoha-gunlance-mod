@@ -41,6 +41,48 @@ class WwevFileTests(unittest.TestCase):
 
 
 class WwevEditorTests(unittest.TestCase):
+    def test_complete_request_clone_preserves_variable_expansion(self) -> None:
+        payload = bytearray(make_test_wwev())
+        parsed = soundbank_editor.WwevFile.from_bytes(bytes(payload))
+        struct.pack_into("<h", payload, parsed.record(6489).offset, 6485)
+        editor = soundbank_editor.WwevEditor.from_bytes(bytes(payload))
+        donors = editor.records_for_request(6485)
+        result = editor.append_cloned_request(
+            donor_request=6485, expected_donor_sha256s=tuple(d.sha256 for d in donors),
+            new_request=6500, new_event_ids=(3_000_000_001, 3_000_000_002),
+        )
+        final = editor.validate()
+        self.assertEqual(final.records[:2], donors)
+        self.assertEqual(final.records_for_request(6500), result)
+        for original, cloned in zip(donors, result):
+            self.assertEqual(original.raw[2:4], cloned.raw[2:4])
+            self.assertEqual(original.raw[8:], cloned.raw[8:])
+        self.assertEqual(len(editor.summary.edits), 2)
+
+    def test_request_clone_guards_do_not_commit_partial_expansion(self) -> None:
+        payload = bytearray(make_test_wwev())
+        parsed = soundbank_editor.WwevFile.from_bytes(bytes(payload))
+        struct.pack_into("<h", payload, parsed.record(6489).offset, 6485)
+        original = bytes(payload)
+        donors = soundbank_editor.WwevFile.from_bytes(original).records_for_request(6485)
+        args = dict(donor_request=6485, expected_donor_sha256s=tuple(d.sha256 for d in donors),
+                    new_request=6500, new_event_ids=(3_000_000_001, 3_000_000_002))
+        for override in (
+            dict(expected_donor_sha256s=(donors[0].sha256,)),
+            dict(expected_donor_sha256s=(donors[0].sha256, "00" * 32)),
+            dict(expected_donor_sha256s=tuple(d.sha256 for d in reversed(donors))),
+            dict(new_request=6485), dict(new_request=32768),
+            dict(new_event_ids=(3_000_000_001, 3_000_000_001)),
+            dict(new_event_ids=(3_000_000_001, donors[1].event_id)),
+            dict(new_event_ids=(3_000_000_001, -1)),
+        ):
+            editor = soundbank_editor.WwevEditor.from_bytes(original)
+            with self.subTest(override=override):
+                with self.assertRaises(soundbank_editor.WwevError):
+                    editor.append_cloned_request(**(args | override))
+                self.assertEqual(editor.build(), original)
+                self.assertEqual(editor.summary.edits, ())
+
     def test_clones_complete_records_and_supports_multiple_appends(self) -> None:
         editor = soundbank_editor.WwevEditor.from_bytes(make_test_wwev())
         first_donor = editor.records_for_request(6485)[0]
