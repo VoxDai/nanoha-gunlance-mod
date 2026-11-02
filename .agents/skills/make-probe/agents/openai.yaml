@@ -1,0 +1,4 @@
+interface:
+  display_name: "制作探针"
+  short_description: "制作游戏实测探针、整理触发记录并分析动作和音效的完整路由"
+  default_prompt: "使用 $make-probe 为指定招式制作探针，或分析 recordings.md 并确定下一步测试。"
