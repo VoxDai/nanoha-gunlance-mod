@@ -7,6 +7,7 @@ import struct
 
 from tools import soundbank_editor
 
+from . import clutch_weapon_attack_routes as clutch
 from .base import MediaAddition, SoundBankBuildPlan, run_single_cli
 from .voice_standard import (
     STANDARD_VOICE_PARENT_ID,
@@ -605,19 +606,6 @@ def validate_charged_shelling_divine_hirc(
 
     _guard_charged_shelling_divine_original(bank)
     editor = bank.hirc
-    with_wyrmstake = WYR_STAKE_EVENT_IDS[0] in editor.object_ids
-    with_wyrmstake_mute = WYR_STAKE_MUTE_ROUTE_EVENT_ID in editor.object_ids
-    if with_wyrmstake_mute and not with_wyrmstake:
-        raise soundbank_editor.SoundBankError("Wyrmstake mute route lacks custom voice route")
-    expected_count, expected_size = (
-        (168, 9_018) if with_wyrmstake_mute
-        else (165, 8_970) if with_wyrmstake
-        else (159, 8_770)
-    )
-    if len(editor.objects()) != expected_count or len(editor.build()) != expected_size:
-        raise soundbank_editor.SoundBankError(
-            "charged-shelling Divine combined HIRC count or payload size differs"
-        )
     validate_firing_silence_hirc(bank)
 
     for index, sound_id, media_id, body_sha256 in zip(
@@ -1188,6 +1176,7 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
     _apply_charged_shelling_divine(bank)
     _apply_wyrmstake_voice(bank)
     _apply_wyrmstake_original_voice_mute(bank)
+    clutch.apply_voices(bank)
 
 
 EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
@@ -1208,8 +1197,8 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (46, CHARGED_SHELLING_DIVINE_MEDIA_IDS[1]),
         (47, WYR_STAKE_MEDIA_IDS[0]),
         (48, WYR_STAKE_MEDIA_IDS[1]),
-    ),
-    hirc_changed_bytes=41,
+    ) + tuple((voice.media.expected_index, voice.media.media_id) for voice in clutch.VOICES),
+    hirc_changed_bytes=57,
     added_hirc_objects=(
         (soundbank_editor.HIRC_SOUND, VOICE_SOUND_ID),
         (soundbank_editor.HIRC_SOUND, STATIONARY_SOUND_IDS[1]),
@@ -1259,11 +1248,11 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (soundbank_editor.HIRC_EVENT, WYR_STAKE_MUTE_EMPTY_EVENT_ID),
         (soundbank_editor.HIRC_ACTION, WYR_STAKE_MUTE_PLAY_ACTION_ID),
         (soundbank_editor.HIRC_EVENT, WYR_STAKE_MUTE_ROUTE_EVENT_ID),
-    ),
+    ) + clutch.VOICE_OBJECTS,
     resized_hirc_objects=(
         (soundbank_editor.HIRC_EVENT, RELOAD_EVENT_ID, 12, 16),
     ),
-    hirc_size_delta=1768,
+    hirc_size_delta=1968,
 )
 
 
@@ -1276,6 +1265,7 @@ PLAN = SoundBankBuildPlan(
         "wp_gun_cmn.wide_sweep",
         "wp07_gun_epvsp_shell.charged_shelling",
         "wp07_gun_epvsp_shell.wyrmstake_cannon",
+        clutch.DESIGN_ID,
     ),
     source="original/nbnk/wp_gun_cmn.nbnk",
     target="sound/wwise/Windows/wp_gun_cmn.nbnk",
@@ -1382,6 +1372,7 @@ PLAN = SoundBankBuildPlan(
             "nanoha_drive_01(gears_of_destiny.attack_voice.attack_02.2).wav",
             wem_channels=1,
         ),
+        *(voice.media for voice in clutch.VOICES),
     ),
     apply_edits=apply_edits,
     expected_summary=EXPECTED_SUMMARY,

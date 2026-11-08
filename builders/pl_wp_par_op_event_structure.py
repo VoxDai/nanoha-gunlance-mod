@@ -1,4 +1,4 @@
-"""Build the media-less event wrappers for ordinary Wyrmstake attacks."""
+"""Build the media-less event wrappers for Wyrmstake and clutch attacks."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import struct
 
 from tools import soundbank_editor
 
+from . import clutch_weapon_attack_routes as clutch
 from .base import HircBankBuildPlan, HircBankEditSummary, run_single_cli
 
 DESIGN_ID = "wp07_gun_epvsp_shell.wyrmstake_cannon"
@@ -90,6 +91,7 @@ def apply_edits(hirc: soundbank_editor.HircEditor) -> None:
                            struct.pack("<III", 2, original_action, voice_action),
                            label="insert Wyrmstake wrapper Event")
     validate_wyrmstake_wrappers(hirc)
+    clutch.apply_wrappers(hirc)
 
 
 EXPECTED_SUMMARY = HircBankEditSummary(
@@ -98,15 +100,15 @@ EXPECTED_SUMMARY = HircBankEditSummary(
         for item in ((soundbank_editor.HIRC_ACTION, original_action),
                      (soundbank_editor.HIRC_ACTION, voice_action),
                      (soundbank_editor.HIRC_EVENT, event))
-    ),
+    ) + clutch.WRAPPER_OBJECTS,
     changed_byte_count=0,
     resized_hirc_objects=(),
-    hirc_size_delta=171,
+    hirc_size_delta=320,
 )
 
 PLAN = HircBankBuildPlan(
     name="pl_wp_par_op_event_structure",
-    design_ids=(DESIGN_ID,),
+    design_ids=(DESIGN_ID, clutch.DESIGN_ID),
     source="original/nbnk/pl_wp_par_op_event_structure.nbnk",
     target="sound/wwise/Windows/pl_wp_par_op_event_structure.nbnk",
     expected_source_sha256="4765ba898f64dc57fca55e6015925aff49f4b9111908866b083c89a2edc63484",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from tools import soundbank_editor
 
+from . import clutch_weapon_attack_routes as clutch
 from .base import LmtBuildPlan, run_single_cli
 
 
@@ -154,9 +155,20 @@ def apply_edits(editor: soundbank_editor.LmtEditor) -> None:
             expected_trigger_frames=(frame,),
         )
 
+    for edit in clutch.LMT_EDITS:
+        editor.replace_request(
+            motion_id=edit.motion_id,
+            event_group=edit.event_group,
+            slot=edit.slot,
+            request_keyframe_frame=edit.request_keyframe_frame,
+            expected_request=edit.old_request,
+            replacement_request=edit.new_request,
+            expected_trigger_frames=edit.trigger_frames,
+        )
+
 
 EXPECTED_SUMMARY = soundbank_editor.LmtEditSummary(
-    changed_byte_count=46,
+    changed_byte_count=48,
     edits=(
         soundbank_editor.LmtRequestEdit(
             motion_id=MOTION_ID,
@@ -258,7 +270,7 @@ EXPECTED_SUMMARY = soundbank_editor.LmtEditSummary(
             new_request=WYR_STAKE_VOICE_MUTE_REQUEST, changed_byte_count=2,
         )
         for motion, slot, old_request, frame, offset in WYR_STAKE_VOICE_MUTE_EDITS
-    ),
+    ) + clutch.LMT_EDITS,
 )
 
 
@@ -270,6 +282,7 @@ PLAN = LmtBuildPlan(
         "wp_gun_cmn.wide_sweep",
         "wp07_gun_epvsp_shell.charged_shelling",
         "wp07_gun_epvsp_shell.wyrmstake_cannon",
+        clutch.DESIGN_ID,
     ),
     source="original/lmt/w07_00.lmt",
     target="hm/wp/wp07/mot/w07_00/w07_00.lmt",

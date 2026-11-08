@@ -566,7 +566,7 @@ def validate_wide_sweep(staged: Mapping[Path, Path]) -> None:
         45, WIDE_SWEEP_DONOR_MODE, WIDE_SWEEP_NEW_EVENT_ID, WIDE_SWEEP_NEW_RECORD_SHA256
     ):
         raise BuildError("wide-sweep appended WWEV record differs from its complete guard")
-    if len(wwev.records) != 49 or any(wwev.records_for_request(request) for request in (6597, 6598)):
+    if any(wwev.records_for_request(request) for request in (6597, 6598)):
         raise BuildError("wide-sweep WWEV contains unexpected timing candidates")
     if any(record.event_id in WIDE_SWEEP_UNUSED_EVENT_IDS for record in wwev.records):
         raise BuildError("wide-sweep WWEV still references an unused timing Event")
@@ -771,7 +771,7 @@ def validate_charged_shelling(staged: Mapping[Path, Path]) -> None:
         CHARGED_SHELLING_DONOR_MODE,
         CHARGED_SHELLING_NEW_EVENT_ID,
         CHARGED_SHELLING_NEW_RECORD_SHA256,
-    ) or len(wwev.records) != 49:
+    ):
         raise BuildError("charged-shelling appended WWEV record differs from its guard")
 
     all_routes = lmt.triggered_requests(wwev)

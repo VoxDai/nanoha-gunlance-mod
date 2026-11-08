@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .base import ModBuildPlan, run_all_cli
+from .clutch_weapon_attack_routes import VALIDATOR as CLUTCH_WEAPON_ATTACK_VALIDATOR
 from .hm_cm00_epvsp import PLAN as HM_CM00_EPVSP
 from .hm_wp07_epvsp import PLAN as HM_WP07_EPVSP
 from .hm_wp07_epvsp_snd_ev import PLAN as HM_WP07_EPVSP_SND_EV
@@ -50,6 +51,7 @@ MOD_PLAN = ModBuildPlan(
         CHARGED_SHELLING_VALIDATOR,
         WYR_STAKE_VALIDATOR,
         WYVERNS_FIRE_VALIDATOR,
+        CLUTCH_WEAPON_ATTACK_VALIDATOR,
     ),
 )
 
