@@ -33,6 +33,7 @@ Notes:
     propagate as OSError. No generic deletion operation is exported.
 """
 
+from .epvsp import EpvspEditor, EpvspFile, EpvspStartEdit
 from .errors import EditorError, LmtError, SoundBankError, WwevError
 from .hirc import (
     ACTION_PLAY,
@@ -91,6 +92,9 @@ from .wwev import (
 )
 
 __all__ = (
+    "EpvspEditor",
+    "EpvspFile",
+    "EpvspStartEdit",
     "ACTION_PLAY",
     "ACTION_PLAY_EVENT",
     "ACTION_STOP",

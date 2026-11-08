@@ -30,6 +30,7 @@ __all__ = (
     "ArtifactBuildPlan",
     "BuildError",
     "BuildResult",
+    "EpvspBuildPlan",
     "BundleValidator",
     "HircBankBuildPlan",
     "HircBankEditSummary",
@@ -438,12 +439,46 @@ class WwevBuildPlan:
             raise TypeError("expected_summary must be WwevEditSummary")
 
 
-ArtifactBuildPlan = SoundBankBuildPlan | HircBankBuildPlan | LmtBuildPlan | WwevBuildPlan
+@dataclass(frozen=True)
+class EpvspBuildPlan:
+    """Complete build contract for one request-only ESP v8 artifact."""
+
+    name: str
+    design_ids: tuple[str, ...]
+    source: Path
+    target: Path
+    expected_source_sha256: str
+    apply_edits: Callable[[soundbank_editor.EpvspEditor], None]
+    expected_summary: tuple[soundbank_editor.EpvspStartEdit, ...]
+
+    def __post_init__(self) -> None:
+        _plan_identity(self.name, self.design_ids, self.apply_edits)
+        object.__setattr__(
+            self, "source", _declared_path(self.source, "source EPVSP", suffix=".epvsp")
+        )
+        object.__setattr__(
+            self,
+            "target",
+            _declared_path(self.target, "target EPVSP", suffix=".epvsp", target=True),
+        )
+        object.__setattr__(
+            self,
+            "expected_source_sha256",
+            _sha256_guard(self.expected_source_sha256, "source EPVSP SHA-256"),
+        )
+        if not isinstance(self.expected_summary, tuple) or not all(
+            isinstance(edit, soundbank_editor.EpvspStartEdit) for edit in self.expected_summary
+        ):
+            raise TypeError("expected_summary must be a tuple of EpvspStartEdit")
+
+
+ArtifactBuildPlan = SoundBankBuildPlan | HircBankBuildPlan | LmtBuildPlan | WwevBuildPlan | EpvspBuildPlan
 ArtifactSummary = (
     soundbank_editor.SoundBankEditSummary
     | HircBankEditSummary
     | soundbank_editor.LmtEditSummary
     | soundbank_editor.WwevEditSummary
+    | tuple[soundbank_editor.EpvspStartEdit, ...]
 )
 BundleValidationHook = Callable[[Mapping[Path, Path]], None]
 
@@ -476,7 +511,7 @@ class ModBuildPlan:
         if not isinstance(self.artifacts, tuple) or not self.artifacts:
             raise TypeError("artifacts must be a non-empty tuple")
         if any(
-                not isinstance(item, (SoundBankBuildPlan, HircBankBuildPlan, LmtBuildPlan, WwevBuildPlan))
+                not isinstance(item, (SoundBankBuildPlan, HircBankBuildPlan, LmtBuildPlan, WwevBuildPlan, EpvspBuildPlan))
             for item in self.artifacts
         ):
             raise TypeError("artifacts contains an unsupported plan")
@@ -506,6 +541,7 @@ class PreparedArtifact:
         | HircBank
         | soundbank_editor.LmtFile
         | soundbank_editor.WwevFile
+        | soundbank_editor.EpvspFile
     )
     preview_summary: ArtifactSummary
     staged: Path | None = None
@@ -768,6 +804,14 @@ def prepare_plan(plan: ArtifactBuildPlan, project_root: Path) -> PreparedArtifac
         elif isinstance(plan, LmtBuildPlan):
             original = soundbank_editor.LmtFile.from_file(source)
             editor = soundbank_editor.LmtEditor(original)
+            plan.apply_edits(editor)
+            editor.validate()
+            summary = editor.summary
+            if summary != plan.expected_summary:
+                raise _summary_mismatch(plan.name, plan.expected_summary, summary)
+        elif isinstance(plan, EpvspBuildPlan):
+            original = soundbank_editor.EpvspFile.from_file(source)
+            editor = soundbank_editor.EpvspEditor(original)
             plan.apply_edits(editor)
             editor.validate()
             summary = editor.summary
@@ -1087,6 +1131,17 @@ def build_plan(
                 raise _summary_mismatch(plan.name, plan.expected_summary, editor.summary)
             if soundbank_editor.LmtFile.from_file(stage).to_bytes() != editor.build():
                 raise BuildError(f"{plan.name}: staged LMT failed byte-exact read-back")
+        elif isinstance(plan, EpvspBuildPlan):
+            if not isinstance(prepared.original, soundbank_editor.EpvspFile):
+                raise BuildError(f"{plan.name}: prepared source is not EPVSP")
+            editor = soundbank_editor.EpvspEditor(prepared.original)
+            plan.apply_edits(editor)
+            rebuilt = editor.validate()
+            if editor.summary != plan.expected_summary:
+                raise _summary_mismatch(plan.name, plan.expected_summary, editor.summary)
+            atomic_write(stage, rebuilt.to_bytes())
+            if soundbank_editor.EpvspFile.from_file(stage) != rebuilt:
+                raise BuildError(f"{plan.name}: staged EPVSP failed read-back")
         else:
             if not isinstance(prepared.original, soundbank_editor.WwevFile):
                 raise BuildError(f"{plan.name}: prepared source is not a WWEV")

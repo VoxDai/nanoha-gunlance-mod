@@ -9,6 +9,7 @@ import struct
 from tools import soundbank_editor
 
 from .base import MediaAddition, SoundBankBuildPlan, run_single_cli
+from .wyverns_fire_routes import CLIPS as WYVERN_CLIPS, EXTRA_FILENAMES, apply_wyverns_fire
 from .voice_standard import (
     STANDARD_VOICE_PARENT_ID,
     STANDARD_VOICE_REFERENCE_INPUTS,
@@ -180,34 +181,6 @@ class FullBurstRoute:
 
 
 @dataclass(frozen=True)
-class OverlayRoute:
-    """One guarded Event-to-Action-to-Sound overlay route."""
-
-    label: str
-    event_id: int
-    expected_actions: tuple[int, ...]
-    donor_sound_id: int
-    expected_donor_source_id: int
-    media_id: int
-    action_id: int
-    sound_id: int
-
-
-@dataclass(frozen=True)
-class StopRoute:
-    """One guarded native Stop Action clone for a custom playback root."""
-
-    label: str
-    event_id: int
-    expected_actions: tuple[int, ...]
-    donor_action_id: int
-    expected_donor_target_id: int
-    expected_donor_body_sha256: str
-    action_id: int
-    target_id: int
-
-
-@dataclass(frozen=True)
 class ChargedShellingRoute:
     """One guarded native charged-shelling route receiving a voice overlay."""
 
@@ -269,62 +242,6 @@ FULL_BURST_ROUTES = (
         994_484_287,
         272_642_002,
         3_047_212_046,
-    ),
-)
-
-WYVERNS_FIRE_ROUTES = (
-    OverlayRoute(
-        "Wyvern charge Nanoha Starlight",
-        302_768_804,
-        (51_759_545,),
-        990_545_535,
-        477_887_770,
-        STARLIGHT_MEDIA_ID,
-        4_011_774_951,
-        4_149_261_730,
-    ),
-    OverlayRoute(
-        "Wyvern charge Raising Heart Starlight Breaker",
-        302_768_804,
-        (51_759_545, 4_011_774_951),
-        990_545_535,
-        477_887_770,
-        STARLIGHT_BREAKER_MEDIA_ID,
-        254_514_827,
-        36_215_958,
-    ),
-    OverlayRoute(
-        "Wyvern explosion right Breaker",
-        3_655_102_100,
-        (648_832_766,),
-        269_350_169,
-        401_136_332,
-        BREAKER_MEDIA_ID,
-        1_866_468_495,
-        2_472_459_210,
-    ),
-)
-
-WYVERNS_FIRE_STOP_ROUTES = (
-    StopRoute(
-        "Wyvern charge Nanoha Starlight",
-        461_444_626,
-        (743_936_681,),
-        743_936_681,
-        60_034_062,
-        "137f38d973a5e3b84d35d84146d2b562e21e575abbfee532b8531d3583ae0ebd",
-        2_987_046_856,
-        4_149_261_730,
-    ),
-    StopRoute(
-        "Wyvern charge Raising Heart Starlight Breaker",
-        461_444_626,
-        (743_936_681, 2_987_046_856),
-        743_936_681,
-        60_034_062,
-        "137f38d973a5e3b84d35d84146d2b562e21e575abbfee532b8531d3583ae0ebd",
-        3_645_807_405,
-        36_215_958,
     ),
 )
 
@@ -548,60 +465,6 @@ def _apply_full_burst(bank: soundbank_editor.SoundBankEditor) -> None:
     _validate_full_burst_hirc(bank)
 
 
-def _add_overlay(
-    bank: soundbank_editor.SoundBankEditor, route: OverlayRoute
-) -> None:
-    editor = bank.hirc
-    bank.media_entry(media_id=route.media_id)
-    _guard_sound_source(
-        editor,
-        route.donor_sound_id,
-        route.expected_donor_source_id,
-        route.label,
-    )
-    insert_standard_voice_sound(
-        editor,
-        route.sound_id,
-        route.media_id,
-        label=f"insert standard custom-voice Sound for {route.label}",
-    )
-    action = editor.create_play_action(route.action_id, route.sound_id, bank.bank_id)
-    editor.insert_object(
-        soundbank_editor.HIRC_ACTION,
-        route.action_id,
-        action[4:],
-        before=(soundbank_editor.HIRC_EVENT, route.event_id),
-        label=f"add Play Action for {route.label}",
-    )
-    editor.append_event_action(
-        route.event_id,
-        route.action_id,
-        expected_actions=route.expected_actions,
-        label=f"append overlay Action for {route.label}",
-    )
-
-
-def _add_stop_route(
-    bank: soundbank_editor.SoundBankEditor, route: StopRoute
-) -> None:
-    editor = bank.hirc
-    editor.clone_stop_action(
-        route.donor_action_id,
-        route.action_id,
-        route.target_id,
-        expected_target_id=route.expected_donor_target_id,
-        expected_body_sha256=route.expected_donor_body_sha256,
-        before_event_id=route.event_id,
-        label=f"clone native Stop Action for {route.label}",
-    )
-    editor.append_event_action(
-        route.event_id,
-        route.action_id,
-        expected_actions=route.expected_actions,
-        label=f"append Stop Action for {route.label}",
-    )
-
-
 def _event_referenced_stop_targets(
     editor: soundbank_editor.HircEditor,
 ) -> frozenset[int]:
@@ -720,7 +583,7 @@ def validate_charged_shelling_hirc(
     _guard_charged_shelling_charge_event(bank)
     editor = bank.hirc
     with_hit_release_voice = WYR_STAKE_STRIKE_ACTION_ID in editor.object_ids
-    expected_count, expected_size = (215, 12_555) if with_hit_release_voice else (211, 12_326)
+    expected_count, expected_size = (225, 13_183) if with_hit_release_voice else (221, 12_954)
     if len(editor.objects()) != expected_count or len(editor.build()) != expected_size:
         raise soundbank_editor.SoundBankError(
             "charged-shelling combined HIRC count or payload size differs"
@@ -1114,10 +977,7 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
         )
     _guard_charged_shelling_original(bank)
     _apply_full_burst(bank)
-    for route in WYVERNS_FIRE_ROUTES:
-        _add_overlay(bank, route)
-    for route in WYVERNS_FIRE_STOP_ROUTES:
-        _add_stop_route(bank, route)
+    apply_wyverns_fire(bank)
     _apply_charged_shelling(bank)
     _apply_wyrmstake_hit_release(bank)
 
@@ -1125,70 +985,84 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
 EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
     replaced_media=(),
     added_media=(
-        (43, FULL_BURST_MEDIA_IDS[0]),
-        (44, STARLIGHT_MEDIA_ID),
-        (45, STARLIGHT_BREAKER_MEDIA_ID),
-        (46, BREAKER_MEDIA_ID),
-        (47, FULL_BURST_MEDIA_IDS[1]),
-        (48, FULL_BURST_MEDIA_IDS[2]),
-        (49, FULL_BURST_MEDIA_IDS[3]),
-        (50, CHARGED_SHELLING_MEDIA_IDS[0]),
-        (51, CHARGED_SHELLING_MEDIA_IDS[1]),
-        (52, WYR_STAKE_STRIKE_MEDIA_ID),
-        (53, WYR_STAKE_ACS_STANDBY_MEDIA_ID),
+        (43, 242768048),
+        (44, 322318543),
+        (45, 3332910283),
+        (46, 2217266443),
+        (47, 954495929),
+        (48, 2170495128),
+        (49, 2062876979),
+        (50, 1793121649),
+        (51, 570980126),
+        (52, 949600199),
+        (53, 938668400),
+        (54, 2014220448),
+        (55, 3735305437),
+        (56, 941385580),
+        (57, 3696251564),
+        (58, 631532425),
     ),
-    hirc_changed_bytes=32,
+    hirc_changed_bytes=42,
     added_hirc_objects=(
-        (soundbank_editor.HIRC_SOUND, 960_803_121),
-        (soundbank_editor.HIRC_SOUND, 479_969_098),
-        (soundbank_editor.HIRC_SOUND, 2_544_331_946),
-        (soundbank_editor.HIRC_SOUND, 4_251_385_954),
-        (soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, FULL_BURST_RANDOM_ID),
-        (soundbank_editor.HIRC_ACTION, 3_386_055_930),
-        (soundbank_editor.HIRC_ACTION, 4_199_321_359),
-        (soundbank_editor.HIRC_ACTION, 4_100_049_135),
-        (soundbank_editor.HIRC_ACTION, 4_272_498_343),
-        (soundbank_editor.HIRC_ACTION, 3_047_212_046),
-        (soundbank_editor.HIRC_SOUND, 4_149_261_730),
-        (soundbank_editor.HIRC_ACTION, 4_011_774_951),
-        (soundbank_editor.HIRC_SOUND, 36_215_958),
-        (soundbank_editor.HIRC_ACTION, 254_514_827),
-        (soundbank_editor.HIRC_SOUND, 2_472_459_210),
-        (soundbank_editor.HIRC_ACTION, 1_866_468_495),
-        (soundbank_editor.HIRC_ACTION, 2_987_046_856),
-        (soundbank_editor.HIRC_ACTION, 3_645_807_405),
-        (soundbank_editor.HIRC_SOUND, CHARGED_SHELLING_SOUND_IDS[0]),
-        (soundbank_editor.HIRC_SOUND, CHARGED_SHELLING_SOUND_IDS[1]),
-        (soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, CHARGED_SHELLING_RANDOM_ID),
-        (soundbank_editor.HIRC_ACTION, 1_426_818_832),
-        (soundbank_editor.HIRC_ACTION, 515_837_897),
-        (soundbank_editor.HIRC_ACTION, 858_972_567),
-        (soundbank_editor.HIRC_ACTION, 1_225_287_532),
-        (soundbank_editor.HIRC_ACTION, 1_287_808_358),
-        (soundbank_editor.HIRC_ACTION, 4_053_288_866),
-        (soundbank_editor.HIRC_ACTION, 728_690_884),
-        (soundbank_editor.HIRC_ACTION, 1_267_644_869),
-        (soundbank_editor.HIRC_ACTION, 3_259_504_927),
-        (soundbank_editor.HIRC_SOUND, WYR_STAKE_STRIKE_SOUND_ID),
-        (soundbank_editor.HIRC_SOUND, WYR_STAKE_ACS_STANDBY_SOUND_ID),
-        (soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, WYR_STAKE_HIT_RANDOM_ID),
-        (soundbank_editor.HIRC_ACTION, WYR_STAKE_STRIKE_ACTION_ID),
+        (2, 960803121),
+        (2, 479969098),
+        (2, 2544331946),
+        (2, 4251385954),
+        (5, 853759195),
+        (3, 3386055930),
+        (3, 4199321359),
+        (3, 4100049135),
+        (3, 4272498343),
+        (3, 3047212046),
+        (2, 4149261730),
+        (2, 36215958),
+        (2, 2472459210),
+        (2, 2849114849),
+        (2, 1620588112),
+        (2, 1229173909),
+        (2, 3984040149),
+        (2, 3346634804),
+        (5, 3610379736),
+        (5, 3391377780),
+        (5, 362366644),
+        (3, 3388979775),
+        (3, 4011774951),
+        (3, 254514827),
+        (3, 1866468495),
+        (4, 281273126),
+        (3, 2987046856),
+        (3, 3645807405),
+        (2, 3489806140),
+        (2, 3928375835),
+        (5, 2510752860),
+        (3, 1426818832),
+        (3, 515837897),
+        (3, 858972567),
+        (3, 1225287532),
+        (3, 1287808358),
+        (3, 4053288866),
+        (3, 728690884),
+        (3, 1267644869),
+        (3, 3259504927),
+        (2, 38895430),
+        (2, 1727570929),
+        (5, 2393951905),
+        (3, 1821689211),
     ),
     resized_hirc_objects=(
-        (soundbank_editor.HIRC_EVENT, 302_768_804, 12, 20),
-        (soundbank_editor.HIRC_EVENT, 461_444_626, 12, 20),
-        (soundbank_editor.HIRC_EVENT, 680_296_805, 12, 16),
-        (soundbank_editor.HIRC_EVENT, 1_124_197_610, 12, 16),
-        (soundbank_editor.HIRC_EVENT, WYR_STAKE_STRIKE_EVENT_ID, 12, 16),
-        (soundbank_editor.HIRC_EVENT, 1_765_608_260, 12, 16),
-        (soundbank_editor.HIRC_EVENT, 1_962_814_816, 12, 24),
-        (soundbank_editor.HIRC_EVENT, 2_187_565_051, 12, 24),
-        (soundbank_editor.HIRC_EVENT, 2_727_643_337, 12, 16),
-        (soundbank_editor.HIRC_EVENT, 2_727_643_338, 12, 16),
-        (soundbank_editor.HIRC_EVENT, 3_325_567_640, 12, 24),
-        (soundbank_editor.HIRC_EVENT, 3_655_102_100, 12, 16),
+        (4, 461444626, 12, 20),
+        (4, 680296805, 12, 16),
+        (4, 1124197610, 12, 16),
+        (4, 1581859410, 12, 16),
+        (4, 1765608260, 12, 16),
+        (4, 1962814816, 12, 24),
+        (4, 2187565051, 12, 24),
+        (4, 2727643337, 12, 16),
+        (4, 2727643338, 12, 16),
+        (4, 3325567640, 12, 24),
+        (4, 3655102100, 12, 16),
     ),
-    hirc_size_delta=1465,
+    hirc_size_delta=2093,
 )
 
 
@@ -1287,6 +1161,8 @@ PLAN = SoundBankBuildPlan(
             "raising_heart_acs_standby_01(movie_2nd_as.raising_heart.acs_standby.1).wav",
             wem_channels=1,
         ),
+        *(MediaAddition(index, media, f"audio/wp07_gun_epvsp_shell/wyverns_fire/{name}", wem_channels=1)
+          for (index, media, _, _), name in zip(WYVERN_CLIPS[3:], EXTRA_FILENAMES, strict=True)),
     ),
     apply_edits=apply_edits,
     expected_summary=EXPECTED_SUMMARY,

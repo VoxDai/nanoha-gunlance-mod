@@ -879,3 +879,62 @@ CHARGED_SHELLING_VALIDATOR = BundleValidator(
     design_id="wp07_gun_epvsp_shell.charged_shelling",
     validate=validate_charged_shelling,
 )
+
+
+def validate_wyverns_fire(staged: Mapping[Path, Path]) -> None:
+    """Prove the staged EPVSP/WWEV/Bank route and preserve the native branch."""
+    from .hm_wp07_epvsp import PLAN as esp_plan
+    from .hm_wp07_epvsp_snd_ev import PLAN as wwev_plan
+    from .wp07_gun_epvsp_shell import PLAN as shell_plan
+    from . import wyverns_fire_routes as fire
+
+    root = Path(__file__).resolve().parents[1]
+    esp = soundbank_editor.EpvspFile.from_file(staged[esp_plan.target])
+    original_esp = soundbank_editor.EpvspFile.from_file(root / esp_plan.source)
+    if (
+        original_esp.requests[0] != fire.EPVSP_OLD_ROW
+        or esp.header != original_esp.header
+        or esp.requests != (fire.EPVSP_NEW_ROW, *original_esp.requests[1:])
+        or esp.requests.count(fire.EPVSP_CLUTCH_ROW) != 1
+    ):
+        raise BuildError("Wyvern EPVSP must change only the element-2000 start request")
+
+    original_ww = soundbank_editor.WwevFile.from_file(root / wwev_plan.source)
+    ww = soundbank_editor.WwevFile.from_file(staged[wwev_plan.target])
+    record = ww.record(fire.NEW_REQUEST)
+    donor = original_ww.record(26501)
+    if (
+        donor.sha256 != fire.DONOR_RECORD_SHA256
+        or ww.records != (*original_ww.records, record)
+        or ww.dependencies != original_ww.dependencies
+        or record.event_id != fire.PRIVATE_EVENT
+        or record.mode != -1
+        or record.raw[2:4] != donor.raw[2:4]
+        or record.raw[8:] != donor.raw[8:]
+        or ww.record(26502).event_id != fire.STOP_EVENT
+    ):
+        raise BuildError("Wyvern EPVSP WWEV expansion or native records changed")
+
+    bank = soundbank_editor.SoundBankEditor.from_file(
+        staged[shell_plan.target], external_stop_references=shell_plan.external_stop_references
+    )
+    original = soundbank_editor.SoundBankEditor.from_file(root / shell_plan.source)
+    fire.validate_wyverns_fire_hirc(bank)
+    for kind, ident in (
+        (soundbank_editor.HIRC_EVENT, fire.CHARGE_EVENT),
+        (soundbank_editor.HIRC_EVENT, fire.LEFT_EVENT),
+        *((soundbank_editor.HIRC_ACTION, aid) for aid in (51_759_545, 648_832_766, 120_830_402)),
+    ):
+        if bank.hirc.object_body(kind, ident) != original.hirc.object_body(kind, ident):
+            raise BuildError(f"Wyvern native Event or Action {ident} changed")
+    final_bank = bank.validate()
+    for entry in original.original.entries:
+        if final_bank.extract_media(media_id=entry.media_id) != original.original.extract_media(media_id=entry.media_id):
+            raise BuildError(f"Wyvern original media {entry.media_id} changed")
+
+
+WYVERNS_FIRE_VALIDATOR = BundleValidator(
+    name="wyverns_fire_epvsp_route",
+    design_id="wp07_gun_epvsp_shell.wyverns_fire",
+    validate=validate_wyverns_fire,
+)

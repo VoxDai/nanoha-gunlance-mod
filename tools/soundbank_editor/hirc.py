@@ -1310,6 +1310,7 @@ class HircEditor:
         bank_id: int,
         *,
         delay_ms: int = 0,
+        delay_random_range_ms: tuple[int, int] | None = None,
         transition_ms: int | None = None,
         fade_curve: int = 0x04,
     ) -> bytes:
@@ -1319,7 +1320,10 @@ class HircEditor:
             action_id: Unsigned-32 Action identity encoded at body offset zero.
             target_id: Unsigned-32 playback object identity to encode.
             bank_id: Unsigned-32 Bank identity to encode.
-            delay_ms: Unsigned-32 delay when nonzero; zero omits the property.
+            delay_ms: Unsigned-32 base delay. Zero omits the property unless a
+                random range is supplied.
+            delay_random_range_ms: Optional signed millisecond offsets to delay_ms.
+                Both resulting endpoints must be nonnegative and ordered.
             transition_ms: Optional unsigned-32 transition in milliseconds; None
                 omits it, while zero encodes an explicit zero property.
             fade_curve: Unsigned byte fade-curve code; defaults to 0x04.
@@ -1338,7 +1342,21 @@ class HircEditor:
 
         self._require_v120("create Play Action")
         properties: list[tuple[int, int]] = []
-        if delay_ms:
+        ranged = b"\0"
+        if delay_random_range_ms is not None:
+            base = _check_u32(delay_ms, "delay_ms")
+            if (
+                not isinstance(delay_random_range_ms, tuple)
+                or len(delay_random_range_ms) != 2
+                or any(type(v) is not int or not -0x80000000 <= v <= 0x7FFFFFFF
+                       for v in delay_random_range_ms)
+            ):
+                raise SoundBankError("Delay range must contain two signed-32 offsets")
+            lo, hi = delay_random_range_ms
+            if lo > hi or not 0 <= base + lo <= base + hi <= 0x7FFFFFFF:
+                raise SoundBankError("Effective delay range must be ordered and nonnegative")
+            ranged = struct.pack("<BBii", 1, 0x0F, lo, hi)
+        if delay_ms or delay_random_range_ms is not None:
             properties.append((0x0F, _check_u32(delay_ms, "delay_ms")))
         if transition_ms is not None:
             properties.append((0x10, _check_u32(transition_ms, "transition_ms")))
@@ -1355,7 +1373,7 @@ class HircEditor:
         body += bytes(prop_id for prop_id, _ in properties)
         for _, value in properties:
             body += struct.pack("<I", value)
-        body += b"\0"
+        body += ranged
         body += struct.pack("<B", _check_u8(fade_curve, "fade_curve"))
         body += struct.pack("<I", _check_u32(bank_id, "Bank ID"))
         return bytes(body)

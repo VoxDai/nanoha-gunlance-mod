@@ -1,9 +1,11 @@
-"""Build the complete eight-artifact design-driven release."""
+"""Build the complete registered design-driven release."""
 
 from __future__ import annotations
 
 from .base import ModBuildPlan, run_all_cli
 from .hm_cm00_epvsp import PLAN as HM_CM00_EPVSP
+from .hm_wp07_epvsp import PLAN as HM_WP07_EPVSP
+from .hm_wp07_epvsp_snd_ev import PLAN as HM_WP07_EPVSP_SND_EV
 from .hm_wp07_snd_ev import PLAN as HM_WP07_SND_EV
 from .integration import (
     CHARGED_SHELLING_VALIDATOR,
@@ -11,6 +13,7 @@ from .integration import (
     STATIONARY_DRAW_VALIDATOR,
     WIDE_SWEEP_VALIDATOR,
     WYR_STAKE_VALIDATOR,
+    WYVERNS_FIRE_VALIDATOR,
 )
 from .pl_wp_par_op_event_structure import PLAN as PL_WP_PAR_OP_EVENT_STRUCTURE
 from .pl_prop_cmn import PLAN as PL_PROP_CMN
@@ -31,6 +34,8 @@ ARTIFACT_PLANS = (
     HM_WP07_SND_EV,
     PL_PROP_CMN,
     PL_VOICE,
+    HM_WP07_EPVSP,
+    HM_WP07_EPVSP_SND_EV,
 )
 
 # Kept as a small import compatibility alias for project-side callers.
@@ -44,6 +49,7 @@ MOD_PLAN = ModBuildPlan(
         WIDE_SWEEP_VALIDATOR,
         CHARGED_SHELLING_VALIDATOR,
         WYR_STAKE_VALIDATOR,
+        WYVERNS_FIRE_VALIDATOR,
     ),
 )
 

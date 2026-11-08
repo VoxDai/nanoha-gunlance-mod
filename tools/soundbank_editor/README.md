@@ -1,7 +1,7 @@
 # soundbank_editor
 
 `tools.soundbank_editor` is the project-local Python Library for lossless NBNK,
-LMT v95/TIML, and WWEV v19 parsing and guarded editing. It has no CLI or
+LMT v95/TIML, WWEV v19, and request-only EPVSP v8 parsing and guarded editing. It has no CLI or
 JSON-plan interface.
 
 This README owns **API navigation and examples**. Public docstrings own exact
@@ -28,11 +28,12 @@ Import public names from this package. Its `__all__` is the public API list;
 | HIRC | [HircEditor, HircObject, SwitchContainerTopology, SwitchNodeParams](hirc.py); [HircPitchSettings](_pitch.py) |
 | LMT/TIML | [LmtFile, LmtEditor, LmtAction, TimlType, TimlTransform, TimlKeyframe, TriggeredRequest, LmtRequestEdit, LmtEditSummary](lmt.py) |
 | WWEV | [WwevFile, WwevEditor, WwevRecord, WwevRecordEdit, WwevEditSummary](wwev.py) |
+| EPVSP | [EpvspFile, EpvspEditor, EpvspStartEdit](epvsp.py) |
 | Errors | [EditorError, SoundBankError, LmtError, WwevError](errors.py) |
 | Constants and compatibility | [Package docstring and exports](__init__.py); [legacy imports](editor.py) |
 
-`from_file()` records the resolved input path; `from_bytes()` has no source-path
-identity. Parsed files serialize losslessly with `to_bytes()`. Editors keep
+For NBNK, LMT, and WWEV, `from_file()` records the resolved input path;
+`from_bytes()` has no source-path identity. Parsed files serialize losslessly with `to_bytes()`. Editors keep
 changes in memory until explicitly written. The examples below run from the
 project root and share the imports above; no example writes into `original/`.
 
@@ -223,6 +224,25 @@ body hash and embedded media, and rejects undeclared external Stops. Both
 directions may refer to each other; this does not impose a build order or prove
 runtime loading and Game Object identity. Single-artifact diagnostics with
 declarations must report that joint resolution is still outstanding.
+
+## EPVSP
+
+The editor supports the verified ESP v8 WWCT-path layout with no TriggerData
+rows. It preserves the original header, row order, and all fields except the
+declared start request. The guard is a zero-based row index and its full
+`(mElemNo, mReqID, mKillReqID, EpvElement, EpvIndex)` tuple.
+
+```python
+epvsp = se.EpvspFile.from_file(Path("original/epvsp/hm_wp07.epvsp"))
+editor = se.EpvspEditor(epvsp)
+editor.replace_start_request(0, expected=(0, 26501, 26502, 2000, 0), new_request=26690)
+payload = editor.validate().to_bytes()
+```
+
+For v120 Play Actions, `create_play_action(..., delay_ms=0,
+delay_random_range_ms=(0, 50))` encodes a 0 ms base and 0–50 ms DelayTime
+offsets. Without a range, the immediate and fixed-delay layouts remain unchanged.
+This is a serialized playback property, not a change to the source waveform.
 
 ## LMT and WWEV
 
