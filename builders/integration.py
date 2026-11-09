@@ -10,6 +10,7 @@ import struct
 from tools import soundbank_editor
 
 from .base import BuildError, BundleValidator, HircBank
+from .clutch_weapon_attack_routes import MUTE_EDITS as CLUTCH_MUTE_EDITS
 from .pl_wp_par_op_event_structure import (
     PLAN as WYR_STAKE_STRUCTURE_PLAN,
     WRAPPERS as WYR_STAKE_WRAPPERS,
@@ -266,8 +267,18 @@ def validate_wyrmstake_cannon(staged: Mapping[Path, Path]) -> None:
     }
     if actual_voice != expected_voice or len(selected) != len(expected_voice):
         raise BuildError("Wyrmstake selected Motion voice routes differ")
-    if tuple(row for row in voice_routes if row.request_no == WYR_STAKE_MUTE_REQUEST) != selected:
-        raise BuildError("Wyrmstake mute request leaks into an unselected Motion")
+    expected_clutch_mute = {
+        (edit.motion_id, edit.event_group, edit.slot, frame)
+        for edit in CLUTCH_MUTE_EDITS for frame in edit.trigger_frames
+    }
+    allowed_mute = {(row.motion_id, row.event_group, row.slot, row.trigger_frame)
+                    for row in selected} | expected_clutch_mute
+    actual_mute = [
+        (row.motion_id, row.event_group, row.slot, row.trigger_frame)
+        for row in voice_routes if row.request_no == WYR_STAKE_MUTE_REQUEST
+    ]
+    if set(actual_mute) != allowed_mute or len(actual_mute) != len(allowed_mute):
+        raise BuildError("Shared voice mute request differs from its declared triggers")
     if (
             event_owners.get(WYR_STAKE_MUTE_ROUTE_EVENT_ID) != ["common"]
             or event_owners.get(WYR_STAKE_MUTE_EMPTY_EVENT_ID) != ["common"]

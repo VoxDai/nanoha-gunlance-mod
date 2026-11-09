@@ -1,4 +1,4 @@
-"""Guarded routes for the two Motion 335 voice overlays."""
+"""Guarded routes for the Motion 335 draw voice overlay and grunt mute."""
 
 from __future__ import annotations
 
@@ -11,6 +11,11 @@ import struct
 from tools import soundbank_editor as se
 
 from .base import BuildError, BundleValidator, HircBank, MediaAddition
+from .pl_voice import (
+    WYR_STAKE_MUTE_EVENT_ID,
+    WYR_STAKE_MUTE_RECORD_SHA256,
+    WYR_STAKE_MUTE_REQUEST,
+)
 from .voice_standard import insert_standard_voice_sound
 
 DESIGN_ID = "wp_gun_cmn.clutch_weapon_attack"
@@ -19,10 +24,15 @@ GROUP = "EventGroup06"
 ASSIGNMENT_FRAME = 0.0
 PITCH = se.HircPitchSettings(None, (-50.0, 50.0))
 
+MUTE_EDITS = (
+    se.LmtRequestEdit(MOTION, "EventGroup02", "B", ASSIGNMENT_FRAME, (16.0,), 2915504,
+                      1409, WYR_STAKE_MUTE_REQUEST, 2),
+    se.LmtRequestEdit(MOTION, "EventGroup02", "A", ASSIGNMENT_FRAME, (107.0,), 2915472,
+                      1309, WYR_STAKE_MUTE_REQUEST, 2),
+)
 LMT_EDITS = (
     se.LmtRequestEdit(MOTION, GROUP, "F", ASSIGNMENT_FRAME, (5.0,), 2915840, 6470, 6613, 1),
-    se.LmtRequestEdit(MOTION, GROUP, "H", ASSIGNMENT_FRAME, (110.0,), 2915904, 6460, 6614, 1),
-)
+) + MUTE_EDITS
 
 
 @dataclass(frozen=True)
@@ -43,22 +53,6 @@ WRAPPERS = (
         "cdf654b3ef9e93d51971da97cc9479fcfd85ad8baaa6923f1a94bb6784844f15",
         "6c8f6ba1362064c06db17ed2248d1f9f288a3f0459caba8c77131d8b487c810a",
         ((1984195518, 3567942167), (1423603563, 2405966492)),
-    ),
-    Wrapper(
-        se.WwevRecordEdit(14, 6460, 1024101668, 51, 6614, 1767044258, 129),
-        "ee5b6bfa669cd61e9828e3dc88db75219ec5a55babe87548eabd65c159c0a52e",
-        220419703,
-        "9e0727fd4f80e2a0410e6b26cb44565a62194e49011716232d2e07a68c460876",
-        "b5a74054bd5d85178c6129c3668a6ec8f211f897e40477b17d02a7a7901ad5c8",
-        ((2910429509, 1024101668), (2515977290, 3228545391)),
-    ),
-    Wrapper(
-        se.WwevRecordEdit(15, 6460, 1080565533, 52, 6614, 3205911733, 129),
-        "641f251490902f7b5e322be89c5bd4b72bfe3b5100f3a85d1ccc26563d7e8f32",
-        29680933,
-        "27390d1f2a5a2a3356cd5eee0cdbafe1d9fa9f4d734a6f8fba0f469e5a8f193b",
-        "b156ed03e9878e9474778f313489e1f7c9d3ac905ba4cd8d30655e94ee780ebb",
-        ((2396863630, 1080565533),),
     ),
 )
 
@@ -82,16 +76,6 @@ VOICES = (
         ),
         507956785, 1277608954, 2405966492,
         "0b8d9f6f3c01e0f9f91234fc65954a1ec1db9f4f0c502577bd5f97dc28dfef8c",
-    ),
-    Voice(
-        MediaAddition(
-            50, 2785082779,
-            "audio/wp_gun_cmn/clutch_weapon_attack/"
-            "nanoha_buster_03(movie_reflection.nanoha.excellion_buster.1).wav",
-            wem_channels=1,
-        ),
-        690215586, 1585582823, 3228545391,
-        "38a24e9f1761e74c1f7e02a400e890fb6ad966ec4989895805be414e9fff44ab",
     ),
 )
 
@@ -124,8 +108,6 @@ def _guard_native(hirc: se.HircEditor, wrapper: Wrapper) -> None:
 
 
 def apply_wrappers(hirc: se.HircEditor) -> None:
-    for wrapper in WRAPPERS[1:]:
-        _guard_native(hirc, wrapper)
     for wrapper in WRAPPERS:
         for action, target in wrapper.calls:
             hirc.insert_object(se.HIRC_ACTION, action, hirc.create_play_event_action(action, target)[4:])
@@ -195,11 +177,57 @@ def _validate_voices(bank: se.SoundBankEditor) -> None:
             raise BuildError(f"Clutch voice route {voice.event} differs")
 
 
+def _validate_mute_routes(original_lmt, lmt, original_voice, voice) -> None:
+    mute_records = voice.records_for_request(WYR_STAKE_MUTE_REQUEST)
+    if tuple((r.index, r.mode, r.event_id, r.sha256) for r in mute_records) != (
+        (103, 4, WYR_STAKE_MUTE_EVENT_ID, WYR_STAKE_MUTE_RECORD_SHA256),
+    ):
+        raise BuildError("Clutch shared mute WWEV record differs")
+
+    expected = []
+    for edit, (index, event, digest) in zip(MUTE_EDITS, (
+        (20, 967571325, "73c0de66cceb0d4c467d1652296537e0a63b53490620542d1b9174df7a3da507"),
+        (18, 3262711103, "505d806915b6b08b37add31895e56e4e45faf84cc0e85883a4414873927390f9"),
+    ), strict=True):
+        original_records = original_voice.records_for_request(edit.old_request)
+        if (
+            tuple((r.index, r.mode, r.event_id, r.sha256) for r in original_records)
+            != ((index, 4, event, digest),)
+            or voice.records_for_request(edit.old_request) != original_records
+        ):
+            raise BuildError(f"Clutch original voice request {edit.old_request} differs")
+        expected.append(se.TriggeredRequest(
+            motion_id=MOTION, frame_count=359, timl_offset=2913472,
+            shared_timl_motions=(MOTION,), event_group=edit.event_group,
+            trigger_frame=edit.trigger_frames[0], trigger_mask=1 << (ord(edit.slot) - ord("A")),
+            slot=edit.slot, request_no=edit.old_request, wwev_record=index,
+            wwev_mode=4, event_id=event,
+        ))
+
+    def motion_voice_routes(timeline, table):
+        return tuple(
+            row for row in timeline.triggered_requests(table)
+            if row.motion_id == MOTION and row.event_group == "EventGroup02"
+        )
+
+    muted = tuple(
+        replace(row, request_no=WYR_STAKE_MUTE_REQUEST, wwev_record=103,
+                event_id=WYR_STAKE_MUTE_EVENT_ID)
+        for row in expected
+    )
+    if (
+        motion_voice_routes(original_lmt, original_voice) != tuple(expected)
+        or motion_voice_routes(lmt, voice) != muted
+    ):
+        raise BuildError("Clutch Motion 335 voice triggers differ")
+
+
 def validate_bundle(staged: Mapping[Path, Path]) -> None:
     from .hm_wp07_snd_ev import PLAN as wwev_plan
+    from .pl_voice import PLAN as voice_plan
     from .pl_wp_par_op_event_structure import PLAN as structure_plan
     from .w07_00 import PLAN as lmt_plan
-    from .wp_gun_cmn import PLAN as common_plan
+    from .wp_gun_cmn import PLAN as common_plan, validate_wyrmstake_original_voice_mute_hirc
 
     root = Path(__file__).resolve().parents[1]
     original_wwev = se.WwevFile.from_file(root / wwev_plan.source)
@@ -209,16 +237,27 @@ def validate_bundle(staged: Mapping[Path, Path]) -> None:
         or wwev.dependencies != original_wwev.dependencies
     ):
         raise BuildError("Clutch original weapon WWEV records or dependencies changed")
+    retired_events = {1767044258, 3205911733, 3228545391}
+    if any(record.request_no == 6614 or record.event_id in retired_events for record in wwev.records):
+        raise BuildError("Retired clutch insert WWEV route remains")
     original_lmt = se.LmtFile.from_file(root / lmt_plan.source)
     lmt = se.LmtFile.from_file(staged[lmt_plan.target])
+    original_voice = se.WwevFile.from_file(root / voice_plan.source)
+    voice = se.WwevFile.from_file(staged[voice_plan.target])
+    _validate_mute_routes(original_lmt, lmt, original_voice, voice)
     original_routes = original_lmt.triggered_requests(original_wwev)
     native_routes = {
         (route.slot, route.wwev_record): route
         for route in original_routes
-        if route.motion_id == MOTION and route.event_group == GROUP and route.slot in ("F", "H")
+        if route.motion_id == MOTION and route.event_group == GROUP and route.slot == "F"
     }
-    replacements = {}
-    for wrapper, slot in zip(WRAPPERS, ("F", "H", "H"), strict=True):
+    mute_slots = {(edit.event_group, edit.slot): edit.new_request for edit in MUTE_EDITS}
+    replacements = {
+        route: replace(route, request_no=mute_slots[route.event_group, route.slot])
+        for route in original_routes
+        if route.motion_id == MOTION and (route.event_group, route.slot) in mute_slots
+    }
+    for wrapper, slot in zip(WRAPPERS, ("F",), strict=True):
         edit = wrapper.edit
         donor = original_wwev.records[edit.donor_record_index - 1]
         record = wwev.records[edit.added_record_index - 1]
@@ -251,11 +290,16 @@ def validate_bundle(staged: Mapping[Path, Path]) -> None:
     common = se.SoundBankEditor.from_file(
         staged[common_plan.target], external_stop_references=common_plan.external_stop_references,
     )
+    if (
+        wrappers.object_ids & {1767044258, 3205911733, 2910429509, 2515977290, 2396863630}
+        or common.hirc.object_ids & {3228545391, 1585582823, 690215586}
+        or any(entry.media_id == 2785082779 for entry in common.original.entries)
+    ):
+        raise BuildError("Retired clutch insert HIRC or media remains")
     _guard_native(common.hirc, WRAPPERS[0])
-    for wrapper in WRAPPERS[1:]:
-        _guard_native(wrappers, wrapper)
     _validate_wrappers(wrappers)
     _validate_voices(common)
+    validate_wyrmstake_original_voice_mute_hirc(common)
 
 
 VALIDATOR = BundleValidator(

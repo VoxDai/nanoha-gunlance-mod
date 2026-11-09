@@ -43,13 +43,14 @@ FULL_BURST_PLAYLIST = tuple((sound_id, 25_000) for sound_id in FULL_BURST_SOUND_
 STARLIGHT_MEDIA_ID = 322_318_543
 STARLIGHT_BREAKER_MEDIA_ID = 3_332_910_283
 BREAKER_MEDIA_ID = 2_217_266_443
-CHARGED_SHELLING_MEDIA_IDS = (1_793_121_649, 570_980_126)
-CHARGED_SHELLING_SOUND_IDS = (3_489_806_140, 3_928_375_835)
+CHARGED_SHELLING_MEDIA_IDS = (1_793_121_649, 570_980_126, 2_785_082_779)
+CHARGED_SHELLING_SOUND_IDS = (3_489_806_140, 3_928_375_835, 690_215_586)
 CHARGED_SHELLING_SOUND_SHA256S = (
     "bbc603bac06e30ea54aa58de3b749e1d413c8275c2834a931e015b8835c7e06d",
     "2e5a7e3eb467114ad41a2a742e5204f51a5dcf9bf45bc0a011f8c1a3cd8663a4",
+    "8851587d5cec37e5055865facfd818745aa344bf30ca4a001f5caea89b87bcf0",
 )
-CHARGED_SHELLING_MEDIA_INDICES = (50, 51)
+CHARGED_SHELLING_MEDIA_INDICES = (50, 51, 59)
 WYR_STAKE_STRIKE_MEDIA_ID = 949_600_199
 WYR_STAKE_STRIKE_SOUND_ID = 38_895_430
 WYR_STAKE_STRIKE_ACTION_ID = 1_821_689_211
@@ -103,7 +104,7 @@ CHARGED_SHELLING_RANDOM_DONOR_SHA256 = (
     "53ce24846e01ef33e99c2c66575a9e50e367730b25231c53289fc2e772c4aff7"
 )
 CHARGED_SHELLING_RANDOM_SHA256 = (
-    "fdca235137ca95d9080e9377307782d0a832574d6fd8e7ae746079b8538fbbf8"
+    "1d3240b0b6205ac132d53ddf81f7647375ae2c56a365e4c904d7819491862a33"
 )
 CHARGED_SHELLING_PLAYLIST = tuple((sid, 50_000) for sid in CHARGED_SHELLING_SOUND_IDS)
 CHARGED_SHELLING_ORIGINAL_EVENT_ID = 1_308_679_810
@@ -583,7 +584,7 @@ def validate_charged_shelling_hirc(
     _guard_charged_shelling_charge_event(bank)
     editor = bank.hirc
     with_hit_release_voice = WYR_STAKE_STRIKE_ACTION_ID in editor.object_ids
-    expected_count, expected_size = (225, 13_183) if with_hit_release_voice else (221, 12_954)
+    expected_count, expected_size = (226, 13_246) if with_hit_release_voice else (222, 13_017)
     if len(editor.objects()) != expected_count or len(editor.build()) != expected_size:
         raise soundbank_editor.SoundBankError(
             "charged-shelling combined HIRC count or payload size differs"
@@ -614,7 +615,7 @@ def validate_charged_shelling_hirc(
         soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, CHARGED_SHELLING_RANDOM_ID
     )
     if (
-            len(random_body) != 95
+            len(random_body) != 107
             or hashlib.sha256(random_body).hexdigest() != CHARGED_SHELLING_RANDOM_SHA256
             or editor.pitch_settings(soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, CHARGED_SHELLING_RANDOM_ID)
             != soundbank_editor.HircPitchSettings(None, (-50.0, 50.0))
@@ -1001,6 +1002,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (56, 941385580),
         (57, 3696251564),
         (58, 631532425),
+        (59, 2785082779),
     ),
     hirc_changed_bytes=42,
     added_hirc_objects=(
@@ -1034,6 +1036,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (3, 3645807405),
         (2, 3489806140),
         (2, 3928375835),
+        (2, 690215586),
         (5, 2510752860),
         (3, 1426818832),
         (3, 515837897),
@@ -1062,7 +1065,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (4, 3325567640, 12, 24),
         (4, 3655102100, 12, 16),
     ),
-    hirc_size_delta=2093,
+    hirc_size_delta=2156,
 )
 
 
@@ -1163,6 +1166,13 @@ PLAN = SoundBankBuildPlan(
         ),
         *(MediaAddition(index, media, f"audio/wp07_gun_epvsp_shell/wyverns_fire/{name}", wem_channels=1)
           for (index, media, _, _), name in zip(WYVERN_CLIPS[3:], EXTRA_FILENAMES, strict=True)),
+        MediaAddition(
+            59,
+            CHARGED_SHELLING_MEDIA_IDS[2],
+            "audio/wp07_gun_epvsp_shell/charged_shelling/"
+            "nanoha_buster_03(movie_reflection.nanoha.excellion_buster.1).wav",
+            wem_channels=1,
+        ),
     ),
     apply_edits=apply_edits,
     expected_summary=EXPECTED_SUMMARY,

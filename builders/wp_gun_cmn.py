@@ -323,11 +323,12 @@ CHARGED_SHELLING_RANDOM_SHA256 = (
 CHARGED_SHELLING_PLAYLIST = tuple((sid, 50_000) for sid in CHARGED_SHELLING_DIVINE_SOUND_IDS)
 CHARGED_SHELLING_STOP_BUSTER_ACTION_ID = 1_603_135_794
 CHARGED_SHELLING_BUSTER_SOUND_ID = 3_489_806_140
-CHARGED_SHELLING_STOP_BUSTER_ACTION_IDS = (CHARGED_SHELLING_STOP_BUSTER_ACTION_ID, 85_406_655)
-CHARGED_SHELLING_BUSTER_SOUND_IDS = (CHARGED_SHELLING_BUSTER_SOUND_ID, 3_928_375_835)
+CHARGED_SHELLING_STOP_BUSTER_ACTION_IDS = (CHARGED_SHELLING_STOP_BUSTER_ACTION_ID, 85_406_655, 2_076_396_906)
+CHARGED_SHELLING_BUSTER_SOUND_IDS = (CHARGED_SHELLING_BUSTER_SOUND_ID, 3_928_375_835, 690_215_586)
 CHARGED_SHELLING_STOP_BUSTER_SHA256S = (
     "f33f2c36a8e9ec2278fe3c85950abe4b8163f58a1770404fed9e531a2b4ebb65",
     "a3e37d407b2de99b7f29088dc93127b5c02a5423a8c702196df2315edfa7b13d",
+    "546bee5372b864ea27999bb884e4aa030466b7fda336e9629d9a2b89015bbacb",
 )
 CHARGED_SHELLING_EXTERNAL_STOPS = tuple(
     soundbank_editor.ExternalStopReference(
@@ -339,6 +340,7 @@ CHARGED_SHELLING_EXTERNAL_STOPS = tuple(
         (
             "bbc603bac06e30ea54aa58de3b749e1d413c8275c2834a931e015b8835c7e06d",
             "2e5a7e3eb467114ad41a2a742e5204f51a5dcf9bf45bc0a011f8c1a3cd8663a4",
+            "8851587d5cec37e5055865facfd818745aa344bf30ca4a001f5caea89b87bcf0",
         ),
         strict=True,
     )
@@ -360,7 +362,7 @@ CHARGED_SHELLING_DIVINE_ACTION_SHA256 = (
     "ac01f6c3c01f4b9870cf14af9c1f6614cc78fa2d2d1f01dcc16bed071da1be38"
 )
 CHARGED_SHELLING_EVENT_SHA256 = (
-    "a83a290f75974e96d8ac6b237c52cfa8f78c3e52d4ccd0aa22f0183653c5f20c"
+    "8e966f8f23233c1839a1f9a464e3e2a26eda29b3c457e30ddfbe7935ea3f5582"
 )
 CHARGED_SHELLING_NATIVE_PARENT_GUARDS = (
     (soundbank_editor.HIRC_RANDOM_SEQUENCE_CONTAINER, 522_283_251, 768_813_060),
@@ -770,8 +772,8 @@ def _apply_charged_shelling_divine(
         soundbank_editor.HIRC_EVENT,
         CHARGED_SHELLING_EVENT_ID,
         struct.pack(
-            "<IIIII",
-            4,
+            "<IIIIII",
+            5,
             CHARGED_SHELLING_ORIGINAL_ROUTE_ACTION_ID,
             *CHARGED_SHELLING_STOP_BUSTER_ACTION_IDS,
             CHARGED_SHELLING_DIVINE_ACTION_ID,
@@ -1198,7 +1200,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (47, WYR_STAKE_MEDIA_IDS[0]),
         (48, WYR_STAKE_MEDIA_IDS[1]),
     ) + tuple((voice.media.expected_index, voice.media.media_id) for voice in clutch.VOICES),
-    hirc_changed_bytes=57,
+    hirc_changed_bytes=49,
     added_hirc_objects=(
         (soundbank_editor.HIRC_SOUND, VOICE_SOUND_ID),
         (soundbank_editor.HIRC_SOUND, STATIONARY_SOUND_IDS[1]),
@@ -1234,6 +1236,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         ),
         (soundbank_editor.HIRC_ACTION, CHARGED_SHELLING_STOP_BUSTER_ACTION_ID),
         (soundbank_editor.HIRC_ACTION, CHARGED_SHELLING_STOP_BUSTER_ACTION_IDS[1]),
+        (soundbank_editor.HIRC_ACTION, CHARGED_SHELLING_STOP_BUSTER_ACTION_IDS[2]),
         (soundbank_editor.HIRC_ACTION, CHARGED_SHELLING_DIVINE_ACTION_ID),
         (soundbank_editor.HIRC_EVENT, CHARGED_SHELLING_EVENT_ID),
         (soundbank_editor.HIRC_ACTION, FIRING_SILENT_ACTION_ID),
@@ -1252,7 +1255,7 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
     resized_hirc_objects=(
         (soundbank_editor.HIRC_EVENT, RELOAD_EVENT_ID, 12, 16),
     ),
-    hirc_size_delta=1968,
+    hirc_size_delta=1900,
 )
 
 

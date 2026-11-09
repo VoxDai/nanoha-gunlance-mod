@@ -90,7 +90,7 @@ EXPECTED_SUMMARY = soundbank_editor.WwevEditSummary(
 PLAN = WwevBuildPlan(
     name="pl_voice",
     design_ids=("wp_gun_cmn.overhead_smash", "wp07_gun_epvsp_shell.charged_shelling",
-                "wp07_gun_epvsp_shell.wyrmstake_cannon"),
+                "wp07_gun_epvsp_shell.wyrmstake_cannon", "wp_gun_cmn.clutch_weapon_attack"),
     source="original/wwev/pl_voice.wwev",
     target="sound/pl/pl_voice.wwev",
     expected_source_sha256=(

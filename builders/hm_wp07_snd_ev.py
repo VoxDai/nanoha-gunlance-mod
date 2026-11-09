@@ -101,7 +101,7 @@ def apply_edits(editor: soundbank_editor.WwevEditor) -> None:
             new_event_id=new_event,
         )
 
-    charge, insert, insert_secondary = clutch.WRAPPERS
+    (charge,) = clutch.WRAPPERS
     editor.append_cloned_record(
         donor_request=charge.edit.donor_request,
         expected_donor_event_id=charge.edit.donor_event_id,
@@ -110,18 +110,13 @@ def apply_edits(editor: soundbank_editor.WwevEditor) -> None:
         new_request=charge.edit.new_request,
         new_event_id=charge.edit.new_event_id,
     )
-    editor.append_cloned_request(
-        donor_request=insert.edit.donor_request,
-        expected_donor_sha256s=(insert.donor_sha256, insert_secondary.donor_sha256),
-        new_request=insert.edit.new_request,
-        new_event_ids=(insert.edit.new_event_id, insert_secondary.edit.new_event_id),
-    )
+
 
 
 EXPECTED_SUMMARY = soundbank_editor.WwevEditSummary(
     record_count_before=43,
-    record_count_after=52,
-    appended_size=1161,
+    record_count_after=50,
+    appended_size=903,
     edits=(
         soundbank_editor.WwevRecordEdit(
             donor_record_index=17,

@@ -168,7 +168,7 @@ def apply_edits(editor: soundbank_editor.LmtEditor) -> None:
 
 
 EXPECTED_SUMMARY = soundbank_editor.LmtEditSummary(
-    changed_byte_count=48,
+    changed_byte_count=51,
     edits=(
         soundbank_editor.LmtRequestEdit(
             motion_id=MOTION_ID,

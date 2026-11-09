@@ -103,7 +103,7 @@ EXPECTED_SUMMARY = HircBankEditSummary(
     ) + clutch.WRAPPER_OBJECTS,
     changed_byte_count=0,
     resized_hirc_objects=(),
-    hirc_size_delta=320,
+    hirc_size_delta=228,
 )
 
 PLAN = HircBankBuildPlan(

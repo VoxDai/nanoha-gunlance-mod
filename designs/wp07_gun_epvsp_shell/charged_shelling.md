@@ -12,7 +12,7 @@ target_artifacts:
 
 ## 描述
 
-保留三种炮击类型的原版蓄力、姿态调整与蓄力爆炸声；进入水平、斜上或垂直蓄力动作时立即等概率随机叠加两条奈叶「Divine」之一，蓄力过程中调整炮口姿态不重复播放，实际完成蓄力炮击并爆炸时同步等概率随机叠加两条「Buster」之一。两阶段独立选择，允许连续重复且不绑定素材来源；每次播放产生
+保留三种炮击类型的原版蓄力、姿态调整与蓄力爆炸声；进入水平、斜上或垂直蓄力动作时立即等概率随机叠加两条奈叶「Divine」之一，蓄力过程中调整炮口姿态不重复播放，实际完成蓄力炮击并爆炸时同步等概率随机叠加三条「Buster」之一。钩爪武器攻击插枪后的炮击也共用这一组 Buster。两阶段独立选择，允许连续重复且不绑定素材来源；每次播放产生
 ±50 cents 随机音调偏移。每次 Divine 或 Buster 开始时，当前游戏对象上尚未结束的对侧语音在 50 ms 内线性淡出停止；新语音立即播放，允许淡出期间短暂重叠。关闭三种类型、三个方向的普通炮击与蓄力完成后发射时的原人物“哼”声；保留全部原武器音效，不改动蓄力开始时的声音，也不补回普通炮击人物语音。
 
 | 名称                       | 动作或状态                             | 预期行为                                                                                                       |
@@ -24,8 +24,9 @@ target_artifacts:
 | 扩散型蓄力炮击             | 完成蓄力并触发扩散型爆炸               | 保留原版爆炸声，同步额外播放一次「Buster」，同时将尚未结束的「Divine」在 50 ms 内淡出停止                      |
 | 放射型蓄力炮击             | 完成蓄力并触发放射型爆炸               | 保留原版爆炸声，同步额外播放一次「Buster」，同时将尚未结束的「Divine」在 50 ms 内淡出停止                      |
 | 通常型蓄力炮击             | 完成蓄力并触发通常型爆炸               | 保留原版爆炸声，同步额外播放一次「Buster」，同时将尚未结束的「Divine」在 50 ms 内淡出停止                      |
+| 钩爪武器攻击炮击 | 插入怪物后实际触发炮击 | 保留原版爆炸声，使用同一 Buster 容器播放一次；插枪时保留原声 |
 | 蓄力中断                   | 已触发蓄力后取消或被中断               | 不触发「Buster」；不额外发出 Stop，已开始的「Divine」自然结束                                                  |
-| 连续独立蓄力与炮击         | 再次开始蓄力或实际爆炸                 | 每个阶段独立重新选择一条语音，各候选概率 50%，允许与上次相同；Divine 与 Buster 不绑定同一来源                  |
+| 连续独立蓄力与炮击         | 再次开始蓄力或实际爆炸                 | 每个阶段独立重新选择一条语音，Divine 各 50%，Buster 各 1/3，允许与上次相同；Divine 与 Buster 不绑定同一来源                  |
 | 蓄力炮击发射人物语音 | 通常、放射、扩散型以水平、斜上或垂直方向完成蓄力并发射 | 原人物“哼”声静音；原武器音效及本设计 Buster 保持不变 |
 | 普通炮击 | 三种类型、三个方向的未蓄力炮击 | 原人物“哼”声静音，保留原武器音效；不补回人物语音，不新增 Divine/Buster |
 | 空弹与其它动作 | 空弹、全弹发射及其它铳枪动作 | 不播放本设计追加语音；保持各动作既有声音设计，不扩大人物静音范围 |
@@ -34,14 +35,15 @@ target_artifacts:
 
 | 名称      | 音频                                                                                                                                    | 响度（LUFS-I） | 播放方式                                                                                                              |
 |-----------|-----------------------------------------------------------------------------------------------------------------------------------------|----------------|-----------------------------------------------------------------------------------------------------------------------|
-| Divine 01 | [nanoha_divine_01](<../../audio/wp07_gun_epvsp_shell/charged_shelling/nanoha_divine_01(battle_of_aces.attack_04.1).wav>)                | -21 LUFS-I     | 独立追加媒体，权重 50000（50%）；与 Divine 02 共用 Random，Motion 132–134 第 1 帧无 delay 选一条；停止对侧两份 Buster |
+| Divine 01 | [nanoha_divine_01](<../../audio/wp07_gun_epvsp_shell/charged_shelling/nanoha_divine_01(battle_of_aces.attack_04.1).wav>)                | -21 LUFS-I     | 独立追加媒体，权重 50000（50%）；与 Divine 02 共用 Random，Motion 132–134 第 1 帧无 delay 选一条；停止对侧三份 Buster |
 | Divine 02 | [nanoha_divine_02](<../../audio/wp07_gun_epvsp_shell/charged_shelling/nanoha_divine_02(gears_of_destiny.attack_voice.attack_04.1).wav>) | -21 LUFS-I     | 独立追加媒体，权重 50000（50%）；与 Divine 01 共享触发、随机音调和停止语义                                            |
-| Buster 01 | [nanoha_buster_01](<../../audio/wp07_gun_epvsp_shell/charged_shelling/nanoha_buster_01(battle_of_aces.attack_04.2).wav>)                | -21 LUFS-I     | 独立追加媒体，权重 50000（50%）；与 Buster 02 共用 Random，三种爆炸 Event 无 delay 选一条；停止对侧两份 Divine        |
-| Buster 02 | [nanoha_buster_02](<../../audio/wp07_gun_epvsp_shell/charged_shelling/nanoha_buster_02(gears_of_destiny.attack_voice.attack_04.2).wav>) | -21 LUFS-I     | 独立追加媒体，权重 50000（50%）；与 Buster 01 共享触发、随机音调和停止语义                                            |
+| Buster 01 | [nanoha_buster_01](<../../audio/wp07_gun_epvsp_shell/charged_shelling/nanoha_buster_01(battle_of_aces.attack_04.2).wav>)                | -21 LUFS-I     | 独立追加媒体，权重 50000（1/3）；三条 Buster 共用 Random，三种爆炸 Event 无 delay 选一条；停止对侧两份 Divine        |
+| Buster 02 | [nanoha_buster_02](<../../audio/wp07_gun_epvsp_shell/charged_shelling/nanoha_buster_02(gears_of_destiny.attack_voice.attack_04.2).wav>) | -21 LUFS-I     | 独立追加媒体，权重 50000（1/3）；与 Buster 01 共享触发、随机音调和停止语义                                            |
+| Buster 03 | [nanoha_buster_03](<../../audio/wp07_gun_epvsp_shell/charged_shelling/nanoha_buster_03(movie_reflection.nanoha.excellion_buster.1).wav>) | -22 LUFS-I | 权重 50000（1/3），与 Buster 01／02 共享触发、随机音调和停止语义 |
 
-四份最终 WAV 均为 48 kHz、stereo、24-bit PCM。按上表顺序保留 42000／48000／60000／60000 帧 （0.875／1／1.25／1.25 秒），分别以恒定
+五份最终 WAV 均为 48 kHz、stereo、24-bit PCM。前四份按上表顺序保留 42000／48000／60000／60000 帧 （0.875／1／1.25／1.25 秒），分别以恒定
 -1.06／+1.03／-5.26／-6.20 dB 线性增益标准化到 -21 LUFS-I 目标； 最终实测为 -21.00／-20.95／-21.02／-21.00 LUFS-I，true peak 为
--12.54／-10.33／-16.29／-17.40 dBTP。 两组语音在对侧触发时均以 50 ms 线性淡出停止；每次仅播放一个候选，允许重复。构建只无增益下混为
+-12.54／-10.33／-16.29／-17.40 dBTP。新版 Buster 03 为 60000 帧（1.25 秒），实测 −21.97 LUFS-I、−11.41 dBTP。两组语音在对侧触发时均以 50 ms 线性淡出停止；每次仅播放一个候选，允许重复。构建只无增益下混为
 48 kHz、16-bit mono Wwise PCM WEM，channel config
 `000001410000`；不在构建时校正响度。
 
@@ -58,13 +60,13 @@ target_artifacts:
 - 原 Event `3567942167` 的 Action 列表固定为 `(1061269777,)`，原 Action 完整 body SHA-256 为
   `6c8f6ba1362064c06db17ed2248d1f9f288a3f0459caba8c77131d8b487c810a`，必须仍为无 delay Play，目标原 Container
   `522283251`。原 Sound `233981936` / Media `867938822`、DIDX #27 和原 Event 均保持 byte-exact。
-- 新 Event `3452820647` 的 Action 列表固定为 `(1005770249, 1603135794, 85406655, 583060699)`：依次为委托完整原 Event
-  `3567942167` 的 PlayEvent、停止 Buster 01、停止 Buster 02，以及目标 Random `1153640130` 的无 delay Play。 按两个 Sound →
-  Random → 原声委托 Action → 两个 Buster Stop Action → Divine Play Action → 新 Event → 原 Event 的顺序序列化。
+- 新 Event `3452820647` 的 Action 列表固定为 `(1005770249, 1603135794, 85406655, 2076396906, 583060699)`：依次为委托完整原 Event
+  `3567942167` 的 PlayEvent、依次停止 Buster 01／02／03，以及目标 Random `1153640130` 的无 delay Play。 按两个 Sound →
+  Random → 原声委托 Action → 三个 Buster Stop Action → Divine Play Action → 新 Event → 原 Event 的顺序序列化。
   原声委托、Divine Play Action 和新 Event 的完整 body SHA-256 依次为
   `c87314f918eb3d617c61c98cf8842b0132f85e688d3ad0e8d10da6d1d41bafca`、
   `ac01f6c3c01f4b9870cf14af9c1f6614cc78fa2d2d1f01dcc16bed071da1be38`、
-  `a83a290f75974e96d8ac6b237c52cfa8f78c3e52d4ccd0aa22f0183653c5f20c`。
+  `8e966f8f23233c1839a1f9a464e3e2a26eda29b3c457e30ddfbe7935ea3f5582`。
 - Divine 01 沿用 Media `370615719`、Sound `3754878246` 和 Action `583060699`；Divine 02 使用 Media `3246372848`、 Sound
   `4035275377`。单独应用时两份 Media 依次追加为 DIDX #34–#35；与该 Bank 现有设计合并时为 #45–#46。 运行时媒体须读回为 48
   kHz、16-bit mono Wwise PCM，分别为 42000／48000 samples。
@@ -83,10 +85,10 @@ target_artifacts:
   `3f95ef076e1c9119c81973022288e86d273d5dd4de8501fc0aad26c218584a80`；该参考 Bank 不打入 Mod。原生播放根及父链为
   `522283251 → 768813060 → 972300144 → 694534885`，原 `wp_gun_cmn.nbnk` 未发现由 Event 引用且命中该链的 Stop
   Action；本设计按用户指定行为新增双向 Stop，不将其作为原生中断路由的克隆。
-- Divine 路由单独新增 2 个 Sound、1 个 Random、4 个 Action、1 个 Event，HIRC 对象 `123→131`、payload
-  `7250→7578`，增量 `+328`、changed-byte count 为 `4`。不含下述发射人物静音对象时，与该 Bank 现有设计合并后媒体共 46 项、HIRC 对象
-  `123→156`、payload `7250→8722`，总增量 `+1472`、changed-byte count 为 `25`；既有 reload Event
-  `3476627122` 仍是唯一扩长的原对象。除 DIDX/DATA 追加、上述 8 个新对象及下述 3 个静音对象外，本设计不改变该 Bank 的原对象或其它 chunk。
+- Divine 路由单独新增 2 个 Sound、1 个 Random、5 个 Action、1 个 Event，HIRC 对象 `123→132`、payload
+  `7250→7610`，增量 `+360`、changed-byte count 为 `4`。不含下述发射人物静音对象时，与该 Bank 现有设计合并后媒体共 46 项、HIRC 对象
+  `123→157`、payload `7250→8754`，总增量 `+1504`、changed-byte count 为 `25`；既有 reload Event
+  `3476627122` 仍是唯一扩长的原对象。除 DIDX/DATA 追加、上述 9 个新对象及下述 3 个静音对象外，本设计不改变该 Bank 的原对象或其它 chunk。
 
 | 名称 | Event ID | 原 Action ID | Container ID | donor Sound / Media ID | DIDX / 原 Media ID | 新 Action ID | 新 Sound ID |
 |------|----------|--------------|--------------|------------------------|--------------------|--------------|-------------|
@@ -103,9 +105,9 @@ target_artifacts:
   `b690ca747f5c2f83d75a560d068fbd86abaa6f20ce8a6eeacb4d669ce978277c`、
   `4d0ae624d720e9762e04c1e6bd78afb8045cd44b78d323fe32db3af2563ac1c5`。
 - 静音路线独立新增 1 个 Action、2 个 Event：HIRC 对象 `123→126`、payload `7250→7298`，增量 `+48`，
-  changed-byte count 为 `0`。连同本设计 Divine 路由单独应用为 `123→134`、`7250→7626`，增量 `+376`、
-  changed-byte count 为 `4`；与 Common Bank 全部现有设计合并后媒体仍为 46 项，HIRC 对象 `123→159`、
-  payload `7250→8770`，总增量 `+1520`、changed-byte count 仍为 `25`。不改变 DIDX/DATA、既有媒体或其它 chunk。
+  changed-byte count 为 `0`。连同本设计 Divine 路由单独应用为 `123→135`、`7250→7658`，增量 `+408`、
+  changed-byte count 为 `4`；与 Common Bank 全部已注册设计合并后媒体为 49 项，HIRC 对象 `123→172`、
+  payload `7250→9150`，总增量 `+1900`、changed-byte count 为 `49`。不改变 DIDX/DATA、既有媒体或其它 chunk。
 - ReqNo `6608` 与三个静音 HIRC ID 沿用已实机测试的局部静音路线，不重新分配；已复核原版 8 个参考 Bank、
   当前 design／builder 数值及原版 WWEV 请求和 Event 均无冲突。此路线不需要跨 Bank PlayEvent API。
 
@@ -113,9 +115,9 @@ target_artifacts:
 
 | 名称                 | Event ID   | 原 Action ID | Container ID           | donor Sound / Media ID | DIDX / 原 Media ID | 新 Action ID | 新 Sound ID             |
 |----------------------|------------|--------------|------------------------|------------------------|--------------------|--------------|-------------------------|
-| 扩散型爆炸（Buster） | 3325567640 | 116178715    | 63659294 → 2510752860  | 264207839 / 93971960   | #4 / 93971960      | 858972567    | 3489806140 / 3928375835 |
-| 放射型爆炸（Buster） | 1962814816 | 409203877    | 176125134 → 2510752860 | 220939954 / 693612246  | #33 / 693612246    | 4053288866   | 3489806140 / 3928375835 |
-| 通常型爆炸（Buster） | 2187565051 | 530572411    | 847665525 → 2510752860 | 69557296 / 849663903   | #37 / 849663903    | 3259504927   | 3489806140 / 3928375835 |
+| 扩散型爆炸（Buster） | 3325567640 | 116178715    | 63659294 → 2510752860  | 264207839 / 93971960   | #4 / 93971960      | 858972567    | 3489806140 / 3928375835 / 690215586 |
+| 放射型爆炸（Buster） | 1962814816 | 409203877    | 176125134 → 2510752860 | 220939954 / 693612246  | #33 / 693612246    | 4053288866   | 3489806140 / 3928375835 / 690215586 |
+| 通常型爆炸（Buster） | 2187565051 | 530572411    | 847665525 → 2510752860 | 69557296 / 849663903   | #37 / 849663903    | 3259504927   | 3489806140 / 3928375835 / 690215586 |
 
 - 原蓄力特效 Event `1308679810` 必须恢复并保持原 Action 列表 `(485858073,)`；其完整 Event / Action body SHA-256
   分别为 `09b397e743d362043c390fdbab88811990f9867b882cea25cd56b59053c19347`、
@@ -123,7 +125,7 @@ target_artifacts:
   `3754878246`／`4035275377`、Media `370615719`／`3246372848`、Random `1153640130` 和 Action `583060699`
   只能存在于最终 `wp_gun_cmn.nbnk`。
 - 原 Bank 的 42 份媒体及载荷保持 byte-exact；保留同 artifact owner 的全弹发射和龙击炮 DIDX #43–#49 及其顺序，Buster 01 追加为
-  DIDX #50 / Media `1793121649`，02 为 #51 / Media `570980126`；单独应用时为 #43–#44。 运行时两份媒体均须读回为 48
+  DIDX #50 / Media `1793121649`，02 为 #51 / Media `570980126`，03 追加为 #59 / Media `2785082779`，保留 #52–#58 的既有索引。单独应用时为 #43–#45。运行时三份媒体均须读回为 48
   kHz、16-bit mono Wwise PCM、60000 samples。
 - 三个爆炸 Event 的 Action 列表固定为 `(116178715, 1426818832, 515837897, 858972567)`、
   `(409203877, 1225287532, 1287808358, 4053288866)`、`(530572411, 728690884, 1267644869, 3259504927)`； 原 Action 始终第一，停止
@@ -133,20 +135,21 @@ target_artifacts:
   `f0fa0a8665a23264e891f26ddbe4335aed7815ae8afb6733e3e35feb46d64992`。
 - Buster Random `2510752860` 克隆原 Container `58172267`，83-byte donor body SHA-256 为
   `53ce24846e01ef33e99c2c66575a9e50e367730b25231c53289fc2e772c4aff7`，原 playlist `((46149961, 50000),)`、avoid-repeat=1。
-  新 playlist 为 `((3489806140, 50000), (3928375835, 50000))`、avoid-repeat=0；其余 Random 模式和 Pitch 与 Divine 相同。
-  body `+0x0B` 父级从 `717111903` 改为 `209038110`。最终 95-byte body SHA-256 为
-  `fdca235137ca95d9080e9377307782d0a832574d6fd8e7ae746079b8538fbbf8`。
-- Buster Sound `3489806140`／`3928375835` 使用上述标准 46-byte C1 模板，DirectParentID 均为 `2510752860`， 子 Sound 无本地
+  新 playlist 为 `((3489806140, 50000), (3928375835, 50000), (690215586, 50000))`、avoid-repeat=0；其余 Random 模式和 Pitch 与 Divine 相同。
+  body `+0x0B` 父级从 `717111903` 改为 `209038110`。最终 107-byte body SHA-256 为
+  `1d3240b0b6205ac132d53ddf81f7647375ae2c56a365e4c904d7819491862a33`。
+- Buster Sound `3489806140`／`3928375835`／`690215586` 使用上述标准 46-byte C1 模板，DirectParentID 均为 `2510752860`， 子 Sound 无本地
   Pitch、delay 或额外增益。最终 body SHA-256 分别为
   `bbc603bac06e30ea54aa58de3b749e1d413c8275c2834a931e015b8835c7e06d`、
-  `2e5a7e3eb467114ad41a2a742e5204f51a5dcf9bf45bc0a011f8c1a3cd8663a4`。
+  `2e5a7e3eb467114ad41a2a742e5204f51a5dcf9bf45bc0a011f8c1a3cd8663a4`、
+  `8851587d5cec37e5055865facfd818745aa344bf30ca4a001f5caea89b87bcf0`。
 - 三条爆炸原播放根及父链分别为 `63659294`、`176125134`、`847665525`，随后汇入
   `717111903 → 972300144 → 694534885`。原 Bank 中由 Event 引用的 Stop Action 目标集合固定为
   `{60034062, 662442083, 1054468797, 956375262, 599243561}`，未命中上述播放根或父链，本设计按用户指定行为为每个爆炸 Event
   新增两条停止 Divine 候选的独立 Stop Action。
-- Buster 路由单独新增 2 个 Sound、1 个 Random 和 9 个 Action，扩长 3 个原 Event，HIRC 对象 `181→193`、payload
-  `11090→11565`，增量 `+475`、changed-byte count 为 `13`。与 `full_burst`、`wyverns_fire` 合并后媒体 `42→51`、 HIRC 对象
-  `181→211`、payload `11090→12326`，总增量 `+1236`、changed-byte count 为 `27`。除 DIDX/DATA 追加、 上述 12 个新对象及 3 个
+- Buster 路由单独新增 3 个 Sound、1 个 Random 和 9 个 Action，扩长 3 个原 Event，HIRC 对象 `181→194`、payload
+  `11090→11628`，增量 `+538`、changed-byte count 为 `13`。与全部已注册设计合并后媒体 `42→59`、HIRC 对象
+  `181→226`、payload `11090→13246`，总增量 `+2156`、changed-byte count 为 `42`。本设计除 DIDX/DATA 追加、上述 13 个新对象及 3 个
   Event 扩展外，其它 Bank chunk、原媒体和原 HIRC 对象保持 byte-exact。
 
 | 名称                         | Stop Event ID | 结构参考 Stop Action ID / target | scope       | transition / fade | exceptions | 新 Stop Action ID | 新 Stop target                             |
@@ -159,6 +162,7 @@ target_artifacts:
 | 扩散型 Buster 停止 Divine 02 | 3325567640    | 743936681 / 60034062             | Game Object | 50 ms / Linear    | 空         | 515837897         | Divine Sound 4035275377（Bank 939294496）  |
 | 放射型 Buster 停止 Divine 02 | 1962814816    | 743936681 / 60034062             | Game Object | 50 ms / Linear    | 空         | 1287808358        | Divine Sound 4035275377（Bank 939294496）  |
 | 通常型 Buster 停止 Divine 02 | 2187565051    | 743936681 / 60034062             | Game Object | 50 ms / Linear    | 空         | 1267644869        | Divine Sound 4035275377（Bank 939294496）  |
+| Divine 开始停止 Buster 03 | 3452820647 | 743936681 / 60034062 | Game Object | 50 ms / Linear | 空 | 2076396906 | Buster Sound 690215586（Bank 3273965928） |
 
 - Stop 结构参考为 `original/nbnk/wp07_gun_epvsp_shell.nbnk` 的 Action `743936681`，完整 body SHA-256
   `137f38d973a5e3b84d35d84146d2b562e21e575abbfee532b8531d3583ae0ebd`；其原始 transition 为 200 ms。
@@ -173,13 +177,14 @@ target_artifacts:
   `528b713f34e7cadf416b2612ba9cc56a7813ad1f54409fcdcb4172610f114de7`、
   `6f9143c623e3e346b9a72f77961b896c8e67b70101113fac9ade4f8ddae9f051`、
   `e13eb2147999bf1de1e6e4b45a82ff8d241ee91ad564d1a34068f9fd4b2f9724`。
+  Buster 03 Stop body SHA-256 为 `546bee5372b864ea27999bb884e4aa030466b7fda336e9629d9a2b89015bbacb`。
   放射、通常、扩散三个最终 Event body SHA-256 依次为
   `4785364970e4080e0ddbec1853ed77f428c4dabd1a73028b8a3ff6f9072f6214`、
   `a8a3fd311a313491b6b4871b35668004d7195b0ad9b64b26c3024f845d4cff24`、
   `8d8857c2dfce5ebc9121f055016074b8b131b98c624b344b8833c30860726dae`。
-- 每条 Action 只能归属一个 Event。三个爆炸 Event 共用 Buster Random，但不得共用 Play 或 Stop Action。 先序列化两个 Sound →
+- 每条 Action 只能归属一个 Event。三个爆炸 Event 共用 Buster Random，但不得共用 Play 或 Stop Action。 先序列化三个 Sound →
   Random；在每个爆炸 Event 原序列位置插入两条 Divine Stop → Buster Play → Event；原 HIRC 对象之间顺序不变。
-- 两个 Bank 显式声明上表八条跨 Bank Stop 边，分别绑定目标 Bank ID、Sound ID 和上文完整 Sound body SHA-256。
+- 两个 Bank 显式声明上表九条跨 Bank Stop 边，分别绑定目标 Bank ID、Sound ID 和上文完整 Sound body SHA-256。
   单 Bank 检查不得放宽其它缺失引用；完整暂存 Bank 集合必须核对实际目标 Bank、唯一 Sound、body 哈希和媒体归属。
   不复制目标 Sound 或媒体到另一 Bank，不通过停止共享父级扩大范围；目标未播放时不影响新语音和原声。
 - 前四个 Stop ID 沿用独立 Action 实机测试包。其 FNV-1 名称前缀为
@@ -192,6 +197,9 @@ target_artifacts:
   `buster_02_stop_action`、`divine_02_wide_stop_action`、`divine_02_long_stop_action`、`divine_02_normal_stop_action`
   为 `85406655`／`515837897`／`1287808358`／`1267644869`。已核实彼此唯一，且不与本地 original Bank 的 HIRC／Media 或现有
   design／builder 自定义 ID 碰撞。
+
+- Buster 03 沿用钩爪旧独立路线的 Media `2785082779` 和 Sound `690215586`，两者仅在 shell Bank 定义。Stop `2076396906` 的派生后缀为 `buster_03_stop_action`，仅在 common Bank 定义。
+- [钩爪武器攻击](../wp_gun_cmn/clutch_weapon_attack.md)只保留独立的拔枪语音。实测确认钩爪炮击会触发共享的 Buster 路由，三种炮型的覆盖范围分别实测验收。
 
 | 名称 | LMT | Motion | EventGroup | Slot | 赋值帧 | 原 ReqNo | 新 ReqNo | 预期触发帧 |
 |------|-----|--------|------------|------|--------|----------|----------|------------|
