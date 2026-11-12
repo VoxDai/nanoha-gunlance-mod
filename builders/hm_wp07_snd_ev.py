@@ -5,6 +5,7 @@ from __future__ import annotations
 from tools import soundbank_editor
 
 from . import clutch_weapon_attack_routes as clutch
+from . import mounted_finisher_routes as mounted
 from .base import WwevBuildPlan, run_single_cli
 
 
@@ -111,12 +112,18 @@ def apply_edits(editor: soundbank_editor.WwevEditor) -> None:
         new_event_id=charge.edit.new_event_id,
     )
 
+    editor.append_cloned_request(
+        donor_request=mounted.DONOR_REQUEST,
+        expected_donor_sha256s=mounted.DONOR_RECORD_HASHES,
+        new_request=mounted.REQUEST,
+        new_event_ids=tuple(edit.new_event_id for edit in mounted.WWEV_EDITS),
+    )
 
 
 EXPECTED_SUMMARY = soundbank_editor.WwevEditSummary(
     record_count_before=43,
-    record_count_after=50,
-    appended_size=903,
+    record_count_after=52,
+    appended_size=1161,
     edits=(
         soundbank_editor.WwevRecordEdit(
             donor_record_index=17,
@@ -148,7 +155,7 @@ EXPECTED_SUMMARY = soundbank_editor.WwevEditSummary(
         soundbank_editor.WwevRecordEdit(13, 6456, 2_798_914_977, 47, 6610, 2_456_922_025, 129),
         soundbank_editor.WwevRecordEdit(38, 6570, 1_517_840_452, 48, 6611, 4_272_667_772, 129),
         soundbank_editor.WwevRecordEdit(10, 6525, 2_279_772_715, 49, 6612, 3_413_751_962, 129),
-    ) + tuple(wrapper.edit for wrapper in clutch.WRAPPERS),
+    ) + tuple(wrapper.edit for wrapper in clutch.WRAPPERS) + mounted.WWEV_EDITS,
 )
 
 
@@ -161,6 +168,7 @@ PLAN = WwevBuildPlan(
         "wp07_gun_epvsp_shell.charged_shelling",
         "wp07_gun_epvsp_shell.wyrmstake_cannon",
         clutch.DESIGN_ID,
+        mounted.DESIGN_ID,
     ),
     source="original/wwev/hm_wp07_snd_ev.wwev",
     target="sound/pl/hm_wp07_snd_ev.wwev",

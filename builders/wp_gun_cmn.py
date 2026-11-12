@@ -8,6 +8,7 @@ import struct
 from tools import soundbank_editor
 
 from . import clutch_weapon_attack_routes as clutch
+from . import mounted_finisher_routes as mounted
 from .base import MediaAddition, SoundBankBuildPlan, run_single_cli
 from .voice_standard import (
     STANDARD_VOICE_PARENT_ID,
@@ -1179,6 +1180,7 @@ def apply_edits(bank: soundbank_editor.SoundBankEditor) -> None:
     _apply_wyrmstake_voice(bank)
     _apply_wyrmstake_original_voice_mute(bank)
     clutch.apply_voices(bank)
+    mounted.apply_voice(bank)
 
 
 EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
@@ -1199,8 +1201,9 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (46, CHARGED_SHELLING_DIVINE_MEDIA_IDS[1]),
         (47, WYR_STAKE_MEDIA_IDS[0]),
         (48, WYR_STAKE_MEDIA_IDS[1]),
-    ) + tuple((voice.media.expected_index, voice.media.media_id) for voice in clutch.VOICES),
-    hirc_changed_bytes=49,
+    ) + tuple((voice.media.expected_index, voice.media.media_id) for voice in clutch.VOICES)
+    + ((mounted.MEDIA.expected_index, mounted.MEDIA.media_id),),
+    hirc_changed_bytes=57,
     added_hirc_objects=(
         (soundbank_editor.HIRC_SOUND, VOICE_SOUND_ID),
         (soundbank_editor.HIRC_SOUND, STATIONARY_SOUND_IDS[1]),
@@ -1251,11 +1254,11 @@ EXPECTED_SUMMARY = soundbank_editor.SoundBankEditSummary(
         (soundbank_editor.HIRC_EVENT, WYR_STAKE_MUTE_EMPTY_EVENT_ID),
         (soundbank_editor.HIRC_ACTION, WYR_STAKE_MUTE_PLAY_ACTION_ID),
         (soundbank_editor.HIRC_EVENT, WYR_STAKE_MUTE_ROUTE_EVENT_ID),
-    ) + clutch.VOICE_OBJECTS,
+    ) + clutch.VOICE_OBJECTS + mounted.VOICE_OBJECTS,
     resized_hirc_objects=(
         (soundbank_editor.HIRC_EVENT, RELOAD_EVENT_ID, 12, 16),
     ),
-    hirc_size_delta=1900,
+    hirc_size_delta=2000,
 )
 
 
@@ -1269,6 +1272,7 @@ PLAN = SoundBankBuildPlan(
         "wp07_gun_epvsp_shell.charged_shelling",
         "wp07_gun_epvsp_shell.wyrmstake_cannon",
         clutch.DESIGN_ID,
+        mounted.DESIGN_ID,
     ),
     source="original/nbnk/wp_gun_cmn.nbnk",
     target="sound/wwise/Windows/wp_gun_cmn.nbnk",
@@ -1376,6 +1380,7 @@ PLAN = SoundBankBuildPlan(
             wem_channels=1,
         ),
         *(voice.media for voice in clutch.VOICES),
+        mounted.MEDIA,
     ),
     apply_edits=apply_edits,
     expected_summary=EXPECTED_SUMMARY,

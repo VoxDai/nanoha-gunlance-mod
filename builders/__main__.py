@@ -16,6 +16,7 @@ from .integration import (
     WYR_STAKE_VALIDATOR,
     WYVERNS_FIRE_VALIDATOR,
 )
+from .mounted_finisher_routes import VALIDATOR as MOUNTED_FINISHER_VALIDATOR
 from .pl_wp_par_op_event_structure import PLAN as PL_WP_PAR_OP_EVENT_STRUCTURE
 from .pl_prop_cmn import PLAN as PL_PROP_CMN
 from .pl_voice import PLAN as PL_VOICE
@@ -52,6 +53,7 @@ MOD_PLAN = ModBuildPlan(
         WYR_STAKE_VALIDATOR,
         WYVERNS_FIRE_VALIDATOR,
         CLUTCH_WEAPON_ATTACK_VALIDATOR,
+        MOUNTED_FINISHER_VALIDATOR,
     ),
 )
 
