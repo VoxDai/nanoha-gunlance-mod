@@ -1,4 +1,0 @@
-interface:
-  display_name: "Build Mods"
-  short_description: "Run and publish the complete registered Mod plan"
-  default_prompt: "Use $build-mod to run the registered Mod plan, cross-validate every artifact, and transactionally publish the complete release/nativePC tree."

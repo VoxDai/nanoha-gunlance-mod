@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mod Design"
+  short_description: "Update sound designs and guarded builders together"
+  default_prompt: "Use $mod-design to update the specified sound-effect design and its guarded builders together."

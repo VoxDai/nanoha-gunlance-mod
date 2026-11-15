@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create Probe"
+  short_description: "Create in-game probes and analyze playback results"
+  default_prompt: "Use $create-probe to build a probe for the specified move or analyze recordings.md and choose the next test."

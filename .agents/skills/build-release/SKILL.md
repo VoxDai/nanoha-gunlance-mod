@@ -1,9 +1,9 @@
 ---
-name: build-mod
+name: build-release
 description: "Run and validate the registered design-driven Monster Hunter: World Mod artifact plan, then transactionally publish the complete release/nativePC tree. Use for dry-runs, focused artifact diagnostics, and official release builds; do not author designs or builders."
 ---
 
-# Build Mods
+# Build Release
 
 Execute the registered `ModBuildPlan` in `builders.__main__`. It is the sole
 release membership and implementation contract. `designs/` explains intent
@@ -77,5 +77,4 @@ Mod-conflict testing.
 - Do not publish a subset after another artifact or validator fails.
 - Keep converted WEMs, decoded WAVs, wwiser dumps, and semantic diffs out of
   `output/` and `release/`.
-- Route incomplete or incorrect design contracts to `audio-design`. Route
-  implementation, registry, summary, or validator drift to `design-implement`.
+- Route design, builder, registry, summary, or validator issues to `mod-design`.

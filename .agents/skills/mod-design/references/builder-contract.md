@@ -1,32 +1,4 @@
----
-name: design-implement
-description: "Implement specified project sound-effect designs as explicit guarded NBNK, LMT, and WWEV artifact builders, bundle validators, and registry entries. Use after a designs/ contract is complete; do not author designs or publish releases."
----
-
-# Design Implement
-
-Translate one or more user-specified documents under `designs/` into the sole
-executable contracts under `builders/`. A design fixes intent; its Python plans
-fix implementation. Builders never parse design documents at build time.
-
-## Scope and Boundaries
-
-- Require an explicit design path or `design_id`. When the request does not
-  identify one unambiguously, ask for it instead of implementing every design.
-- Modify only `builders/` and generic builder tests when shared infrastructure
-  changes, unless the user explicitly expands the task. Do not edit `designs/`,
-  `audio/`, `original/`, `docs/mapping/`, `assets/chunk/`, `output/`, or
-  `release/`.
-- Treat the selected design as authoritative. If it lacks final audio, source
-  artifacts, IDs, required structural body or record guards, editor guards,
-  target paths, or an exact behavioral contract, stop and report what
-  `audio-design` must resolve.
-- Never invent or silently repair a design value. Values derived by executing
-  its complete guarded edit in memory, such as a combined summary, may be
-  calculated and fixed in the plan.
-- Use `tools.soundbank_editor` guarded APIs. Never patch an absolute binary
-  offset or mutate an original artifact.
-- Do not run a publishing build. `build-mod` owns complete release execution.
+# Builder Contract
 
 ## Inspect the Contract and Existing Owners
 
@@ -90,33 +62,3 @@ it back into the design.
   preservation, uniqueness, and required serialization order.
 - Keep validators keyed by the selected `design_id`; do not infer release
   membership from `designs/`, `original/`, or directory contents.
-
-## Tests and Verification
-
-Do not add tests for a specific Bank, design, action route, media ID, exact
-artifact summary, or fixed output hash. The guarded callback, exact plan
-summary, bundle validators, and artifact dry-runs own those implementation
-contracts.
-
-Update tests only when changing shared builder or editor behavior. Such tests
-must use synthetic fixtures and cover reusable behavior such as Plan value
-validation, preflight guards, registry conflicts, transactional publication,
-or a common helper API.
-
-Run, in order:
-
-```sh
-conda run -n nanoha-gunlance-mod python -m builders.<affected-artifact> --dry-run
-conda run -n nanoha-gunlance-mod python -m unittest
-conda run -n nanoha-gunlance-mod python -m builders --dry-run
-git diff --check
-```
-
-Run every affected single-artifact dry-run when there is more than one. These
-commands may use temporary files but must not create or replace `output/` or
-`release/`.
-
-Report the implemented design IDs, artifact owners, media declarations,
-summaries and guarded inputs, added validators, tests run, and any remaining
-in-game acceptance work. If the design cannot be implemented exactly, leave it
-and its builders unchanged and report the blocking contract discrepancy.

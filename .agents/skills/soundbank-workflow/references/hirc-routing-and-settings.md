@@ -142,7 +142,7 @@ does not establish a later 50 ms transition’s in-game result.
 
 Compare exact summaries, semantic differences, references, and preservation;
 reparse with the Library and wwiser, then re-extract changed media. These checks
-do not replace game acceptance. For a persistent feature, provide `audio-design`
+do not replace game acceptance. For a persistent feature, provide `mod-design`
 with:
 
 - Original Bank path, version, Bank ID, DIDX index, and Media ID.
@@ -152,5 +152,5 @@ with:
   expected summary.
 - Positive and negative game acceptance cases.
 
-`design-implement` handles the resulting design's builders and tests. HIRC
-analysis does not implicitly include implementation or release publication.
+Use the evidence in `mod-design` when the user requests a design and its
+implementation. Release publication belongs to `build-release`.

@@ -6,11 +6,10 @@
 ## 基本步骤
 
 1. 使用 `soundbank-workflow` 只读分析原版 NBNK、LMT、WWEV，整理事件、动作、媒体和路由证据。
-2. 收集并处理最终语音素材；需要从本地媒体截取时可使用 `extract-audio`。
-3. 使用 `audio-design` 将预期播放行为、最终音频、原始 artifact、guard 和验收要求固化到 `designs/`。
-4. 使用 `design-implement` 将指定 design 实现为显式 artifact builders、bundle validators 和测试。
-5. 使用 `build-mod` 执行完整 dry-run，并在全部验证通过后事务发布 `release/nativePC/`。
-6. 在可恢复的游戏环境中验证触发范围、播放时机、音量、空间感、中断行为和 Mod 冲突。
+2. 收集并处理最终语音素材。
+3. 使用 `mod-design` 核实预期播放行为、最终音频、原始 artifact、路由和 guard，在同一任务中更新 `designs/` 契约和 `builders/` 对应实现，并验证受影响的 artifact 和跨文件路由。
+4. 使用 `build-release` 执行完整 dry-run，并在全部验证通过后事务发布 `release/nativePC/`。
+5. 在可恢复的游戏环境中验证触发范围、播放时机、音量、空间感、中断行为和 Mod 冲突。
 
 ## 目录结构
 
@@ -35,7 +34,7 @@
     - `original/wwev/`：原版 WWEV 请求表。
     - `original/audio_files/<SoundBank>/{wav,wem}/`：按 SoundBank 分类的原版媒体提取结果。
 - `output/`：用户明确请求的单 artifact 调试输出；不构成正式 Mod。
-- `release/`：`build-mod` 事务发布的完整 Mod 树；不得手工拼装或发布子集。
+- `release/`：`build-release` 事务发布的完整 Mod 树；不得手工拼装或发布子集。
 - `tools/`：格式 Library、音频转换和第三方分析工具。
 
 ## 本地开发环境

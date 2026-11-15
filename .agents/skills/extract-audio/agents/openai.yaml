@@ -1,4 +1,0 @@
-interface:
-  display_name: "Extract Audio"
-  short_description: "Extract tracks or channels from local media"
-  default_prompt: "Use $extract-audio to extract a time range or channel from a local media file as WAV."

@@ -1,41 +1,4 @@
----
-name: audio-design
-description: "Create or update specified project sound-effect designs under designs/ from intended playback behavior, verified final audio, original artifacts, routes, and guarded implementation contracts. Use before builder implementation; do not implement builders or publish releases."
----
-
-# Audio Design
-
-Turn the user's audible-behavior requirements into a concise, auditable
-contract under `designs/`. The design is the complete input for
-`design-implement`; it is documentation, not runtime configuration.
-
-## Scope and Boundaries
-
-- Work only on the design path or behavior selected by the user. Do not reshape
-  the requested playback behavior to fit an existing builder or
-  `docs/mapping/` entry.
-- Unless the user explicitly expands the task, modify only the selected design
-  and promote any missing dependent game artifacts from `assets/chunk/` to
-  `original/` as byte-exact copies.
-- Never edit `builders/`, `docs/mapping/`, existing `original/` files,
-  `output/`, or `release/`. Do not edit `audio/` unless a loudness validation has failed and the user explicitly
-  confirms the exact files and target LUFS-I for a separately reviewed standardization task. Existing builders may be
-  inspected only to find and report design-to-implementation drift.
-- Never modify, move, or delete a source under `assets/chunk/`. Never
-  overwrite an `original/` destination. If an existing destination differs
-  from the resolved source, stop and report the conflict.
-- Use mapping and research documents only as evidence. Inspect the original
-  binaries before fixing IDs, guards, structural body or record hashes,
-  versions, byte counts, or routes.
-- Never invent Event, Action, Container, Sound, Media, DIDX, ReqNo, frame,
-  offset, record, or summary values. Preserve an existing `design_id`.
-- Use only final project WAVs. Probes, placeholders, and unprocessed source
-  clips do not satisfy a complete design.
-- For custom character voice, read
-  `references/custom-voice-sound.md` before selecting the Sound route or
-  documenting media conversion.
-
-## Standard Design Contract
+# Design Contract
 
 Use the current
 `designs/wp07_gun_epvsp_shell/wyverns_fire.md` and
@@ -153,40 +116,3 @@ Record every guard required by `LmtEditor.replace_request()` and
 `WwevEditor.append_cloned_record()`, including versions, shared TIML,
 duplicate request expansion, record boundaries, and byte-preservation rules.
 Do not reduce a cross-format route to its final Event ID.
-
-## Verification Workflow
-
-1. Read the request, the selected design if it exists, both standard design
-   examples, and only the mapping or research material relevant to the action.
-   For custom character voice, also read
-   `references/custom-voice-sound.md` before route analysis.
-2. Inventory every NBNK, LMT, WWEV, and final WAV dependency. Each game binary
-   must exist in its documented `original/nbnk/`, `original/lmt/`, or
-   `original/wwev/` directory.
-3. If a dependency is missing, locate exactly one source under
-   `assets/chunk/`, copy it byte-for-byte to the correct new `original/`
-   path, and verify the source and destination are byte-exact. Stop on absence,
-   ambiguity, or a differing existing destination.
-4. Inspect every original through `tools.soundbank_editor`; use
-   `soundbank-workflow` and a task-specific wwiser dump under `/tmp` when
-   topology needs deeper proof. For each custom playback route, complete the
-   native Stop Action audit described above before fixing its HIRC contract.
-   Resolve LMT routes with
-   `LmtFile.triggered_requests()` and the matching `WwevFile`.
-5. Verify every final audio link, measure its unrounded LUFS-I, and validate its format and filename. Stop and report
-   ordinary WAVs outside the loudness range or media contract; document any justified special-audio exception. Build an
-   in-memory guarded prototype when exact summaries, structural body or record
-   hashes, or collision checks cannot be established by inspection alone; do
-   not publish it.
-6. Create or update the design, keeping behavior, audio, and implementation
-   facts in their respective sections.
-7. Reparse the front matter, require a unique `design_id`, validate every
-   local link and table column count, and ensure all game-artifact contract
-   paths point into `original/`, never `assets/chunk/`.
-8. Run `git diff --check` and report the design, promoted artifact paths,
-   verified route facts, unresolved blockers, and any disagreement with
-   existing builders or mapping.
-
-When the contract is complete, hand off its path or `design_id` to
-`design-implement`. Do not implement or repair the builder in the same task
-unless the user explicitly requests that separate stage.

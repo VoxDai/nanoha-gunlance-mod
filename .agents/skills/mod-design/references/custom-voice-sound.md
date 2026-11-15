@@ -29,7 +29,7 @@ separate design choice and requires explicit probe evidence.
 ## Media Contract
 
 - Repository source: ordinary character voice is a 48 kHz, stereo, 24-bit PCM WAV that passes the LUFS-I and filename
-  validation in `../SKILL.md`.
+  validation in the [design contract](design-contract.md).
 - Runtime media: 48 kHz, 16-bit, mono Wwise PCM WEM using channel config
   `000001410000`.
 - Downmix without gain. Do not add pre-gain, loudness normalization,

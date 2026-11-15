@@ -1,4 +1,0 @@
-interface:
-  display_name: "Design Implement"
-  short_description: "Implement designs as guarded artifact builders"
-  default_prompt: "Use $design-implement to implement the specified design document or design ID as registered guarded builders and tests."

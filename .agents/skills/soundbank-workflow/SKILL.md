@@ -147,11 +147,9 @@ conda run -n nanoha-gunlance-mod python tools/utils/wav_to_wem.py \
 
 ## Project Handoff
 
-- Use `audio-design` to turn verified audible behavior, final audio, original
-  artifacts, routes, guards, and acceptance cases into a design contract.
-- Use `design-implement` to implement a specified design in artifact builders,
-  integration validators, and tests.
-- Use `build-mod` to execute the registered complete Mod plan and publish
+- Use `mod-design` to turn verified playback behavior, audio, routes, and guards
+  into a design contract and the corresponding guarded builders and validators.
+- Use `build-release` to execute the registered complete Mod plan and publish
   `release/nativePC/`.
 
 Binary analysis does not implicitly authorize editing these project layers.
