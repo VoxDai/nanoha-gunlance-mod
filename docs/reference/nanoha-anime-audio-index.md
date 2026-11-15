@@ -1,6 +1,6 @@
-# 魔法少女奈叶动画语音索引
+# Magical Girl Lyrical Nanoha Anime Audio Index
 
-本文档记录《魔法少女奈叶》系列（TV/剧场版）中奈叶&旭日之心战斗音效的动画音轨时间戳，供语音素材提取时索引。
+Use these soundtrack timestamps to locate Nanoha and Raising Heart’s combat audio in the Magical Girl Lyrical Nanoha television series and films when extracting voice assets.
 
 ## The MOVIE 1st
 
@@ -12,14 +12,14 @@
 |                       | flier fin                 |              | 0:12:24   |
 |                       | protection                |              | 0:12:48   |
 |                       | mode change, cannon mode  |              | 0:14:58   |
-|                       |                           | 散热         | 0:15:51   |
+|                       |                           | Cooling         | 0:15:51   |
 |                       | standby ready             |              | 0:22:31   |
 |                       | sealing                   |              | 0:23:16   |
 |                       | protection                |              | 0:24:51   |
 |                       | standby ready             |              | 0:31:57   |
 |                       | cannon mode               |              | 0:32:31   |
 |                       | divine buster             |              | 0:32:42   |
-|                       |                           | 散热         | 0:33:20   |
+|                       |                           | Cooling         | 0:33:20   |
 |                       | device mode               |              | 0:33:22   |
 |                       | cannon mode, stun setting |              | 0:35:37   |
 | shoot                 |                           |              | 0:35:39   |
@@ -41,9 +41,9 @@
 |                       | cannon mode               |              | 1:22:57   |
 | divine buster         |                           |              | 1:23:25   |
 |                       | starlight breaker         |              | 1:24:36   |
-| 全力全开              |                           |              | 1:25:06   |
+| Full power              |                           |              | 1:25:06   |
 | starlight breaker     |                           |              | 1:25:18   |
-|                       |                           | 散热         | 1:26:16   |
+|                       |                           | Cooling         | 1:26:16   |
 |                       | standby ready             |              | 1:47:36   |
 | divine buster         |                           |              | 1:47:53   |
 
@@ -55,33 +55,33 @@
 |                                | cannon mode             |              | 0:16:12   |
 |                                | divine buster           |              | 0:16:18   |
 |                                | protection              |              | 0:17:26   |
-|                                |                         | 弹药装填     | 0:43:41   |
+|                                |                         | Cartridge loading     | 0:43:41   |
 | smasher                        |                         |              | 0:44:08   |
-|                                |                         | 弹药装填     | 0:44:26   |
+|                                |                         | Cartridge loading     | 0:44:26   |
 |                                | accel shooter           |              | 0:44:28   |
 | accel shooter                  |                         |              | 0:44:32   |
 |                                | restrict lock           |              | 1:19:39   |
-|                                |                         | 弹药装填     | 1:19:47   |
+|                                |                         | Cartridge loading     | 1:19:47   |
 |                                | divine buster extension |              | 1:19:51   |
 | shoot                          |                         |              | 1:19:53   |
-|                                |                         | 散热         | 1:20:00   |
+|                                |                         | Cooling         | 1:20:00   |
 |                                | excellion shell         |              | 1:24:52   |
 | buster shift                   |                         |              | 1:28:12   |
 |                                | reload                  |              | 1:37:17   |
 | excellion mode                 |                         |              | 1:38:06   |
-|                                |                         | 弹药装填     | 1:38:09   |
+|                                |                         | Cartridge loading     | 1:38:09   |
 | drive                          |                         |              | 1:38:10   |
 |                                | ignition                |              | 1:38:11   |
-|                                |                         | 弹药装填     | 1:41:35   |
+|                                |                         | Cartridge loading     | 1:41:35   |
 |                                | A.C.S standby           |              | 1:41:37   |
 |                                | strike flame            |              | 1:41:48   |
 | excellion buster, A.C.S drive  |                         |              | 1:41:56   |
 | shoot                          |                         |              | 1:42:45   |
-|                                |                         | 散热         | 1:42:55   |
+|                                |                         | Cooling         | 1:42:55   |
 | accel shooter, vanishing shift |                         |              | 1:59:43   |
 |                                | lock on                 |              | 1:59:47   |
 |                                | starlight breaker       |              | 2:03:11   |
-| 全力全开, starlight            |                         |              | 2:03:17   |
+| Full power, starlight            |                         |              | 2:03:17   |
 |                                | standby ready           |              | 2:26:08   |
 
 ## Reflection

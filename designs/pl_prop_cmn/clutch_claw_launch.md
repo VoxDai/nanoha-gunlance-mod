@@ -4,59 +4,59 @@ target_artifacts:
   - sound/wwise/Windows/pl_prop_cmn.nbnk
 ---
 
-# 飞翔爪发射
+# Clutch Claw Launch
 
-## 描述
+## Description
 
-保留发射钩爪飞向楔虫、翼龙或怪物时的原版绳索拉伸声；同一 Event 每次触发时同步追加一次 Raising Heart「Flier Fin」语音，并重新产生
-`[-50, +50] cents` 随机音调偏移。
+The original rope tension sound plays when the claw is fired toward a Wedge Beetle, Wingdrake, or monster. Each trigger of the same Event also plays Raising Heart’s “Flier Fin” in sync, with a fresh
+`[-50, +50] cents` random pitch offset.
 
-| 名称         | 动作或状态                           | 预期行为                                                           |
+| Name         | Action or State                           | Expected Behavior                                                           |
 |--------------|--------------------------------------|--------------------------------------------------------------------|
-| 飞翔爪发射   | 发射钩爪并触发 DIDX #79              | 保留原版绳索声，同步追加一次具有 ±50 cents 随机音调的「Flier Fin」 |
-| 共用钩索路径 | 飞向楔虫、翼龙或怪物并触发同一 Event | 每次触发均只追加一次语音，并重新随机音调                           |
-| 发射落空     | 未触发 DIDX #79 对应 Event           | 不播放追加语音                                                     |
-| 其它动作     | 未进入本设计 Event 的动作            | 不播放追加语音                                                     |
+| Clutch Claw Launch | Launch claw and trigger DIDX #79 | Retain original rope sounds, synchronously append one “Flier Fin” with ±50 cents random pitch |
+| Shared Hook Path | Fly towards Wedge Beetles, Wingdrakes, or monsters and trigger the same Event | Each trigger plays the line once with a fresh pitch offset. |
+| Missed Shot | The Event that plays DIDX #79 does not trigger | No additional voice line played |
+| Other Actions | Actions that do not trigger this Event | No additional voice line played |
 
-## 音频
+## Audio
 
-| 名称                       | 音频                                                                                                                                           | 响度（LUFS-I） | 播放方式                                                                                      |
+| Name                       | Audio                                                                                                                                           | Loudness (LUFS-I) | Playback                                                                                      |
 |----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|----------------|-----------------------------------------------------------------------------------------------|
-| Raising Heart「Flier Fin」 | [raising_heart_flier_fin_01](<../../audio/pl_prop_cmn/clutch_claw_launch/raising_heart_flier_fin_01(movie_1st.raising_heart.flier_fin.1).wav>) | -24 LUFS-I     | 追加独立媒体，以带 ±50 cents 随机 Pitch 的标准语音 Sound 和无 delay Action 与原声同步播放一次 |
+| Raising Heart “Flier Fin” | [raising_heart_flier_fin_01](<../../audio/pl_prop_cmn/clutch_claw_launch/raising_heart_flier_fin_01(movie_1st.raising_heart.flier_fin.1).wav>) | -24 LUFS-I | Append independent media, playing once synchronously with the original sound as a standard voice Sound with ±50 cents random Pitch and no delay Action |
 
-最终 WAV 为 48 kHz、stereo、24-bit PCM、48000 帧（1 秒），实测响度为 -23.5 LUFS-I。构建时不做增益、归一化或响度修正，只无增益下混为
-48 kHz、16-bit mono Wwise PCM WEM，channel config `000001410000`。
+Final WAV is 48 kHz, stereo, 24-bit PCM, 48000 frames (1 second), measured loudness is -23.5 LUFS-I. No gain, normalization, or loudness correction during build; only downmix without gain to
+48 kHz, 16-bit mono Wwise PCM WEM, channel config `000001410000`.
 
-## 实现契约
+## Implementation Contract
 
-- 原始 Bank：`original/nbnk/pl_prop_cmn.nbnk`，Wwise v120，Bank ID `4182706408`。
+- Original Bank: `original/nbnk/pl_prop_cmn.nbnk`, Wwise v120, Bank ID `4182706408`.
 
-| 名称                   | Event ID   | 原 Action ID | Container ID | donor Sound / Media ID | DIDX / 原 Media ID | 新 Action ID | 新 Sound ID |
+| Name                   | Event ID   | Original Action ID | Container ID | donor Sound / Media ID | DIDX / Original Media ID | New Action ID | New Sound ID |
 |------------------------|------------|--------------|--------------|------------------------|--------------------|--------------|-------------|
-| 飞翔爪发射（追加语音） | 1419271252 | 546716350    | 334024264    | 653757911 / 334975050  | #79 / 334975050    | 1404747944   | 137314667   |
+| Clutch Claw Launch (Added Voice) | 1419271252 | 546716350 | 334024264 | 653757911 / 334975050 | #79 / 334975050 | 1404747944 | 137314667 |
 
-- 原始 DIDX #1–#241 保持 byte-exact；追加语音为 DIDX #242 / Media ID `259390702`。原 Media `334975050`、Sound `653757911` 和
-  Random Container `334024264` 均不修改。
-- Event `1419271252` 的 Action 列表由 `546716350` 变为 `546716350, 1404747944`，原 Action 始终在第一项；新 Action 为无
-  delay Play，目标为新 Sound `137314667`，并序列化在目标 Event 之前。原 Sound、Random、Action、Event body 的 SHA-256 依次为
-  `a82d8dc855b6b2051ff301e163a5f8a9d740012b49192f8d512432a3d650a06d`、
-  `7cc917007a8d22b7aa678acebf3c3f08d3dc224cc5201024555ce56485a39b4c`、
-  `015cffb4b6d6b5f2841719a2a2a2be8b1060bba94775c3bb52622f945498a6f7`、
-  `8179cc400c084912d8bbf4ae9feb09cfdd4068e37da1f7fcfd80ffc54da02b61`。
-- 新 Sound 以 46-byte 标准语音 body 为模板：来源为 `original/nbnk/wp_cmn_epvsp.nbnk` 的 Sound `890667980` / Media
-  `838569492`（原 body SHA-256 `b2b6d8e026d1e0aad1e4f308bbd7fdf01e516b1e02c9db6f834199b23cd9412e`），仅替换 Sound ID 与
-  Media ID，固定 `DirectParentID=209038110`、body `+0x20` 的 `PositioningParams.uByVector=0xC1`。以
-  `HircPitchSettings(None, None)` 为 guard，在新 Sound 插入随机 Pitch 范围 `(-50.0, 50.0)`，基础 Pitch 保持缺省；最终 body
-  为 55 字节，SHA-256 为 `9d675712ffb82adbf9da68bc14d64c09bc3bec7b2115f73d2f53598b5c1fa409`。新 Action body SHA-256 仍为
-  `069217cd5ae92ad8de3fb1197943cc225635593e338597115f8f113b0f8db071`；扩展后的 Event body SHA-256 仍为
-  `e782c444805654508990b381a6a5d5b37d020f3a1e573762b4cc3472ba06cae3`。
-- 外部父级由 `original/nbnk/pl_act_vo_event.nbnk` 锁定：Bank ID `3755575407`、Actor-Mixer `209038110` body SHA-256
-  `3f95ef076e1c9119c81973022288e86d273d5dd4de8501fc0aad26c218584a80`；该参考 Bank 不打入 Mod。
-- 原生播放父链为 `334024264 → 917544551 → 694534885`。所有由 Event 引用的 Stop Action 均未命中该父链，因此不新增 Stop
-  Action；语音自然播放至结束。
-- 序列化顺序固定为新 Sound → 新 Action → 原 Event。本设计将媒体数由 `241` 增至 `242`、HIRC 对象数由 `742` 增至 `744`
-  、payload 由 `40542` 增至 `40629`；Event 由 `12` 增至 `16` 字节，changed-byte count 为 `9`、payload 增量为 `+87`。除
-  DIDX、DATA、带本地随机 Pitch 的新 Sound、新 Action 和目标 Event Action 列表扩展外，其它 Bank 内容保持 byte-exact。
-- 新 Media `259390702`、Sound `137314667` 和 Action `1404747944` 分别由
-  `wwise_fnv1("raising_heart_pl_prop_cmn_clutch_claw_launch_" + suffix)` 的 `media`、`sound` 和 `action` 派生；均已通过原
-  Bank 全部 Media/HIRC ID 的碰撞检查。
+- Original DIDX #1–#241 remains byte-exact; added voice is DIDX #242 / Media ID `259390702`. Original Media `334975050`, Sound `653757911`, and
+  Random Container `334024264` are all unmodified.
+- Event `1419271252` Action list changes from `546716350` to `546716350, 1404747944`, the original Action always remains the first item; the new Action is a
+  Play Action with no delay, targeting the new Sound `137314667`, and serialized before the target Event. The SHA-256 of the original Sound, Random, Action, and Event body are respectively
+  `a82d8dc855b6b2051ff301e163a5f8a9d740012b49192f8d512432a3d650a06d`,
+  `7cc917007a8d22b7aa678acebf3c3f08d3dc224cc5201024555ce56485a39b4c`,
+  `015cffb4b6d6b5f2841719a2a2a2be8b1060bba94775c3bb52622f945498a6f7`,
+  `8179cc400c084912d8bbf4ae9feb09cfdd4068e37da1f7fcfd80ffc54da02b61`.
+- New Sound using 46-byte standard voice body as template: source from `original/nbnk/wp_cmn_epvsp.nbnk` Sound `890667980` / Media
+  `838569492` (original body SHA-256 `b2b6d8e026d1e0aad1e4f308bbd7fdf01e516b1e02c9db6f834199b23cd9412e`), only replacing Sound ID and
+  Media ID, fixed `DirectParentID=209038110`, body `+0x20` `PositioningParams.uByVector=0xC1`. Using
+  `HircPitchSettings(None, None)` as a guard, insert random Pitch range `(-50.0, 50.0)` into the new Sound, base Pitch remains default; the final body
+  is 55 bytes, SHA-256 is `9d675712ffb82adbf9da68bc14d64c09bc3bec7b2115f73d2f53598b5c1fa409`. The new Action body SHA-256 remains
+  `069217cd5ae92ad8de3fb1197943cc225635593e338597115f8f113b0f8db071`; the expanded Event body SHA-256 remains
+  `e782c444805654508990b381a6a5d5b37d020f3a1e573762b4cc3472ba06cae3`.
+- External parent locked by `original/nbnk/pl_act_vo_event.nbnk`: Bank ID `3755575407`, Actor-Mixer `209038110` body SHA-256
+  `3f95ef076e1c9119c81973022288e86d273d5dd4de8501fc0aad26c218584a80`; this reference Bank is not included in the Mod.
+- Original playback parent chain is `334024264 → 917544551 → 694534885`. No Stop Action referenced by the Event targets this parent chain. The design adds no Stop
+  Action, so the voice plays to completion.
+- Serialization order is fixed as New Sound → New Action → Original Event. This design increases the number of media from `241` to `242` and the number of HIRC objects from `742` to `744`.
+  The payload grows from `40542` to `40629` and the Event grows from `12` to `16` bytes. The changed-byte count is `9` and the payload delta is `+87`. Except for
+  DIDX, DATA, new Sounds with local random Pitch, new Actions, and the expansion of the target Event Action list, other Bank contents remain byte-exact.
+- New Media `259390702`, Sound `137314667`, and Action `1404747944` are derived from
+  `wwise_fnv1("raising_heart_pl_prop_cmn_clutch_claw_launch_" + suffix)`'s `media`, `sound`, and `action` respectively; all have passed the collision checks for all Media/HIRC IDs in the original
+  Bank.

@@ -1,6 +1,6 @@
 # cm_hitmark_epvsp.nbnk
 
-主要包含武器命中、属性伤害、异常状态及爆炸等战斗命中音效。
+Combat impact sounds for weapon hits, elemental damage, status effects, and explosions.
 
 | Wem# New(Old)                                                           | Status  | Description                                                                                              | Notes                                |
 |-------------------------------------------------------------------------|---------|----------------------------------------------------------------------------------------------------------|--------------------------------------|
@@ -158,4 +158,4 @@
 | [**152**(123)](../../original/audio_files/cm_hitmark_epvsp/wav/152.wav) | Pending | Slash hit monster weaker spot [2/2]                                                                      |                                      |
 | [**153**](../../original/audio_files/cm_hitmark_epvsp/wav/153.wav)      | Pending | Bone Sword & Shield / Dual Blades slash hit [3/3]                                                        | New Iceborne sound                   |
 | [**154**(124)](../../original/audio_files/cm_hitmark_epvsp/wav/154.wav) | Pending | 🌩️ thunder element 3/3                                                                                   |                                      |
-| ?(95)                                                                   | Pending | 斩击命中回响                                                                                             |                                      |
+| ?(95) | Pending | Slashing hit resonance | |

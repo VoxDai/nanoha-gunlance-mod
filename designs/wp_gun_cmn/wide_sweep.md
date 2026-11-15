@@ -6,54 +6,54 @@ target_artifacts:
   - sound/wwise/Windows/wp_gun_cmn.nbnk
 ---
 
-# 横扫
+# Wide Sweep
 
-## 描述
+## Description
 
-保留普通地面横扫的全部原声，在第 11 帧独立叠加一次奈叶「Smasher」。两份素材分别以 70%／30% 概率随机播放，允许连续重复，每次由专属 Container 施加 ±50 cents 音调偏移。
+The ordinary grounded Wide Sweep keeps all its original sounds and independently plays Nanoha’s “Smasher” once at frame 11. The two clips have 70% and 30% selection probabilities. Repeats are allowed. A dedicated Container applies a fresh ±50 cents random pitch offset each time.
 
-| 名称 | 动作或状态 | 预期行为 |
+| Name | Action or State | Expected Behavior |
 |------|------------|----------|
-| 普通横扫 | 下砸或全弹发射后进入普通地面横扫 | 第 11 帧与较早的金属声同步，随机播放一条 Smasher |
-| 后续原声 | 同一横扫的第 27／49 帧 | 保留金属声、挥动声及两条条件路线，不额外播放 Smasher |
-| 原人物语音 | Motion 143 的 EventGroup02 | 第 27 帧攻击语音保持未触发，第 166 帧人物语音保持原样 |
-| 其它动作 | 拔刀、收刀、装填、下砸、空中强横扫及登墙横扫 | 不因本设计新增 Smasher；既有 Mod 语音保持原状 |
-| 连续横扫 | 再次进入目标触发帧 | 每次选择一条语音，不设置新增冷却或实例上限 |
+| Normal Wide Sweep | Enters normal ground wide sweep after an Overhead Smash or Full Burst | Synchronized with the earlier metallic sound at frame 11, randomly plays one Smasher |
+| Subsequent Original Sound | Frame 27/49 of the same wide sweep | Retains metallic sounds, swing sounds, and the two conditional routes, without playing an extra Smasher |
+| Original Character Voice | Motion 143's EventGroup02 | Attack voice at frame 27 remains untriggered, character voice at frame 166 remains as-is |
+| Other Actions | Sheathing, drawing, reloading, Overhead Smash, aerial Wide Sweep, and wall-clinging Wide Sweep | Does not add new Smasher due to this design; existing Mod voices remain as-is |
+| Continuous Wide Sweep | Re-entering the target trigger frame | Selects one voice each time, without setting new cooldowns or instance limits |
 
-## 音频
+## Audio
 
-| 名称 | 音频 | 响度（LUFS-I） | 播放方式 |
+| Name | Audio | Loudness (LUFS-I) | Playback |
 |------|------|----------------|----------|
-| Smasher 01 | [nanoha_smasher_01](<../../audio/wp_gun_cmn/wide_sweep/nanoha_smasher_01(gears_of_destiny.attack_voice.attack_05.1).wav>) | -21 LUFS-I | 追加独立媒体，权重 70000（70%）；一次横扫仅选一条 |
-| Smasher 02 | [nanoha_smasher_02](<../../audio/wp_gun_cmn/wide_sweep/nanoha_smasher_02(movie_2nd_as.nanoha.smasher.1).wav>) | -21 LUFS-I | 追加独立媒体，权重 30000（30%）；与 01 共用 Container |
+| Smasher 01 | [nanoha_smasher_01](<../../audio/wp_gun_cmn/wide_sweep/nanoha_smasher_01(gears_of_destiny.attack_voice.attack_05.1).wav>) | -21 LUFS-I | Appends independent media, weight 70000 (70%); only one selected per wide sweep |
+| Smasher 02 | [nanoha_smasher_02](<../../audio/wp_gun_cmn/wide_sweep/nanoha_smasher_02(movie_2nd_as.nanoha.smasher.1).wav>) | -21 LUFS-I | Appends independent media, weight 30000 (30%); shares Container with 01 |
 
-两份最终 WAV 均为 48 kHz、stereo、24-bit PCM，分别为 54000／72000 帧（1.125／1.5 秒），实测均为 -20.99 LUFS-I，true peak 为 -16.52／-14.30 dBTP。构建只无增益下混为 48 kHz、16-bit mono Wwise PCM，channel config `000001410000`；不在构建时校正响度。
+Both final WAVs are 48 kHz, stereo, 24-bit PCM, at 54000/72000 frames (1.125/1.5 seconds), measured at -20.99 LUFS-I, with true peak at -16.52/-14.30 dBTP. Build-only downmix to 48 kHz, 16-bit mono Wwise PCM, channel config `000001410000`; no loudness correction during build.
 
-## 实现契约
+## Implementation Contract
 
-- 原始 Bank：`original/nbnk/wp_gun_cmn.nbnk`，Wwise v120，Bank ID `939294496`。
+- Original Bank: `original/nbnk/wp_gun_cmn.nbnk`, Wwise v120, Bank ID `939294496`.
 
-| 名称 | Event ID | 原 Action ID | Container ID | donor Sound / Media ID | DIDX / 原 Media ID | 新 Action ID | 新 Sound ID |
+| Name | Event ID | Original Action ID | Container ID | donor Sound / Media ID | DIDX / Original Media ID | New Action ID | New Sound ID |
 |------|----------|--------------|--------------|------------------------|--------------------|--------------|-------------|
-| 11 帧原声委托 | 2467230206 | 281299658 | 5732403 | 402899610 / 367086010 | #6 / 367086010 | 2768755612 / 3181937101 | 102041635 / 3822519236 |
+| 11 Frame Original Sound Delegate | 2467230206 | 281299658 | 5732403 | 402899610 / 367086010 | #6 / 367086010 | 2768755612 / 3181937101 | 102041635 / 3822519236 |
 
-- 原 Event 的 Action 列表固定为 `(281299658,)`，该 Action 是无 delay 的 Play，指向原 Container `5732403`。本设计不修改原声对象。新 Event `4096779774` 固定为 Action 列表 `(2768755612, 3181937101)`：第一条为 PlayEvent 委托完整原 Event `2467230206`，第二条为无 delay Play，目标 Random `3645186695`。
-- 两份媒体在既有 DIDX #34–#36 后追加为 #37 / Media `1484106982`、#38 / Media `2274559001`。原 DIDX #1–#33 的身份与媒体载荷不变；既有三个追加媒体和路线不变。仅允许 DIDX/DATA 追加与上述 HIRC 新对象，保留其它 chunk。
-- Random `3645186695` 克隆原 Container `570218704`，完整 donor body SHA-256 `be0beffcec2f1a026d5bea182c34c2fbfcb2a129b1b4efa8c33146bfeb046427`。原 playlist 为 `((647150707, 50000),)`、avoid-repeat=1；新 playlist 为 `((102041635, 70000), (3822519236, 30000))`、avoid-repeat=0。body `+0x0B` 的父级从 `768813060` 改为 `209038110`。保留 donor 的 Random/Normal、one-shot、禁用 transition、无本地 Volume 与实例上限设置；局部 Pitch 基值缺省（0 cents），随机范围固定为 `(-50.0, 50.0)`。最终 95-byte body SHA-256 `369e0b6264741e600b9e87a2a05034365fcaafa6ae82a19ed178d66357fc0efd`。
-- 两个 Sound 使用标准 46-byte 语音模板，来源为 `original/nbnk/wp_cmn_epvsp.nbnk` 的 Sound `890667980` / Media `838569492`，原 body SHA-256 `b2b6d8e026d1e0aad1e4f308bbd7fdf01e516b1e02c9db6f834199b23cd9412e`。仅改 Sound/Media ID、`DirectParentID=3645186695` 和 body `+0x20` 的 positioning vector 为 `0xC1`；沿用已确认 11 帧测试版的 Container 语音层级。
-- 语音父级由 `original/nbnk/pl_act_vo_event.nbnk` 固定（Bank ID `3755575407`、Actor-Mixer `209038110` body SHA-256 `3f95ef076e1c9119c81973022288e86d273d5dd4de8501fc0aad26c218584a80`）。该父级及上级 `694534885` 无局部 Pitch；两个新 Sound 也无局部 Pitch，不叠加第二份随机偏移。原播放根及其父链未发现原生 Event 引用的匹配 Stop，不新增 Stop。两个参考 Bank 不打入 Mod。
-- 序列化顺序为两个 Sound → Random → 原声委托 Action → 语音 Play Action → 新 Event。本设计新增 2 个 Sound、1 个 Random、2 个 Action、1 个 Event，HIRC 增量 `+264`、changed-byte count `4`（新 Random 的父级修改）。与当前全部既有 Bank 设计合并，媒体 38 项、HIRC 对象 `123→140`、payload `7250→7831`，总增量 `+581`、changed-byte count `5`；既有 reload Event `3476627122` 仍是唯一扩长的原对象，body `12→16`。
+- The original Event's Action list is fixed to `(281299658,)`; this Action is a Play with no delay, pointing to the original Container `5732403`. This design does not modify original sound objects. The new Event `4096779774` is fixed to Action list `(2768755612, 3181937101)`: the first is a PlayEvent delegating the full original Event `2467230206`, the second is a Play with no delay, targeting Random `3645186695`.
+- The two media files are appended after the existing DIDX #34–#36 as #37 / Media `1484106982`, #38 / Media `2274559001`. The identity and media payload of the original DIDX #1–#33 remain unchanged; the existing three appended media and routes remain unchanged. Only DIDX/DATA appending to the above HIRC new objects is allowed, preserving other chunks.
+- Random `3645186695` clones the original Container `570218704`, with a complete donor body SHA-256 `be0beffcec2f1a026d5bea182c34c2fbfcb2a129b1b4efa8c33146bfeb046427`. The original playlist is `((647150707, 50000),)`, avoid-repeat=1; the new playlist is `((102041635, 70000), (3822519236, 30000))`, avoid-repeat=0. The parent of body `+0x0B` changes from `768813060` to `209038110`. Retains the donor's Random/Normal, one-shot, disabled transition, and no local Volume or instance limit settings; local Pitch base defaults (0 cents), random range fixed to `(-50.0, 50.0)`. Final 95-byte body SHA-256 `369e0b6264741e600b9e87a2a05034365fcaafa6ae82a19ed178d66357fc0efd`.
+- The two Sounds use standard 46-byte voice templates, sourced from Sound `890667980` / Media `838569492` of `original/nbnk/wp_cmn_epvsp.nbnk`, with the original body SHA-256 `b2b6d8e026d1e0aad1e4f308bbd7fdf01e516b1e02c9db6f834199b23cd9412e`. Only the Sound/Media ID, `DirectParentID=3645186695`, and the positioning vector of body `+0x20` to `0xC1` are changed; follows the confirmed 11 frame test-version Container voice hierarchy.
+- Voice parent is fixed by `original/nbnk/pl_act_vo_event.nbnk` (Bank ID `3755575407`, Actor-Mixer `209038110` body SHA-256 `3f95ef076e1c9119c81973022288e86d273d5dd4de8501fc0aad26c218584a80`). This parent and the upper-level `694534885` have no local Pitch; the two new Sounds also have no local Pitch, and do not stack a second random offset. No matching Stop referenced by the original playback root or its parent chain was found; no new Stop is added. The two reference Banks are not included in the Mod.
+- Serialization order: two Sounds → Random → Original Sound Delegate Action → Voice Play Action → New Event. This design adds 2 Sounds, 1 Random, 2 Actions, and 1 Event; HIRC increments are `+264`, changed-byte count is `4` (due to modification of the new Random's parent). Merges with all current existing Bank designs, media 38 items, HIRC objects `123→140`, payload `7250→7831`, total increment `+581`, changed-byte count `5`; the existing reload Event `3476627122` remains the only extended original object, body `12→16`.
 
-| 名称 | LMT | Motion | EventGroup | Slot | 赋值帧 | 原 ReqNo | 新 ReqNo | 预期触发帧 |
+| Name | LMT | Motion | EventGroup | Slot | Assignment Frame | Original ReqNo | New ReqNo | Expected Trigger Frame |
 |------|-----|--------|------------|------|--------|----------|----------|------------|
-| 横扫 | `original/lmt/w07_00.lmt` | 143 | EventGroup06 | A | 0 | 6486 | 6596 | 11 |
+| Wide Sweep | `original/lmt/w07_00.lmt` | 143 | EventGroup06 | A | 0 | 6486 | 6596 | 11 |
 
-| 名称 | WWEV | donor ReqNo | donor Event ID | mode | record SHA-256 | 新 ReqNo | 新 Event ID |
+| Name | WWEV | donor ReqNo | donor Event ID | mode | record SHA-256 | New ReqNo | New Event ID |
 |------|------|-------------|----------------|------|----------------|----------|-------------|
-| 横扫 | `original/wwev/hm_wp07_snd_ev.wwev` | 6486 | 2467230206 | 100 | `7acef10768c67f1bd791873f65a0c345e00c9e24c50428e4c5ad2cae4bbabbfb` | 6596 | 4096779774 |
+| Wide Sweep | `original/wwev/hm_wp07_snd_ev.wwev` | 6486 | 2467230206 | 100 | `7acef10768c67f1bd791873f65a0c345e00c9e24c50428e4c5ad2cae4bbabbfb` | 6596 | 4096779774 |
 
-- `original/lmt/w07_00.lmt` 为 v95。Motion 143 共 187 帧，TIML `0x124BE0` 仅由该 Motion 使用。仅替换槽位 A 在第 0 帧的请求赋值：记录位置 `1202416`，预期触发帧 `(11.0,)`、trigger mask `0x01`，额外改变 1 字节。与既有 Motion 2、128、131 修改合并后 changed-byte count 为 `6`，文件长度不变。所有其它 TIML 数据保持原样，包括 EventGroup02 第 0 帧槽位 A 的 ReqNo 1129、第 27 帧 trigger=0 及第 166 帧槽位 B 的 ReqNo 1009。
-- `original/wwev/hm_wp07_snd_ev.wwev` 为 v19。ReqNo 6486 必须仅解析出原记录 #22、mode 100、上述 Event 与完整 raw hash；新 ReqNo／Event 必须未占用。用 `append_cloned_record()` 完整克隆为 #45，仅改 ReqNo 和 Event，保留 command、unknown、WWPC，追加 129 字节。原 43 条记录和四个依赖字符串 byte-exact，既有 #44 不变，总记录数 45，总追加 `258` 字节。新记录 raw SHA-256 为 `d4a45c5e6c512f1b9688decbe9ad966e606a5674b7307ad469e6a8c60a9b8637`。
-- 后续原声保持原路线：EventGroup06 第 27 帧槽位 F 为 ReqNo 6488 → Event `2467230204`；第 49 帧槽位 E 为 ReqNo 6410，按原顺序展开为 mode 200 的 Event `252365729`／`3350794741`，两条条件记录均保留。ReqNo 6488 的原 raw hash 为 `f1ad3a74af5e568cbf058b9fa10b4df01459042fd40e7b62989b51b0e3e957d9`；ReqNo 6410 两条原 raw hash 依次为 `e7fd989c59feb3d3543d02dd77ac79113f435212f795ed371cafc59a042d218c`、`9f39b9a7d1443461da8e5e75d6b9d7a62b54badd488494714312df74fd2553f2`。不追加 ReqNo 6597／6598 及 Event `1359210849`／`2281439929`。
-- 所有新增 ID 均为 `wwise_fnv1("nanoha_wp_gun_cmn_wide_sweep_" + suffix)`：媒体与 Sound 使用 `smasher_01_media`／`smasher_02_media`／`smasher_01_sound`／`smasher_02_sound`，Container 使用 `random_container`，Event／Action 使用 `frame11_event`／`frame11_original_action`／`frame11_voice_action`。这些 ID 与 ReqNo 6596 已通过原版 4550 个 NBNK、1300 个 WWEV 的占用检查；同时须拒绝与当前已注册自定义 ID 冲突。
-- 三个既有 artifact owner 均登记本 design ID，正式七件套保持唯一归属。跨文件验证必须在完整动画触发表中恰好解析出一次 Motion 143／EventGroup06／槽位 A／第 11 帧／ReqNo 6596／记录 #45／mode 100／Event `4096779774`，并验证完整原声委托、Random 权重与 Pitch、Sound 父级、媒体和序列化顺序；保留全部既有 bundle validators。
+- `original/lmt/w07_00.lmt` is v95. Motion 143 has 187 frames; TIML `0x124BE0` is used only by this Motion. Only replaces the request assignment for slot A at frame 0: recorded position `1202416`, expected trigger frame `(11.0,)`, trigger mask `0x01`, and an additional change of 1 byte. After merging with existing Motion 2, 128, and 131, the changed-byte count is `6`, with file length unchanged. All other TIML data remains as-is, including EventGroup02's ReqNo 1129 for slot A at frame 0, trigger=0 at frame 27, and ReqNo 1009 for slot B at frame 166.
+- `original/wwev/hm_wp07_snd_ev.wwev` is v19. ReqNo 6486 must only parse the original record #22, mode 100, the aforementioned Event, and the full raw hash; new ReqNo/Event must be unoccupied. Use `append_cloned_record()` to fully clone as #45, only changing ReqNo and Event, retaining command, unknown, WWPC, and appending 129 bytes. The original 43 records and four dependency strings are byte-exact, so existing #44 remains unchanged, total record count 45, total appended `258` bytes. New record raw SHA-256 is `d4a45c5e6c512f1b9688decbe9ad966e606a5674b7307ad469e6a8c60a9b8637`.
+- Subsequent original audio follows the original route: EventGroup06's 27 frame slot F is ReqNo 6488 → Event `2467230204`; the 49 frame slot E is ReqNo 6410, expanding in original order to mode 200's Event `252365729`/`3350794741`, with both conditional records retained. The original raw hash of ReqNo 6488 is `f1ad3a74af5e568cbf058b9fa10b4df01459042fd40e7b62989b51b0e3e957d9`; the two original raw hashes of ReqNo 6410 are `e7fd989c59feb3d3543d02dd77ac79113f435212f795ed371cafc59a042d218c` and `9f39b9a7d1443461da8e5e75d6b9d7a62b54badd488494714312df74fd2553f2` respectively. Do not append ReqNo 6597/6598 and Event `1359210849`/`2281439929`.
+- All new IDs are `wwise_fnv1("nanoha_wp_gun_cmn_wide_sweep_" + suffix)`: Media and Sound use `smasher_01_media`/`smasher_02_media`/`smasher_01_sound`/`smasher_02_sound`, Container uses `random_container`, Event/Action uses `frame11_event`/`frame11_original_action`/`frame11_voice_action`. These IDs and ReqNo 6596 have passed the occupancy check of 4550 NBNK and 1300 WWEV from the original version; simultaneously, they must reject conflicts with currently registered custom IDs.
+- All three existing artifact owners are registered to this design ID, with the formal seven-piece set maintaining unique ownership. Cross-file validation must parse exactly once Motion 143/EventGroup06/Slot A/11 frame/ReqNo 6596/Record #45/mode 100/Event `4096779774` within the full animation trigger table, and verify full audio delegation, Random weights and Pitch, Sound parent, media, and serialization order; retain all existing bundle validators.

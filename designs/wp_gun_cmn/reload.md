@@ -4,55 +4,55 @@ target_artifacts:
   - sound/wwise/Windows/wp_gun_cmn.nbnk
 ---
 
-# 装填
+# Reload
 
-## 描述
+## Description
 
-保留完整装填和起爆龙航装填的原版机械音；在两种动作触发 DIDX #1 原声时同步追加一次 Raising Heart「Reload」，每次播放重新产生 `[-50, +50] cents` 随机音调偏移，不污染快速装填或其它铳枪动作。
+Full Reload and the Load Wyrmstake Blast move keep their original mechanical sounds. When either move triggers the original DIDX #1 sound, Raising Heart’s “Reload” plays once in sync with a fresh `[-50, +50] cents` random pitch offset. Quick Reload and other Gunlance moves are outside this change.
 
-| 名称         | 动作或状态                     | 预期行为                                      |
+| Name         | Action or State                     | Expected Behavior                                      |
 |--------------|--------------------------------|-----------------------------------------------|
-| 完整装填     | 执行会触发 DIDX #1 的完整装填  | 保留全部原声，并同步额外播放一次具有 ±50 cents 随机音调的「Reload」    |
-| 起爆龙航装填 | 装填起爆龙航并触发 DIDX #1     | 保留全部原声，并同步额外播放一次具有 ±50 cents 随机音调的「Reload」    |
-| 快速装填     | 执行快速装填                   | 不播放「Reload」                              |
-| 其它铳枪动作 | 非上述两种 DIDX #1 装填路径    | 不播放「Reload」                              |
+| Full Reload | Perform a Full Reload that triggers DIDX #1 | Keep the original sounds and play “Reload” in sync with a ±50 cents random pitch offset. |
+| Load Wyrmstake Blast | Load Wyrmstake Blast and trigger DIDX #1 | Keep the original sounds and play “Reload” in sync with a ±50 cents random pitch offset. |
+| Quick Reload | Perform a Quick Reload | No "Reload" played |
+| Other Gunlance Actions | Other routes that do not trigger the reload sound at DIDX #1 | No "Reload" played |
 
-## 音频
+## Audio
 
-| 名称                    | 音频                                                                                                                        | 响度（LUFS-I） | 播放方式                                                                     |
+| Name                    | Audio                                                                                                                        | Loudness (LUFS-I) | Playback                                                                     |
 |-------------------------|-----------------------------------------------------------------------------------------------------------------------------|----------------|------------------------------------------------------------------------------|
-| Raising Heart「Reload」 | [raising_heart_reload_01](<../../audio/wp_gun_cmn/reload/raising_heart_reload_01(movie_2nd_as.raising_heart.reload.1).wav>) | -24 LUFS-I     | 追加独立媒体；以标准语音 Sound 和无 delay Action 与 DIDX #1 原声同步播放一次，每次重新随机偏移 ±50 cents |
+| Raising Heart “Reload” | [raising_heart_reload_01](<../../audio/wp_gun_cmn/reload/raising_heart_reload_01(movie_2nd_as.raising_heart.reload.1).wav>) | -24 LUFS-I | Add independent media; play once synchronized with DIDX #1 original sound with standard voice Sound and no delay, with a random offset of ±50 cents each time |
 
-## 实现契约
+## Implementation Contract
 
-- 原始 Bank: `original/nbnk/wp_gun_cmn.nbnk`，Wwise v120，Bank ID `939294496`。
+- Original Bank: `original/nbnk/wp_gun_cmn.nbnk`, Wwise v120, Bank ID `939294496`.
 
-| 名称                  | Event ID   | 原 Action ID | Container ID | donor Sound / Media ID | DIDX / 原 Media ID | 新 Action ID | 新 Sound ID |
+| Name                  | Event ID   | Original Action ID | Container ID | donor Sound / Media ID | DIDX / Original Media ID | New Action ID | New Sound ID |
 |-----------------------|------------|----------------|--------------|------------------------|--------------------|----------------|-------------|
-| 装填（追加语音）      | 3476627122 | 126049847      | 411055943    | 176748589 / 86782159   | #1 / 86782159      | 3418611510     | 1474128429  |
+| Reload (Additional Voice) | 3476627122 | 126049847 | 411055943 | 176748589 / 86782159 | #1 / 86782159 | 3418611510 | 1474128429 |
 
-- 原始 DIDX #1–#33 保持 byte-exact；在 `stationary_draw` 的 DIDX #34 和 `overhead_smash` 的 DIDX #35 之后，追加语音为
-  DIDX #36 / Media ID `1284288484`。本设计不修改前两个设计追加的媒体。
-- Event `3476627122` 的 Action 列表由 `126049847` 变为 `126049847, 3418611510`，原 Action 始终在第一项；新 Action 为无
-  delay 的 Play，目标新 Sound `1474128429`，并序列化在目标 Event 之前。
-- 表中 donor `176748589` 及 Container `411055943` 只作为原路径 guard；新 Sound 以 46-byte 标准语音 body 为模板，来源为
-  `original/nbnk/wp_cmn_epvsp.nbnk` 的 Sound `890667980` / Media `838569492`（原 body SHA-256
-  `b2b6d8e026d1e0aad1e4f308bbd7fdf01e516b1e02c9db6f834199b23cd9412e`），仅替换 Sound ID 与 Media ID，固定
-  `DirectParentID=209038110`、body `+0x20` 的 `PositioningParams.uByVector=0xC1`。以
-  `HircPitchSettings(None, None)` 为 guard，仅在新 Sound 插入随机 Pitch 范围 `(-50.0, 50.0)`，基础 Pitch
-  保持缺省；最终 body 为 55 字节，SHA-256 为
-  `49b0c3c0cd9a4532abf62b92e701f30cb3f6418d5385c98b1e50ca45d2665c21`。Container 保持 byte-exact，继续仅包含 donor
-  Sound、权重 `50000`、avoid-repeat `1` 的原随机播放列表；新 Sound 不加入该 Container，原版机械音不继承新 Pitch。
-- 外部父级由 `original/nbnk/pl_act_vo_event.nbnk` 锁定：Bank ID `3755575407`、Actor-Mixer
-  `209038110` body SHA-256 `3f95ef076e1c9119c81973022288e86d273d5dd4de8501fc0aad26c218584a80`；该参考 Bank 不打入 Mod。
-- 项目 WAV 固定为 48 kHz、stereo、24-bit PCM，并保持音频表记录的 -24 LUFS-I；构建时不做增益、归一化或响度修正，只无增益下混为
-  48 kHz、16-bit mono Wwise PCM WEM。
-- 本设计单独使 HIRC 对象数由 `123` 增至 `125`、payload 由 `7250` 增至 `7337`；新增 1 个 Sound 和 1 个 Action，Event
-  `3476627122` 由 `12` 增至 `16` 字节，changed-byte count 为 `9`、payload 增量为 `+87`。与当前 artifact owner 的其余设计
-  合并后，DIDX 共 43 项，HIRC 对象数由 `123` 增至 `146`、payload 由 `7250` 增至 `8243`、累计
-  changed-byte count 为 `17`、payload 增量为 `+993`。
-- 新 Media `1284288484`、Sound `1474128429` 和 Action `3418611510` 分别由
-  `raising_heart_wp_gun_cmn_reload_media`、`raising_heart_wp_gun_cmn_reload_sound` 和
-  `raising_heart_wp_gun_cmn_reload_action` 的 `wwise_fnv1()` 值固定，已通过原 Bank 全部 Media/HIRC ID 及同 owner 其余设计已占用
-  ID 的碰撞检查。除追加 DIDX/DATA、带本地随机 Pitch 的新 Sound、新 Action 和目标 Event Action 列表扩展外，其它 Bank
-  内容与既有对象顺序保持 byte-exact。
+- Original DIDX #1–#33 remain byte-exact; after DIDX #34 of `stationary_draw` and DIDX #35 of `overhead_smash`, the additional voice is
+  DIDX #36 / Media ID `1284288484`. This design does not modify the media added by the first two designs.
+- The Action list of Event `3476627122` changes from `126049847` to `126049847, 3418611510`, with the original Action always remaining as the first item; the new Action is a Play with no
+  delay, targeting the new Sound `1474128429`, and serialized before the target Event.
+- The donor `176748589` and Container `411055943` in the table serve only as guards for the original path; the new Sound uses the 46-byte standard voice body as a template, sourced from
+  `original/nbnk/wp_cmn_epvsp.nbnk`'s Sound `890667980` / Media `838569492` (original body SHA-256
+  `b2b6d8e026d1e0aad1e4f308bbd7fdf01e516b1e02c9db6f834199b23cd9412e`), replacing only the Sound ID and Media ID, fixing
+  `DirectParentID=209038110`, and the `PositioningParams.uByVector=0xC1` of body `+0x20`. Using
+  `HircPitchSettings(None, None)` as a guard, only a random Pitch range of `(-50.0, 50.0)` is inserted into the new Sound, with the base Pitch
+  remaining default; the final body is 55 bytes, and SHA-256 is
+  `49b0c3c0cd9a4532abf62b92e701f30cb3f6418d5385c98b1e50ca45d2665c21`. The Container remains byte-exact, continuing to contain only the donor
+  Sound, weight `50000`, and the original random playback list with avoid-repeat `1`; the new Sound is not added to this Container, and the original mechanical sounds do not inherit the new Pitch.
+- External parent locked by `original/nbnk/pl_act_vo_event.nbnk`: Bank ID `3755575407`, Actor-Mixer
+  `209038110` body SHA-256 `3f95ef076e1c9119c81973022288e86d273d5dd4de8501fc0aad26c218584a80`; this reference Bank is not included in the Mod.
+- Project WAVs are fixed at 48 kHz, stereo, 24-bit PCM, and maintain the -24 LUFS-I recorded in the audio table; no gain, normalization, or loudness correction during build, only downmixing without gain to
+  48 kHz, 16-bit mono Wwise PCM WEM.
+- This design individually increases the HIRC object count from `123` to `125`, and the payload from `7250` to `7337`; adds 1 Sound and 1 Action, Event
+  `3476627122` increased from `12` to `16` bytes, changed-byte count is `9`, payload increment is `+87`. When merged with the rest of the design from the current artifact owner,
+  DIDX contains a total of 43 items, HIRC object count increased from `123` to `146`, payload from `7250` to `8243`, cumulative
+  changed-byte count is `17`, payload increment is `+993`.
+- New Media `1284288484`, Sound `1474128429`, and Action `3418611510` are fixed by
+  `raising_heart_wp_gun_cmn_reload_media`, `raising_heart_wp_gun_cmn_reload_sound`, and
+  `raising_heart_wp_gun_cmn_reload_action`'s `wwise_fnv1()` values respectively; collision checks for all original Bank Media/HIRC IDs and IDs occupied by other designs from the same owner have passed.
+  Except for the addition of DIDX/DATA, new Sounds with local random Pitch, new Actions, and the expansion of the target Event Action list, other Bank
+  contents maintain byte-exact order with existing objects.

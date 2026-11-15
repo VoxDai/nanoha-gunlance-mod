@@ -1,6 +1,6 @@
 # pl_prop_cmn.nbnk
 
-主要包含玩家使用道具、采集、移动及环境交互等通用动作音效。
+Mainly includes common action sound effects for player item usage, gathering, movement, and environmental interaction.
 
 | Wem# New(Old)                                                | Status     | Description                                                  | Notes                                                        |
 | ------------------------------------------------------------ | ---------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
@@ -17,7 +17,7 @@
 | [**11**](../../original/audio_files/pl_prop_cmn/wav/011.wav) | Pending    | Player heavy landing [1/2]                                   |                                                              |
 | [**12**](../../original/audio_files/pl_prop_cmn/wav/012.wav) |            |                                                              |                                                              |
 | [**13**](../../original/audio_files/pl_prop_cmn/wav/013.wav) | Pending    | Equipment bump [1/3]                                         | Place bombs, climb vines, dash forward, dash forward, Demon Mode |
-| [**14**](../../original/audio_files/pl_prop_cmn/wav/014.wav) | Verified   | 投射器发射 [1/2]                                             |                                                              |
+| [**14**](../../original/audio_files/pl_prop_cmn/wav/014.wav) | Verified | Projector firing [1/2] | |
 | [**15**](../../original/audio_files/pl_prop_cmn/wav/015.wav) | Pending    | Monster track examine bottle cap pop close [1/2]             |                                                              |
 | [**16**](../../original/audio_files/pl_prop_cmn/wav/016.wav) | Pending    | Swing pickaxe (also putting away) [1/2]                      |                                                              |
 | [**17**](../../original/audio_files/pl_prop_cmn/wav/017.wav) | Pending    | Gathering grab [1/3]                                         | Plants, stones/torches, shiny monster drops                  |
@@ -29,7 +29,7 @@
 | [**23**](../../original/audio_files/pl_prop_cmn/wav/023.wav) | Pending    | Landing from wingdrake at camp unlatch [2nd]                 |                                                              |
 | [**24**](../../original/audio_files/pl_prop_cmn/wav/024.wav) | Pending    | Astera lift moves player to next destination                 |                                                              |
 | [**25**](../../original/audio_files/pl_prop_cmn/wav/025.wav) | Pending    | Close book/map                                               |                                                              |
-| [**26**](../../original/audio_files/pl_prop_cmn/wav/026.wav) | Verified   | 静止或缓慢悬挂时钩爪绳索的拉伸声 [1/3]                       |                                                              |
+| [**26**](../../original/audio_files/pl_prop_cmn/wav/026.wav) | Verified | Rope stretching sound when stationary or hanging slowly [1/3] | |
 | [**27**](../../original/audio_files/pl_prop_cmn/wav/027.wav) | Pending    | Mount successfully finished [2/2]                            |                                                              |
 | [**28**](../../original/audio_files/pl_prop_cmn/wav/028.wav) |            | Possible alt for unknown 109                                 | Sounds like a stomach growl from hunger/stamina              |
 | [**29**](../../original/audio_files/pl_prop_cmn/wav/029.wav) | Pending    | Monster track examine bottle cap pop open [1/2]              |                                                              |
@@ -62,7 +62,7 @@
 | [**56**](../../original/audio_files/pl_prop_cmn/wav/056.wav) | Pending    | Throw arm onto wrestling barrel                              |                                                              |
 | [**57**](../../original/audio_files/pl_prop_cmn/wav/057.wav) | Pending    | Mount cannon/ballista                                        |                                                              |
 | [**58**](../../original/audio_files/pl_prop_cmn/wav/058.wav) |            | Possible alt for unknown 149                                 |                                                              |
-| [**59**](../../original/audio_files/pl_prop_cmn/wav/059.wav) | Verified   | 抓住藤蔓绳索或翼龙，以及攀爬时使用钩爪跳跃的绳索拉伸声 [1/3] | Grappling hook, Wingdrake                                    |
+| [**59**](../../original/audio_files/pl_prop_cmn/wav/059.wav) | Verified | Rope stretching sound when grabbing vine ropes or Wingdrake, or using the Clutch Claw to jump while climbing [1/3] | Grappling hook, Wingdrake |
 | [**60**](../../original/audio_files/pl_prop_cmn/wav/060.wav) | Pending    | Going up ropelift rope stretch [2/2]                         |                                                              |
 | [**61**](../../original/audio_files/pl_prop_cmn/wav/061.wav) | Pending    | Rare mining stone hit [1/2]                                  |                                                              |
 | [**62**](../../original/audio_files/pl_prop_cmn/wav/062.wav) | Pending    | Player crawl ground rubbing [1/3]                            |                                                              |
@@ -82,13 +82,13 @@
 | [**76**](../../original/audio_files/pl_prop_cmn/wav/076.wav) | Pending    | Stuck on giant rock [2/4]                                    | Played when performing any action while mounted              |
 | [**77**](../../original/audio_files/pl_prop_cmn/wav/077.wav) | Pending    | Player light shining on ground [1/2]                         |                                                              |
 | [**78**](../../original/audio_files/pl_prop_cmn/wav/078.wav) | Pending    | Lifepowder throwing [2nd]                                    |                                                              |
-| [**79**](../../original/audio_files/pl_prop_cmn/wav/079.wav) | Verified   | 发射钩爪飞向目标（楔虫、翼龙或怪物）时绳索拉伸声             |                                                              |
+| [**79**](../../original/audio_files/pl_prop_cmn/wav/079.wav) | Verified | Rope stretching sound when firing the grappling hook towards a target (Wedge Beetle, Wingdrake, or monster) | |
 | [**80**](../../original/audio_files/pl_prop_cmn/wav/080.wav) | Pending    | Drink finished slurp [1/3]                                   |                                                              |
 | [**81**](../../original/audio_files/pl_prop_cmn/wav/081.wav) | Pending    | Monster track grab examine [1/3]                             |                                                              |
 | [**82**](../../original/audio_files/pl_prop_cmn/wav/082.wav) | Pending    | Eating (steak, canteen) [2/8]                                |                                                              |
 | [**83**](../../original/audio_files/pl_prop_cmn/wav/083.wav) |            |                                                              |                                                              |
 | [**84**](../../original/audio_files/pl_prop_cmn/wav/084.wav) | Pending    | Raise drink/cheer, place teapot                              | Canteen gesture                                              |
-| [**85**](../../original/audio_files/pl_prop_cmn/wav/085.wav) | Verified   | 抓住藤蔓绳索或翼龙，以及攀爬时使用钩爪跳跃的绳索拉伸声 [2/3] | Grappling hook, Wingdrake                                    |
+| [**85**](../../original/audio_files/pl_prop_cmn/wav/085.wav) | Verified | Rope stretching sound when grabbing vine ropes or Wingdrake, or using the Clutch Claw to jump while climbing [2/3] | Grappling hook, Wingdrake |
 | [**86**](../../original/audio_files/pl_prop_cmn/wav/086.wav) | Pending    | Equipment bump [2/3]                                         | Place bombs, climb vines, dash forward, dash forward, Demon Mode |
 | [**87**](../../original/audio_files/pl_prop_cmn/wav/087.wav) | Pending    | Equipment jumping thump [2/3]                                | Lance jumping charge                                         |
 | [**88**](../../original/audio_files/pl_prop_cmn/wav/088.wav) | Pending    | Equipment thump [1/2]                                        | Bow evasive step                                             |
@@ -97,13 +97,13 @@
 | [**91**](../../original/audio_files/pl_prop_cmn/wav/091.wav) | Pending    | Weapon sharpen [3/3]                                         |                                                              |
 | [**92**](../../original/audio_files/pl_prop_cmn/wav/092.wav) | Pending    | Player hits clothing [1/2]                                   | Quest complete, canteen fist hits hand                       |
 | [**93**](../../original/audio_files/pl_prop_cmn/wav/093.wav) | Pending    | Mounted on monster thud [3/4]                                | Played when performing any action while mounted              |
-| [**94**](../../original/audio_files/pl_prop_cmn/wav/094.wav) | Verified   | 玩家拉动绳索时的拉伸声 [1/2]                                 | 钩爪、翼龙                                                   |
+| [**94**](../../original/audio_files/pl_prop_cmn/wav/094.wav) | Verified | Rope stretching sound when the player pulls the rope [1/2] | Grappling hook, Wingdrake |
 | [**95**](../../original/audio_files/pl_prop_cmn/wav/095.wav) | Pending    | Player hits clothing [2/2]                                   | Quest complete, canteen fist hits hand                       |
 | [**96**](../../original/audio_files/pl_prop_cmn/wav/096.wav) | Pending    | Small & large monster carve end                              |                                                              |
 | [**97**](../../original/audio_files/pl_prop_cmn/wav/097.wav) | Pending    | Player clapping [1/3]                                        |                                                              |
 | [**98**](../../original/audio_files/pl_prop_cmn/wav/098.wav) | Pending    | Enter camp tent flapping                                     |                                                              |
 | [**99**](../../original/audio_files/pl_prop_cmn/wav/099.wav) | Pending    | Cup placed (Canteen) [2/2]                                   |                                                              |
-| [**100**](../../original/audio_files/pl_prop_cmn/wav/100.wav) | Verified   | 投射器发射 [2/2]                                             |                                                              |
+| [**100**](../../original/audio_files/pl_prop_cmn/wav/100.wav) | Verified | Projector firing [2/2] | |
 | [**101**](../../original/audio_files/pl_prop_cmn/wav/101.wav) | Pending    | Slinger equip/reload pull back tension                       |                                                              |
 | [**102**](../../original/audio_files/pl_prop_cmn/wav/102.wav) | Pending    | Landing from wingdrake at camp unlatch [1st]                 |                                                              |
 | [**103**](../../original/audio_files/pl_prop_cmn/wav/103.wav) | Pending    | Natural swinging rustle [2/4]                                | Vines, trees, branches                                       |
@@ -111,7 +111,7 @@
 | [**105**](../../original/audio_files/pl_prop_cmn/wav/105.wav) | Pending    | Player heavy landing [2/2]                                   |                                                              |
 | [**106**](../../original/audio_files/pl_prop_cmn/wav/106.wav) | Pending    | Breaking food crunch [1/2]                                   | Canteen cutscene                                             |
 | [**-**](../../original/audio_files/pl_prop_cmn/wav/107.wav)  |            |                                                              |                                                              |
-| [**108**](../../original/audio_files/pl_prop_cmn/wav/108.wav) | Verified   | 静止或缓慢悬挂时钩爪绳索的拉伸声 [2/3]                       |                                                              |
+| [**108**](../../original/audio_files/pl_prop_cmn/wav/108.wav) | Verified | Rope stretching sound when stationary or hanging slowly [2/3] | |
 | [**109**](../../original/audio_files/pl_prop_cmn/wav/109.wav) |            | Possible alt for unknown 28                                  |                                                              |
 | [**110**](../../original/audio_files/pl_prop_cmn/wav/110.wav) | Pending    | Picking up weapon when leaving tent                          |                                                              |
 | [**111**](../../original/audio_files/pl_prop_cmn/wav/111.wav) | Pending    | Knife unsheath (air swing) [1/2]                             |                                                              |
@@ -125,18 +125,18 @@
 | [**119**](../../original/audio_files/pl_prop_cmn/wav/119.wav) | Pending    | Dismount from ballista                                       |                                                              |
 | [**120**](../../original/audio_files/pl_prop_cmn/wav/120.wav) |            |                                                              |                                                              |
 | [**121**](../../original/audio_files/pl_prop_cmn/wav/121.wav) | Pending    | Bowl sipping (canteen cutscene) [2/2]                        |                                                              |
-| [**122**](../../original/audio_files/pl_prop_cmn/wav/122.wav) | Verified   | 玩家被拉向楔虫时的呼啸声                                     |                                                              |
+| [**122**](../../original/audio_files/pl_prop_cmn/wav/122.wav) | Verified | Whoosh sound when the player is pulled towards the Wedge Beetle | |
 | [**123**](../../original/audio_files/pl_prop_cmn/wav/123.wav) | Pending    | Canteen gestures begun spawned cup placed                    |                                                              |
-| [**124**](../../original/audio_files/pl_prop_cmn/wav/124.wav) | Verified   | 抓住藤蔓绳索或翼龙，以及攀爬时使用钩爪跳跃的绳索拉伸声 [3/3] | Grappling hook, Wingdrake                                    |
+| [**124**](../../original/audio_files/pl_prop_cmn/wav/124.wav) | Verified | Rope stretching sound when grabbing vine ropes or Wingdrake, or using the grappling hook to jump while climbing [3/3] | Grappling hook, Wingdrake |
 | [**125**](../../original/audio_files/pl_prop_cmn/wav/125.wav) | Pending    | Binoculars unequiped                                         |                                                              |
 | [**126**](../../original/audio_files/pl_prop_cmn/wav/126.wav) |            | Possible alt for unknown 168, 172, 203                       |                                                              |
 | [**127**](../../original/audio_files/pl_prop_cmn/wav/127.wav) |            |                                                              |                                                              |
 | [**128**](../../original/audio_files/pl_prop_cmn/wav/128.wav) | Pending    | Fishing rod unequiped                                        |                                                              |
 | [**129**](../../original/audio_files/pl_prop_cmn/wav/129.wav) | Pending    | Capture net shot                                             |                                                              |
-| [**130**](../../original/audio_files/pl_prop_cmn/wav/130.wav) | Verified   | 静止或缓慢悬挂时钩爪绳索的拉伸声 [3/3]                       |                                                              |
+| [**130**](../../original/audio_files/pl_prop_cmn/wav/130.wav) | Verified | Rope stretching sound when stationary or hanging slowly [3/3] | |
 | [**131**](../../original/audio_files/pl_prop_cmn/wav/131.wav) | Pending    | Fishing rod equiped                                          |                                                              |
 | [**132**](../../original/audio_files/pl_prop_cmn/wav/132.wav) | Pending    | Drink heavy splash [1/2]                                     | Canteen gesture                                              |
-| [**133**](../../original/audio_files/pl_prop_cmn/wav/133.wav) | Verified   | 钩爪抓住楔虫                                                 |                                                              |
+| [**133**](../../original/audio_files/pl_prop_cmn/wav/133.wav) | Verified | Clutch Claw grabbing the Wedge Beetle | |
 | [**134**](../../original/audio_files/pl_prop_cmn/wav/134.wav) | Pending    | Equipment jumping thump [2/2]                                | Heavy roll start, jump from ledge, Wingdrake takeoff         |
 | [**135**](../../original/audio_files/pl_prop_cmn/wav/135.wav) | Pending    | Eating (steak, canteen) [3/8]                                |                                                              |
 | [**136**](../../original/audio_files/pl_prop_cmn/wav/136.wav) |            |                                                              |                                                              |
@@ -163,7 +163,7 @@
 | [**157**](../../original/audio_files/pl_prop_cmn/wav/157.wav) | Pending    | Equipment thump (Gathering grab) [2/2]                       |                                                              |
 | [**158**](../../original/audio_files/pl_prop_cmn/wav/158.wav) | Pending    | Flashpod equiped/reloaded into slinger [2/2]                 |                                                              |
 | [**159**](../../original/audio_files/pl_prop_cmn/wav/159.wav) | Pending    | Thorn/bomb/dragon pod reloaded in slinger [2/2]              |                                                              |
-| [**160**](../../original/audio_files/pl_prop_cmn/wav/160.wav) | Verified   | 玩家快速跃进的移动呼啸声（第一段）[1/2]                      | 被拉向楔虫，以及一些武器在斜坡滑铲的招式                     |
+| [**160**](../../original/audio_files/pl_prop_cmn/wav/160.wav) | Verified | Whoosh as the player lunges forward (first phase) [1/2] | Pulled toward a Wedge Beetle and some weapon attacks from a slope slide |
 | [**161**](../../original/audio_files/pl_prop_cmn/wav/161.wav) | Pending    | Drink finished slurp [2/3]                                   |                                                              |
 | [**162**](../../original/audio_files/pl_prop_cmn/wav/162.wav) | Pending    | Eating (steak, canteen) [4/8]                                |                                                              |
 | [**163**](../../original/audio_files/pl_prop_cmn/wav/163.wav) |            |                                                              |                                                              |
@@ -176,7 +176,7 @@
 | [**170**](../../original/audio_files/pl_prop_cmn/wav/170.wav) | Pending    | Eating (steak, canteen) [5/8]                                |                                                              |
 | [**171**](../../original/audio_files/pl_prop_cmn/wav/171.wav) | Pending    | Capture net equiped                                          |                                                              |
 | [**172**](../../original/audio_files/pl_prop_cmn/wav/172.wav) |            | Possible alt for unknown 126, 168, 203                       |                                                              |
-| [**173**](../../original/audio_files/pl_prop_cmn/wav/173.wav) | Verified   | 在空中发射翔飞爪并勾住楔虫                                   |                                                              |
+| [**173**](../../original/audio_files/pl_prop_cmn/wav/173.wav) | Verified | Firing the Clutch Claw in mid-air and hooking the Wedge Beetle | |
 | [**174**](../../original/audio_files/pl_prop_cmn/wav/174.wav) | Pending    | Knife unsheath (air swing) [2/2]                             |                                                              |
 | [**175**](../../original/audio_files/pl_prop_cmn/wav/175.wav) | Pending    | Handler opens book                                           |                                                              |
 | [**176**](../../original/audio_files/pl_prop_cmn/wav/176.wav) | Pending    | Swing pickaxe [2/2]                                          | Also when putting it away                                    |
@@ -187,7 +187,7 @@
 | [**181**](../../original/audio_files/pl_prop_cmn/wav/181.wav) | Pending    | Gathering dig [3/4]                                          | Bone piles, fruits, cacti                                    |
 | [**182**](../../original/audio_files/pl_prop_cmn/wav/182.wav) | Pending    | Light thump [2/2]                                            | Astera player lift, canteen gestures, tent setup, gathering grab |
 | [**183**](../../original/audio_files/pl_prop_cmn/wav/183.wav) | Pending    | Caught fish flopping [2/2]                                   |                                                              |
-| [**184**](../../original/audio_files/pl_prop_cmn/wav/184.wav) | Verified   | 玩家被拉向楔虫时的呼啸声（第二段）                           | 音高随距离变化                                               |
+| [**184**](../../original/audio_files/pl_prop_cmn/wav/184.wav) | Verified | Whoosh as the player is pulled toward a Wedge Beetle (second phase) | Pitch varies with distance |
 | [**185**](../../original/audio_files/pl_prop_cmn/wav/185.wav) | Pending    | Soft table thud [1st]                                        | Canteen gesture                                              |
 | [**186**](../../original/audio_files/pl_prop_cmn/wav/186.wav) |            |                                                              |                                                              |
 | [**187**](../../original/audio_files/pl_prop_cmn/wav/187.wav) | Pending    | Slinger shoot failed (no ammunition)                         |                                                              |
@@ -200,7 +200,7 @@
 | [**194**](../../original/audio_files/pl_prop_cmn/wav/194.wav) | Pending    | Kick toad/helmcrab & throw hand bomb whoosh [1/2]            |                                                              |
 | [**195**](../../original/audio_files/pl_prop_cmn/wav/195.wav) | Pending    | Player ground landing light [2/2]                            |                                                              |
 | [**196**](../../original/audio_files/pl_prop_cmn/wav/196.wav) | Pending    | Equipment rustle [2/2]                                       | Put away map/track; knife rattling sound                     |
-| [**197**](../../original/audio_files/pl_prop_cmn/wav/197.wav) | Verified   | 快速或大幅摆荡钩爪时的绳索拉伸声 [1/2]                       |                                                              |
+| [**197**](../../original/audio_files/pl_prop_cmn/wav/197.wav) | Verified | Rope stretching sound when rapidly or broadly swinging the grappling hook [1/2] | |
 | [**198**](../../original/audio_files/pl_prop_cmn/wav/198.wav) | Pending    | Binoculars zoom in/out                                       |                                                              |
 | [**199**](../../original/audio_files/pl_prop_cmn/wav/199.wav) | Pending    | BBQ spit setup legs extend                                   |                                                              |
 | [**200**](../../original/audio_files/pl_prop_cmn/wav/200.wav) | Pending    | Knife sheath [1st (carve) or 2 (track examine/plant cut)]    |                                                              |
@@ -211,7 +211,7 @@
 | [**205**](../../original/audio_files/pl_prop_cmn/wav/205.wav) | Pending    | Eating (steak, canteen) [7/8]                                |                                                              |
 | [**206**](../../original/audio_files/pl_prop_cmn/wav/206.wav) | Pending    | Equipment thud [2/2]                                         | Bow evasive step                                             |
 | [**207**](../../original/audio_files/pl_prop_cmn/wav/207.wav) | Pending    | Gathering grab [3/3]                                         | Plants, stones/torches, shiny monster drops                  |
-| [**208**](../../original/audio_files/pl_prop_cmn/wav/208.wav) | Verified   | 玩家拉动绳索时的拉伸声 [2/2]                                 | 钩爪、翼龙                                                   |
+| [**208**](../../original/audio_files/pl_prop_cmn/wav/208.wav) | Verified | Rope stretching sound when the player pulls the rope [2/2] | Grappling hook, Wingdrake |
 | [**209**](../../original/audio_files/pl_prop_cmn/wav/209.wav) | Pending    | Soft table thud [2nd]                                        | Canteen gesture                                              |
 | [**210**](../../original/audio_files/pl_prop_cmn/wav/210.wav) | Pending    | Stuck on giant rock [4/4]                                    | Played when performing any action while mounted              |
 | [**211**](../../original/audio_files/pl_prop_cmn/wav/211.wav) | Pending    | Brightmoss reloaded into slinger [2/2]                       |                                                              |
@@ -220,7 +220,7 @@
 | [**214**](../../original/audio_files/pl_prop_cmn/wav/214.wav) | Pending    | Recoil/hard stop                                             | Guard recoil, wind gust, stopping a lance charge, various Switch Axe transitions |
 | [**215**](../../original/audio_files/pl_prop_cmn/wav/215.wav) | Pending    | egg-get [4/4]                                                |                                                              |
 | [**216**](../../original/audio_files/pl_prop_cmn/wav/216.wav) | Pending    | BBQ spit steak cooking sizzle [2/3]                          |                                                              |
-| [**217**](../../original/audio_files/pl_prop_cmn/wav/217.wav) | Verified   | 玩家快速跃进的移动呼啸声（第一段）[2/2]                      | 被拉向楔虫，以及一些武器在斜坡滑铲的招式                     |
+| [**217**](../../original/audio_files/pl_prop_cmn/wav/217.wav) | Verified | Whoosh as the player lunges forward (first phase) [2/2] | Pulled toward a Wedge Beetle and some weapon attacks from a slope slide |
 | [**218**](../../original/audio_files/pl_prop_cmn/wav/218.wav) | Pending    | Eating (steak, canteen) [8/8]                                |                                                              |
 | [**219**](../../original/audio_files/pl_prop_cmn/wav/219.wav) | No         | Glider mantle open                                           |                                                              |
 | [**220**](../../original/audio_files/pl_prop_cmn/wav/220.wav) | Pending    | Small carve background                                       |                                                              |
@@ -235,13 +235,13 @@
 | [**229**](../../original/audio_files/pl_prop_cmn/wav/229.wav) | Pending    | Monster track examine bottle cap pop open [2/2]              |                                                              |
 | [**230**](../../original/audio_files/pl_prop_cmn/wav/230.wav) | Pending    | Equipment rustle [2/2]                                       | Unequip map, equip/unequip capture net and fishing rod       |
 | [**231**](../../original/audio_files/pl_prop_cmn/wav/231.wav) | Pending    | Begin bursting movement [2/2]                                |                                                              |
-| [**232**](../../original/audio_files/pl_prop_cmn/wav/232.wav) | Verified   | 快速或大幅摆荡钩爪时的绳索拉伸声 [2/2]                       |                                                              |
+| [**232**](../../original/audio_files/pl_prop_cmn/wav/232.wav) | Verified | Rope stretching sound when rapidly or broadly swinging the grappling hook [2/2] | |
 | [**233**](../../original/audio_files/pl_prop_cmn/wav/233.wav) | Pending    | Cannon pre-shoot                                             |                                                              |
 | [**234**](../../original/audio_files/pl_prop_cmn/wav/234.wav) | Pending    | Rare mining stone hit [2/2]                                  |                                                              |
 | [**235**](../../original/audio_files/pl_prop_cmn/wav/235.wav) | Pending    | Windgush when lifted by wingdrake                            |                                                              |
 | [**236**](../../original/audio_files/pl_prop_cmn/wav/236.wav) | Pending    | BBQ spit steak cooking sizzle [3/3]                          |                                                              |
 | [**237**](../../original/audio_files/pl_prop_cmn/wav/237.wav) | Pending    | Player clapping [3/3]                                        |                                                              |
 | [**238**](../../original/audio_files/pl_prop_cmn/wav/238.wav) | Pending    | Aim/ready slinger [2/2]                                      |                                                              |
-| [**239**](../../original/audio_files/pl_prop_cmn/wav/239.wav) | Verified   | 飞向楔虫时的气流声                                           |                                                              |
+| [**239**](../../original/audio_files/pl_prop_cmn/wav/239.wav) | Verified | The sound of airflow when flying towards a Clutch Claw | |
 | [**240**](../../original/audio_files/pl_prop_cmn/wav/240.wav) | Pending    | Palico call whistle                                          |                                                              |
 | [**241**](../../original/audio_files/pl_prop_cmn/wav/241.wav) | Pending    | Kick toad/helmcrab & throw hand bomb whoosh [2/2]            |                                                              |

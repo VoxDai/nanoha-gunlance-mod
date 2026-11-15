@@ -1,6 +1,6 @@
 # hm_cm00_epvsp.nbnk
 
-主要包含玩家受击、防御、治疗及异常状态等角色反馈音效。
+Player feedback sounds for taking hits, guarding, healing, and status effects.
 
 | Wem# New(Old)                                                        | Status   | Description                                               | Notes            |
 |----------------------------------------------------------------------|----------|-----------------------------------------------------------|------------------|
@@ -91,7 +91,7 @@
 | [**85**](../../original/audio_files/hm_cm00_epvsp/wav/085.wav)       |          | Maybe crystal burst?                                      |                  |
 | [**86**](../../original/audio_files/hm_cm00_epvsp/wav/086.wav)       |          |                                                           |                  |
 | [**87**](../../original/audio_files/hm_cm00_epvsp/wav/087.wav)       |          |                                                           |                  |
-| [**88**(73)](../../original/audio_files/hm_cm00_epvsp/wav/088.wav)   | Verified | 铳枪盾牌防御，格挡成功时触发                              |                  |
+| [**88**(73)](../../original/audio_files/hm_cm00_epvsp/wav/088.wav) | Verified | Gunlance shield guard on a successful block | |
 | [**89**](../../original/audio_files/hm_cm00_epvsp/wav/089.wav)       |          |                                                           |                  |
 | [**90**](../../original/audio_files/hm_cm00_epvsp/wav/090.wav)       |          |                                                           |                  |
 | [**91**(76)](../../original/audio_files/hm_cm00_epvsp/wav/091.wav)   | Pending  | Player hit [1/4]                                          |                  |

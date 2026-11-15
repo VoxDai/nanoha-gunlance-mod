@@ -18,24 +18,24 @@ Create a new design as
 status field, research diary, approval workflow, evidence section, or generic
 builder instructions.
 
-### 描述
+### Description
 
 State in one compact paragraph which original sounds are preserved or replaced
 and which sounds are added. Follow it with exactly:
 
 ```markdown
-| 名称 | 动作或状态 | 预期行为 |
+| Name | Action or State | Expected Behavior |
 ```
 
 Include every positive trigger and important negative or paired-path behavior.
 Describe what the player must hear, not the implementation mechanics.
 
-### 音频
+### Audio
 
 List only final repository audio with links relative to the design file:
 
 ```markdown
-| 名称 | 音频 | 响度（LUFS-I） | 播放方式 |
+| Name | Audio | Loudness (LUFS-I) | Playback |
 ```
 
 Identify each final WAV by its repository-relative link only. Do not record a
@@ -59,7 +59,7 @@ recommended targets. After the user explicitly confirms the files and target, st
 replacing the final WAV. Do not use dynamic compression, limiting, or `loudnorm` as a write filter, and do not encode
 the correction in a design or builder.
 
-### 实现契约
+### Implementation Contract
 
 For every target, record its project-relative source under `original/`,
 supported version, and the exact editor guards. Identify each `original/` file
@@ -67,7 +67,7 @@ by path only; do not record its whole-file hash in the design. For NBNK, record
 the parsed Bank ID and use this core table:
 
 ```markdown
-| 名称 | Event ID | 原 Action ID | Container ID | donor Sound / Media ID | DIDX / 原 Media ID | 新 Action ID | 新 Sound ID |
+| Name | Event ID | Original Action ID | Container ID | donor Sound / Media ID | DIDX / Original Media ID | New Action ID | New Sound ID |
 ```
 
 Each row fixes one route. After the table, specify:
@@ -87,10 +87,10 @@ native Stop route exists and the user has not explicitly requested that the
 custom sound finish uninterrupted, clone each matching native Stop Action for
 each custom playback root. Retarget only the clone; preserve its scope,
 properties, transition, fade curve, exceptions, and unknown bytes. Add this
-table inside `实现契约` only when at least one matching Stop route exists:
+table inside `Implementation Contract` only when at least one matching Stop route exists:
 
 ```markdown
-| 名称 | Stop Event ID | donor Stop Action ID / target | scope | transition / fade | exceptions | 新 Stop Action ID | 新 Stop target |
+| Name | Stop Event ID | donor Stop Action ID / target | scope | transition / fade | exceptions | New Stop Action ID | New Stop Target |
 ```
 
 Record the donor Action's complete body SHA-256, the Stop Event's original and
@@ -104,12 +104,12 @@ values. Derive stable candidates with
 and HIRC IDs, and record the numbers. An unresolved ID or guard blocks a final
 contract unless the user explicitly asks for a non-final draft.
 
-For animation-driven routes, add these tables inside `实现契约`:
+For animation-driven routes, add these tables inside `Implementation Contract`:
 
 ```markdown
-| 名称 | LMT | Motion | EventGroup | Slot | 赋值帧 | 原 ReqNo | 新 ReqNo | 预期触发帧 |
+| Name | LMT | Motion | EventGroup | Slot | Assignment Frame | Original ReqNo | New ReqNo | Expected Trigger Frame |
 
-| 名称 | WWEV | donor ReqNo | donor Event ID | mode | record SHA-256 | 新 ReqNo | 新 Event ID |
+| Name | WWEV | donor ReqNo | donor Event ID | mode | record SHA-256 | New ReqNo | New Event ID |
 ```
 
 Record every guard required by `LmtEditor.replace_request()` and

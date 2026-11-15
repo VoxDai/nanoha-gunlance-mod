@@ -1,39 +1,39 @@
 # wp_gun_cmn.nbnk
 
-主要包含铳枪装填、拔刀、收刀、折叠及弹壳弹出等机械音效。
+Mainly includes mechanical sound effects for gunlance reloading, drawing, sheathing, folding, and shell ejection.
 
 | Wem# New(Old)                                                  | Status     | Description                                                          | Notes        |
 |----------------------------------------------------------------|------------|----------------------------------------------------------------------|--------------|
-| [**1**(1)](../../original/audio_files/wp_gun_cmn/wav/01.wav)   | Verified   | 完整装填、起爆龙航装填的金属音（快速装填不触发）                     |              |
+| [**1**(1)](../../original/audio_files/wp_gun_cmn/wav/01.wav) | Verified | Metallic sounds for Full Reload and loading Wyrmstake Blast (does not trigger on Quick Reload) | |
 | [**2**(2)](../../original/audio_files/wp_gun_cmn/wav/02.wav)   | Unresolved |                                                                      |              |
-| [**3**(3)](../../original/audio_files/wp_gun_cmn/wav/03.wav)   | Verified   | 龙击炮开始蓄力                                                       |              |
-| [**4**(4)](../../original/audio_files/wp_gun_cmn/wav/04.wav)   | Verified   | 铳枪通用金属音，在拔刀、收刀、装填、下砸时随机触发 [1/2]             |              |
-| [**5**(5)](../../original/audio_files/wp_gun_cmn/wav/05.wav)   | Verified   | 铳枪通用金属音，在拔刀、收刀、装填、下砸时随机触发 [2/2]             |              |
-| [**6**(6)](../../original/audio_files/wp_gun_cmn/wav/06.wav)   | Verified   | 拔刀、横扫的金属音                                                   |              |
-| [**7**(7)](../../original/audio_files/wp_gun_cmn/wav/07.wav)   | Verified   | 完整装填、起爆龙航装填的金属音（快速装填不触发）                     |              |
-| [**8**(8)](../../original/audio_files/wp_gun_cmn/wav/08.wav)   | Verified   | 装填时弹壳弹出碰撞声（仅装填1发弹药时不会触发） [1/2]                |              |
-| [**9**(9)](../../original/audio_files/wp_gun_cmn/wav/09.wav)   | Pending    | 过热                                                                 |              |
-| [**10**(10)](../../original/audio_files/wp_gun_cmn/wav/10.wav) | Verified   | 原地拔刀和收刀的折叠音                                               |              |
-| [**11**(11)](../../original/audio_files/wp_gun_cmn/wav/11.wav) | Verified   | 炮击、龙击炮尝试使用空弹匣时触发                                     |              |
-| [**12**(12)](../../original/audio_files/wp_gun_cmn/wav/12.wav) | Verified   | 弹刀                                                                 |              |
-| [**13**(13)](../../original/audio_files/wp_gun_cmn/wav/13.wav) | Verified   | 完整装填、起爆龙航装填、下砸的机械声（快速装填不触发）               |              |
+| [**3**(3)](../../original/audio_files/wp_gun_cmn/wav/03.wav) | Verified | Wyrmstake Cannon begins charging | |
+| [**4**(4)](../../original/audio_files/wp_gun_cmn/wav/04.wav) | Verified | General gunlance metallic sounds, randomly triggered during drawing, sheathing, reloading, and overhead smash [1/2] | |
+| [**5**(5)](../../original/audio_files/wp_gun_cmn/wav/05.wav) | Verified | General gunlance metallic sounds, randomly triggered during drawing, sheathing, reloading, and overhead smash [2/2] | |
+| [**6**(6)](../../original/audio_files/wp_gun_cmn/wav/06.wav) | Verified | Metallic sounds for drawing and Wide Sweep | |
+| [**7**(7)](../../original/audio_files/wp_gun_cmn/wav/07.wav) | Verified | Metallic sounds for Full Reload and loading Wyrmstake Blast (does not trigger on Quick Reload) | |
+| [**8**(8)](../../original/audio_files/wp_gun_cmn/wav/08.wav) | Verified | Shell ejection collision sound during reloading (only does not trigger when reloading 1 ammo) [1/2] | |
+| [**X9**(9)](../../original/audio_files/wp_gun_cmn/wav/09.wav) | Pending | Overheat | |
+| [**10**(10)](../../original/audio_files/wp_gun_cmn/wav/10.wav) | Verified | Folding sounds for drawing and sheathing in place | |
+| [**11**(11)](../../original/audio_files/wp_gun_cmn/wav/11.wav) | Verified | Triggered when attempting to use Shelling or Wyrmstake Cannon with an empty magazine | |
+| [**12**(12)](../../original/audio_files/wp_gun_cmn/wav/12.wav) | Verified | Shell-clash (drawing/sheathing with shell) | |
+| [**13**(13)](../../original/audio_files/wp_gun_cmn/wav/13.wav) | Verified | Mechanical sounds for Full Reload, loading Wyrmstake Blast, and overhead smash (does not trigger on Quick Reload) | |
 | [**14**(14)](../../original/audio_files/wp_gun_cmn/wav/14.wav) | Unresolved |                                                                      |              |
-| [**15**(15)](../../original/audio_files/wp_gun_cmn/wav/15.wav) | Verified   | 起爆龙航装填                                                         |              |
-| [**16**(16)](../../original/audio_files/wp_gun_cmn/wav/16.wav) | Verified   | 钩爪瞄准和起爆龙航装填时触发                                         |              |
-| [**17**(17)](../../original/audio_files/wp_gun_cmn/wav/17.wav) | Verified   | 大幅挥动铳枪的气流声，上捞、下砸、横扫时触发                         |              |
+| [**15**(15)](../../original/audio_files/wp_gun_cmn/wav/15.wav) | Verified | loading Wyrmstake Blast | |
+| [**16**(16)](../../original/audio_files/wp_gun_cmn/wav/16.wav) | Verified | Triggered during Clutch Claw aiming and loading Wyrmstake Blast | |
+| [**17**(17)](../../original/audio_files/wp_gun_cmn/wav/17.wav) | Verified | Airflow sounds from large gunlance swings, triggered during Rising Slash, Overhead Smash, and Wide Sweep | |
 | [**18**(18)](../../original/audio_files/wp_gun_cmn/wav/18.wav) | Unresolved |                                                                      |              |
-| [**19**(19)](../../original/audio_files/wp_gun_cmn/wav/19.wav) | Verified   | 装填、龙杭炮的机械声                                                 |              |
-| [**20**(20)](../../original/audio_files/wp_gun_cmn/wav/20.wav) | Verified   | 小幅挥动铳枪的气流声，所有攻击动作随机触发 [1/2]                     |              |
-| [**21**(21)](../../original/audio_files/wp_gun_cmn/wav/21.wav) | Verified   | 小幅挥动铳枪的气流声，所有攻击动作随机触发 [2/2]                     |              |
-| [**22**(22)](../../original/audio_files/wp_gun_cmn/wav/22.wav) | Verified   | 起爆龙航装填                                                         |              |
-| [**23**(23)](../../original/audio_files/wp_gun_cmn/wav/23.wav) | Verified   | 龙杭炮插入的金属音                                                   |              |
-| [**24**(24)](../../original/audio_files/wp_gun_cmn/wav/24.wav) | Verified   | 龙杭炮插入的金属音                                                   |              |
-| [**25**(25)](../../original/audio_files/wp_gun_cmn/wav/25.wav) | Verified   | 原地拔刀、装填、磨刀的折叠音                                         |              |
-| [**26**(26)](../../original/audio_files/wp_gun_cmn/wav/26.wav) | Verified   | 装填时弹壳弹出碰撞声（仅装填1发弹药时不会触发） [2/2]                |              |
-| [**27**(27)](../../original/audio_files/wp_gun_cmn/wav/27.wav) | Verified   | 拔刀、收刀、装填、龙杭炮的折叠音                                     |              |
-| [**28**(28)](../../original/audio_files/wp_gun_cmn/wav/28.wav) | Verified   | 铳枪通用金属音，所有动作随机触发，包括拔刀、移动、防御、攻击等 [1/2] |              |
-| [**29**(29)](../../original/audio_files/wp_gun_cmn/wav/29.wav) | Verified   | 铳枪通用金属音，所有动作随机触发，包括拔刀、移动、防御、攻击等 [2/2] |              |
-| [**30**(30)](../../original/audio_files/wp_gun_cmn/wav/30.wav) | Verified   | 拔刀、装填、龙杭炮的折叠音                                           |              |
-| [**31**](../../original/audio_files/wp_gun_cmn/wav/31.wav)     | Verified   | 起爆龙航装填                                                         | 冰原新增音效 |
-| [**32**(31)](../../original/audio_files/wp_gun_cmn/wav/32.wav) | Verified   | 无效果                                                               |              |
-| [**33**(32)](../../original/audio_files/wp_gun_cmn/wav/33.wav) | Verified   | 铳枪通用金属音，在收刀、上捞、下砸、横扫、龙杭炮、快速装填时触发     |              |
+| [**19**(19)](../../original/audio_files/wp_gun_cmn/wav/19.wav) | Verified | Mechanical sounds for reloading and Wyrmstake Cannon | |
+| [**20**(20)](../../original/audio_files/wp_gun_cmn/wav/20.wav) | Verified | Airflow sounds from small gunlance swings, randomly triggered during all attack motions [1/2] | |
+| [**21**(21)](../../original/audio_files/wp_gun_cmn/wav/21.wav) | Verified | Airflow sounds from small gunlance swings, randomly triggered during all attack motions [2/2] | |
+| [**22**(22)](../../original/audio_files/wp_gun_cmn/wav/22.wav) | Verified | loading Wyrmstake Blast | |
+| [**23**(23)](../../original/audio_files/wp_gun_cmn/wav/23.wav) | Verified | Metallic sound of Wyrmstake Cannon insertion | |
+| [**24**(24)](../../original/audio_files/wp_gun_cmn/wav/24.wav) | Verified | Metallic sound of Wyrmstake Cannon insertion | |
+| [**25**(25)](../../original/audio_files/wp_gun_cmn/wav/25.wav) | Verified | Folding sounds for sheathing, reloading, and sharpening in place | |
+| [**26**(26)](../../original/audio_files/wp_gun_cmn/wav/26.wav) | Verified | Sound of shell casing ejecting and colliding during reloading (only triggers when reloading 1 ammo) [2/2] | |
+| [**27**(27)](../../original/audio_files/wp_gun_cmn/wav/27.wav) | Verified | Folding sounds for drawing, sheathing, reloading, and Wyrmstake Cannon | |
+| [**28**(28)](../../original/audio_files/wp_gun_cmn/wav/28.wav) | Verified | Gunlance common metal sounds, randomly triggered by all actions, including drawing the weapon, moving, guarding, attacking, etc. [1/2] | |
+| [**29**(29)](../../original/audio_files/wp_gun_cmn/wav/29.wav) | Verified | General-purpose Gunlance metallic sounds, randomly triggered during all actions, including drawing, moving, defending, attacking, etc. [2/2] | |
+| [**30**(30)](../../original/audio_files/wp_gun_cmn/wav/30.wav) | Verified | Folding sounds for drawing, reloading, and Wyrmstake Cannon | |
+| [**31**](../../original/audio_files/wp_gun_cmn/wav/31.wav) | Verified | Wyrmstake Cannon ignition | New sound effects added in Iceborne |
+| [**32**(31)](../../original/audio_files/wp_gun_cmn/wav/32.wav) | Verified | No effect | |
+| [**33**(32)](../../original/audio_files/wp_gun_cmn/wav/33.wav) | Verified | General-purpose Gunlance metallic sounds, triggered during sheathing, Rising Slash, Overhead Smash, Wide Sweep, Wyrmstake Cannon, and Quick Reloading | |

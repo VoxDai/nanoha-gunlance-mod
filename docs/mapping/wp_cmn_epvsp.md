@@ -1,6 +1,6 @@
 # wp_cmn_epvsp.nbnk
 
-主要包含玩家在不同地面和水体上的落地、冲击与刮擦等通用动作音效。
+Common player sounds for landing, impacts, and scraping across different ground surfaces and bodies of water.
 
 | Wem# New(Old)                                                    | Status   | Description                 | Notes              |
 |------------------------------------------------------------------|----------|-----------------------------|--------------------|
@@ -55,7 +55,7 @@
 | [**49**](../../original/audio_files/wp_cmn_epvsp/wav/49.wav)     |          |                             | New Iceborne sound |
 | [**50**](../../original/audio_files/wp_cmn_epvsp/wav/50.wav)     |          |                             | New Iceborne sound |
 | [**51**(36)](../../original/audio_files/wp_cmn_epvsp/wav/51.wav) | Pending  | Mud great impact [2/2]      |                    |
-| [**52**(37)](../../original/audio_files/wp_cmn_epvsp/wav/52.wav) | Verified | 磨刀完成                    |                    |
+| [**52**(37)](../../original/audio_files/wp_cmn_epvsp/wav/52.wav) | Verified | Sharpening completion | |
 | [**53**](../../original/audio_files/wp_cmn_epvsp/wav/53.wav)     |          |                             | New Iceborne sound |
 | [**54**(38)](../../original/audio_files/wp_cmn_epvsp/wav/54.wav) | Pending  | Land immense scrape [2/2]   |                    |
 | [**55**(39)](../../original/audio_files/wp_cmn_epvsp/wav/55.wav) | Pending  | Land heavy scrape [2/2]     |                    |
