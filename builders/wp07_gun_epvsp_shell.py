@@ -1154,7 +1154,7 @@ PLAN = SoundBankBuildPlan(
             52,
             WYR_STAKE_STRIKE_MEDIA_ID,
             "audio/wp07_gun_epvsp_shell/wyrmstake_cannon/"
-            "raising_heart_strike_flame_01(movie_2nd_as.raising_heart.strike_flame.1).wav",
+            "raising_heart_unit_set_01(movie_detonation.raising_heart.unit_set.1).wav",
             wem_channels=1,
         ),
         MediaAddition(

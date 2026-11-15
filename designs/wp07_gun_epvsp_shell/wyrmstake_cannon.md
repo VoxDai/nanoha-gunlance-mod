@@ -14,8 +14,7 @@ target_artifacts:
 ## Description
 
 The ordinary Wyrmstake Cannon keeps its mechanical, extension or insertion, release, and explosion sounds on hit and miss. Nanoha’s “ACS” plays once at the pre-lift entry verified by the gameplay probe, and “Drive” plays once at the post-insertion discharge entry. Firing immediately after loading Wyrmstake Blast plays ACS at Motion 310 frame 3, then Drive in the shared follow-up Motion 182. The ACS in 310 triggers when loading finishes even if firing has yet to begin. The 12
-vanilla character voice triggers belonging to the Wyrmstake action are rerouted to silent events. When the ordinary stake hits and discharges, release sound 28 gains one Raising Heart voice line chosen with equal probability from “Strike
-Flame” and “ACS Standby.” ACS, Drive, and the hit release line each pick a fresh pitch offset from `-50` to `+50 cents`
+vanilla character voice triggers belonging to the Wyrmstake action are rerouted to silent events. When the ordinary stake hits and discharges, release sound 28 gains one Raising Heart voice line chosen with equal probability from “Unit Set” and “ACS Standby.” ACS, Drive, and the hit release line each pick a fresh pitch offset from `-50` to `+50 cents`
 on every playback. Other actions’ character voices and the original Wyrmstake weapon sounds stay intact. Character lines that were already playing before the Wyrmstake input may continue into the move and are outside this reroute.
 
 | Name                             | Action or State                                       | Expected Behavior                                                                                                |
@@ -23,7 +22,7 @@ on every playback. Other actions’ character voices and the original Wyrmstake 
 | Ordinary Wyrmstake from diagonal shelling, Wide Sweep, or Full Burst | Start of Motion 144, before the gunlance lifts | The original Event and ACS start together. Drive plays on entry into Motion 145. |
 | Ordinary Wyrmstake from vertical shelling | Start of Motion 178, before the gunlance lifts | The original Event and ACS start together. Drive plays on entry into Motion 179. |
 | Ordinary Wyrmstake from horizontal shelling | Start of Motion 181, before the gunlance lifts | The original Event and ACS start together. Drive plays on entry into Motion 182. |
-| Ordinary Wyrmstake hits and releases | Hit release sound 28, then hit explosion sound 40 | ACS and Drive each play once. Release adds either “Strike Flame” or “ACS Standby” with equal probability. Sound 40 retains the original explosion and muting rules. |
+| Ordinary Wyrmstake hits and releases | Hit release sound 28, then hit explosion sound 40 | ACS and Drive each play once. Release adds either “Unit Set” or “ACS Standby” with equal probability. Sound 40 retains the original explosion and muting rules. |
 | Ordinary Wyrmstake misses | Miss release sound 38, with no hit explosion sound 40 | ACS and Drive each play once. The original miss sound and muting rules apply, without the hit release lines. |
 | Fire immediately after loading Wyrmstake Blast | Motion 310 frame 3, followed by Motion 182 | ACS plays when loading finishes. Drive plays on release after insertion. Vanilla character lines in 310 and 182 are muted. |
 | Other Wyrmstake Blast follow-ups | Enter Motion 310 or one of the ordinary Wyrmstake starting Motions above | Each triggered ACS entry plays once. Drive plays on entry into the follow-up, and vanilla character lines are muted. |
@@ -36,14 +35,13 @@ on every playback. Other actions’ character voices and the original Wyrmstake 
 |-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------|-----------------------------------------------------------------------------------------------------|
 | Nanoha “ACS” | [nanoha_acs_01](<../../audio/wp07_gun_epvsp_shell/wyrmstake_cannon/nanoha_acs_01(gears_of_destiny.attack_voice.attack_02.1).wav>)                                 | -21 LUFS-I     | Shares existing Media and Event for ordinary Wyrmstake before lifting or for completion of loading in Motion 310. Plays once per trigger with `±50 cents` random pitch. |
 | Nanoha “Drive” | [nanoha_drive_01](<../../audio/wp07_gun_epvsp_shell/wyrmstake_cannon/nanoha_drive_01(gears_of_destiny.attack_voice.attack_02.2).wav>)                             | -21 LUFS-I     | Appends independent media at the post-insertion release entry. Plays once without delay with `±50 cents` random pitch. |
-| Raising Heart “Strike Flame” | [raising_heart_strike_flame_01](<../../audio/wp07_gun_epvsp_shell/wyrmstake_cannon/raising_heart_strike_flame_01(movie_2nd_as.raising_heart.strike_flame.1).wav>) | -24 LUFS-I     | One of the random choices for hit release Event 28. Equal weight, no delay, repeats allowed. Inherits the Container’s `±50 cents` pitch range. |
+| Raising Heart “Unit Set” | [raising_heart_unit_set_01](<../../audio/wp07_gun_epvsp_shell/wyrmstake_cannon/raising_heart_unit_set_01(movie_detonation.raising_heart.unit_set.1).wav>) | -24 LUFS-I     | One of the random choices for hit release Event 28. Equal weight, no delay, repeats allowed. Inherits the Container’s `±50 cents` pitch range. |
 | Raising Heart “ACS Standby” | [raising_heart_acs_standby_01](<../../audio/wp07_gun_epvsp_shell/wyrmstake_cannon/raising_heart_acs_standby_01(movie_2nd_as.raising_heart.acs_standby.1).wav>)    | -24 LUFS-I     | One of the random choices for hit release Event 28. Equal weight, no delay, repeats allowed. Inherits the Container’s `±50 cents` pitch range. |
 
 The final ACS and Drive WAVs are 48 kHz stereo 24-bit PCM, with 42000 and 43583 frames respectively (0.875 and 0.907979 seconds). After user-approved constant-gain adjustments, their measured loudness is
 -21.01 and -21.04 LUFS-I, with true peaks of -14.09 and -14.33 dBTP. The build downmixes without gain to 48 kHz 16-bit mono Wwise PCM WEM (channel
 config `000001410000`) and applies no loudness correction. ACS and Drive each have their own Event, Action, Sound, and Media. Each uses its assigned file and neither delays the other. The two
-Sounds have no local base Pitch and independently apply a local `(-50.0, 50.0)` cents random range. Strike Flame has 54000 frames (1.125 seconds). After a user-approved
-+1.40 dB constant gain adjustment, it measures -24.00 LUFS-I and -12.32 dBTP true peak. The final WAV is likewise 48 kHz stereo 24-bit PCM. The updated ACS Standby WAV has
+Sounds have no local base Pitch and independently apply a local `(-50.0, 50.0)` cents random range. Unit Set has 44752 frames (0.932333 seconds). A +2.84 dB constant gain adjustment from -26.84 LUFS-I measures -23.99 LUFS-I with a true peak of -9.93 dBTP. The final WAV is likewise 48 kHz stereo 24-bit PCM. The updated ACS Standby WAV has
 78000 frames (1.625 seconds). It uses the previously approved -24 LUFS-I target. A +2.58 dB constant gain adjustment from -26.58 LUFS-I yields -24.00 LUFS-I and a true
 peak of -10.13 dBTP. This WAV is also 48 kHz stereo 24-bit PCM. The two hit release WAVs use separate Media and Sounds. The build downmixes them without gain to 48 kHz 16-bit
 mono Wwise PCM
@@ -70,7 +68,7 @@ delay. Original weapon sound routing does not inherit custom random Pitch.
 | Random voice, hit-release original routing | 1581859410 | 705609317 | 75663767 | 151638268 / 629066097 | #28 / 629066097 | 1821689211 | 38895430 / 1727570929 |
 
 - Confirmed action timeline is hit-release DIDX #28/Media `629066097` (Sound `151638268` → Container `75663767` → Action `705609317` → Event `1581859410`), followed by hit-explosion DIDX #40/Media `932229979` (Sound `762689746` → Container `969725659` → Action `208572495` → Event `1465516383`); miss-hit standalone DIDX #38/Media `858252802` (Sound `835886265` → Container `1049048275` → Action `951626294` → Event `3115395173`). The Action lists of the three original Events contain only the described original Actions. The original full body SHA-256 of the hit-release Event/Action/Container/Sound are `5e098d73a0645fc0d81188cadafe728e3325fd9eda7c67230d85579676e9b26d`/`29045c6ed5c13a286828f7c6e351b3b75a6f8b781539a59861b0cde3aa700521`/`43f44064e18427629d77e5a482d03f415822739ce82b138d07a4372a74cfceb8`/`a1208fe2fdb8a16dd7ec60f1c904ff593922a5d6d06e892a19ea0bbe6192f8b5` respectively. The original full body SHA-256 of the hit-explosion Event/Action/Container/Sound are `2c7b630cdd0276e580e69fcbe8a751ff13f4faee6df765cf87887cdc75fd1962`/`62d140af4d2431b7da43e4ca08246271d73da2d2cc544b7d78bd8839c9452450`/`fa0dd955ba17db67bae2e17c57c5d3de804026a91803d54a3f85d54808bf133a`/`8470dd13a4e97610fe5de92d0c7b1a1c9ca6988ad2e49b6f5b57888593ccd821` respectively; the miss-hit Event/Action body SHA-256 is `fe73b26bcad55501da8c1dcbc4298069cf4e3748d81e12589b61b203089b1340`/`d4e189a50744ef1b00b429df4ee15fc90e93a466089d139c4f519d2313e29c19`. Explosion Event `1465516383` and miss-hit Event `3115395173`, and all original Action/Container/Sound/Media remain byte-exact.
-- Append Strike Flame DIDX #52/Media `949600199` and ACS Standby DIDX #53/Media `938668400` sequentially after the existing DIDX #51. Two
+- Append Unit Set DIDX #52/Media `949600199` and ACS Standby DIDX #53/Media `938668400` sequentially after the existing DIDX #51. Two
   46-byte standard voice Sounds are `38895430` and `1727570929` respectively, copied from standard donor Sound `890667980`/Media `838569492`, only replacing
   Sound/Media ID and DirectParentID `2393951905`; `PositioningParams.uByVector=0xC1`, with no local Pitch or Aux changes. Full body
   SHA-256 are `05b6321f093b39b5a0ebd59c8bf0208b117680a6541d60eabd1d64868f38ca3b` and
@@ -90,12 +88,10 @@ delay. Original weapon sound routing does not inherit custom random Pitch.
 - The original playback root `75663767` and parent chain `717111903→972300144→694534885` released on hit have no intersection with the original Bank's Stop targets `60034062`, `662442083`,
   `1054468797`, `956375262`, `599243561`, therefore the new Random does not add new Stops. It is not attached to the hit explosion Event `1465516383` or the miss
   Event `3115395173`; whether the same hit-release Event is called by other game paths must be re-tested in-game.
-- Strike Flame's Media/Sound/Action IDs follow `wwise_fnv1("nanoha_wp07_wyrmstake_strike_flame_" + suffix)`; ACS Standby
+- Unit Set retains the existing Media/Sound/Action IDs derived from `wwise_fnv1("nanoha_wp07_wyrmstake_strike_flame_" + suffix)`; ACS Standby
   Media/Sound and Random Container IDs are derived from `wwise_fnv1("nanoha_wp07_wyrmstake_hit_release_" + suffix)`'s
   `acs_standby_media`/`acs_standby_sound`/`random_container` respectively. New IDs have been checked against the original Bank HIRC/Media, original WWEV Event IDs, and existing design IDs under the same
-  owner to ensure no collisions. After merging all designs for the Shell Bank, the media `42→53` items, HIRC objects `181→215`, payload `11090→12555`,
-  changed-byte count `32`, and HIRC increments `+1465`; this adds one media, one Sound, and one Random relative to the original single Strike Flame scheme, and moves the pitch attribute from
-  Strike Flame Sound to Random. Other objects, audio, and non-DIDX/DATA/HIRC chunks of the original Bank remain byte-exact.
+  owner to ensure no collisions. After merging all designs for the Shell Bank, the media count is `42→59`, HIRC object count is `181→226`, and HIRC payload is `11090→13246` (`+2156`) with `42` changed bytes. Other objects, audio, and non-DIDX/DATA/HIRC chunks of the original Bank remain byte-exact.
 
 - The complete bodies SHA-256 of the two original Common Events are `92c0853b4112e8fe3e1a476d2225950c728ea8441e5014ee6d4083b6dbc89a80` and
   `0d24089543173b9f1f9a9200a11ab8e05169362751754b03483004a6d11e207c` respectively; the original Action body SHA-256 is

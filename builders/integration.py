@@ -157,7 +157,7 @@ def validate_wyrmstake_cannon(staged: Mapping[Path, Path]) -> None:
     validate_wyrmstake_original_voice_mute_hirc(common)
     validate_wyrmstake_wrappers(shirc)
     shell = soundbank_editor.SoundBankEditor.from_file(
-        _path(staged, SHELL_BANK_TARGET, "Wyrmstake Strike Flame"),
+        _path(staged, SHELL_BANK_TARGET, "Wyrmstake hit release"),
         external_stop_references=SHELL_EXTERNAL_STOPS,
     )
     validate_wyrmstake_hit_release_hirc(shell)
@@ -216,7 +216,7 @@ def validate_wyrmstake_cannon(staged: Mapping[Path, Path]) -> None:
         raise BuildError("Wyrmstake hit-release Event has ambiguous ownership")
     _validate_mono_wwise_pcm(
         shell, index=52, media_id=WYR_STAKE_STRIKE_MEDIA_ID,
-        sample_count=54_000, label="Wyrmstake Strike Flame DIDX #52",
+        sample_count=44_752, label="Wyrmstake Unit Set DIDX #52",
     )
     _validate_mono_wwise_pcm(
         shell, index=53, media_id=WYR_STAKE_ACS_STANDBY_MEDIA_ID,
