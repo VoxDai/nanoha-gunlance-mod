@@ -30,7 +30,9 @@ SILENCE_MEDIA_ID = 2_901_559_960
 GUNLANCE_SWITCH_ID = 3_529_994_682
 
 RANDOM_PARENT_OFFSET = 0x0B
-RANDOM_OVER_LIMIT_BEHAVIOR_OFFSET = 0x19
+RANDOM_PLAYBACK_LIMIT_FLAGS_OFFSET = 0x19
+# The v120 gameplay probe verified this combination with bit 2 enabled.
+VOICE_RANDOM_PLAYBACK_LIMIT_FLAGS = 0x0D
 RANDOM_MAX_INSTANCES_OFFSET = 0x1B
 SWITCH_PARENT_OFFSET = 0x0B
 ORIGINAL_SWITCH_PARENT_ID = 422_956_649
@@ -39,7 +41,7 @@ DONOR_RANDOM_BODY_SHA256 = (
     "dd0dfececc9d361c76f00553fe4179e4558f9adf909199c64c0fd28e9997237f"
 )
 VOICE_RANDOM_BODY_SHA256 = (
-    "396592e4835d0108b6049e3f40c2d1e6fb66c628c52fb59da3506f49c0c4756f"
+    "42c3cc816e6e925eebdb26f635b07eda56c702578411f2081ef5faf53360e208"
 )
 VOICE_RANDOM_PITCH = soundbank_editor.HircPitchSettings(None, (-50, 50))
 
@@ -156,10 +158,10 @@ def _configure_voice_random(editor: soundbank_editor.HircEditor) -> None:
     staged.patch_u8(
         kind,
         VOICE_RANDOM_ID,
-        RANDOM_OVER_LIMIT_BEHAVIOR_OFFSET,
+        RANDOM_PLAYBACK_LIMIT_FLAGS_OFFSET,
         0,
-        1,
-        label="set Protection Random over-limit behavior to Kill Newest",
+        VOICE_RANDOM_PLAYBACK_LIMIT_FLAGS,
+        label="enable the Protection Random playback limit and Kill Newest",
     )
     staged.patch_u16(
         kind,

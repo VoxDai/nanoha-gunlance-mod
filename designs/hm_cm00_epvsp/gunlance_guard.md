@@ -32,7 +32,7 @@ Both Protection clips are 48 kHz, stereo, 24-bit PCM, last 5 seconds, and measur
 24-bit and filename requirements. It is 48 kHz, stereo, 16-bit PCM with 480 frames of zero samples and measures -∞ LUFS-I. The build downmixes all three WAVs without gain, normalization, or loudness correction to
 48 kHz, 16-bit mono Wwise PCM WEM. Random Container `avoid-repeat=0`, each of the two voices has a 50% probability, allowing the same one to be selected consecutively.
 Each valid playback generates a random `[-50, +50] cents` pitch offset on the Container; the two Protection Sounds inherit this offset and do not add local
-Pitch attributes. Instance limit is 1, and when the limit is exceeded, Kill Newest is used. Asset file duration is kept at 5 seconds, and playback duration during runtime may vary with pitch; continuous defense
+Pitch attributes. The Random Container overrides the inherited playback limit, so both Protection Sounds share one playback slot. When the limit is exceeded, Kill Newest is used. Asset file duration is kept at 5 seconds, and playback duration during runtime may vary with pitch; continuous defense
 suppression is based on the actual end of the current voice playback.
 
 ## Implementation Contract
@@ -62,14 +62,17 @@ suppression is based on the actual end of the current voice playback.
   Sound `640829561` / weight `50000`, Random mode remains unchanged, `avoid-repeat=0`. Dual-entry clone body is 91 bytes.
 - The new Random's parent, instance limit, and Pitch must be applied together via a single guarded full body replacement: in an independent memory HircEditor,
   first change the parent of the 91-byte cloned body `+0x0B` from donor Switch `368774789` to new Switch `4010844647`, `+0x19` from `0x00`
-  to `0x01` (Kill Newest), `+0x1B` from `0` to `1` (instance limit); serialize and re-parse this temporary HIRC, then call `set_pitch()`,
+  to `0x0D` (bit 3 `bIgnoreParentMaxNumInst`, bit 2, and bit 0 `bKillNewest`), and `+0x1B` from `0` to `1` (instance limit).
+  The [timed-tail gameplay probe](../../assets/analyses/gunlance_guard/gunlance_guard_02_limit_scope/recordings.md) with bit 2 enabled
+  suppressed a second playback at about 3 seconds and allowed playback again after at least 6 seconds. The scope semantics of bit 2 remain unverified.
+  Serialize and re-parse this temporary HIRC, then call `set_pitch()`,
   using `HircPitchSettings(None, None)` as the initial guard, setting only `random_range_cents=(-50, 50)`, with base Pitch attribute remaining default.
   Replace the 91-byte cloned body in the main editor with the resulting full body via `replace_object_body()`, expected must be the full clone
   body prior to the above modifications; do not apply field patches to the same Random in the main editor before inserting the Pitch attribute.
 - Random Pitch attribute `0x02` insertion results in new Random body `91→100` bytes; final read-back must be `HircPitchSettings(None, (-50, 50))`.
-  Parent field remains at `+0x0B`, Kill Newest and instance limit fields moved to `+0x22` and `+0x24` respectively. Final body SHA-256 is fixed to
-  `396592e4835d0108b6049e3f40c2d1e6fb66c628c52fb59da3506f49c0c4756f`; except for explicitly declared ID, parent, playlist, avoid-repeat,
-  instance limit, and random Pitch, retain the donor's other attributes and unknown bytes.
+  Parent field remains at `+0x0B`, and the playback-limit flags (`0x0D`) and instance limit (`1`) move to `+0x22` and `+0x24` respectively. Final body SHA-256 is fixed to
+  `42c3cc816e6e925eebdb26f635b07eda56c702578411f2081ef5faf53360e208`; except for explicitly declared ID, parent, playlist, avoid-repeat,
+  playback-limit settings, and random Pitch, retain the donor's other attributes and unknown bytes.
 - All three new Sounds use 46-byte standard voice bodies: source is Sound `original/nbnk/wp_cmn_epvsp.nbnk`
   `890667980` / Media `838569492`, original body
   SHA-256 is `b2b6d8e026d1e0aad1e4f308bbd7fdf01e516b1e02c9db6f834199b23cd9412e`, standard C1 body SHA-256 is
