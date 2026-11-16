@@ -137,8 +137,8 @@ conda run -n nanoha-gunlance-mod python tools/utils/pyvgmstream.py decode \
   "$temp_dir/22.wem" "$temp_dir/22.wav"
 ```
 
-Convert a reviewed project WAV before embedding it; `replacement.wav` is the
-chosen input WAV:
+Convert the reviewed input WAV to the project's 48 kHz, 16-bit stereo Wwise
+PCM WEM format before embedding it:
 
 ```sh
 conda run -n nanoha-gunlance-mod python tools/utils/wav_to_wem.py \

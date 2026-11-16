@@ -2,47 +2,47 @@
 
 Mainly includes explosion and reload-triggered sound effects for Gunlance shots, Wyrmstake Cannon, and Wyrmstake Blast.
 
-| Wem# New(Old)                                                | Status     | Description                                           | Notes                                      |
-| ------------------------------------------------------------ | ---------- | ----------------------------------------------------- | ------------------------------------------ |
-| [**1**](../../original/audio_files/wp07_gun_epvsp_shell/wav/01.wav) | Unused | | New sound effects added in Iceborne |
-| [**2**(1)](../../original/audio_files/wp07_gun_epvsp_shell/wav/02.wav) | Verified | Full Burst `3` primer ignition and explosion when firing shells (regardless of hit) | |
-| [**3**(2)](../../original/audio_files/wp07_gun_epvsp_shell/wav/03.wav) | Verified | Wyrmstake Cannon extension from the barrel and insertion (regardless of hit) | |
-| [**4**(3)](../../original/audio_files/wp07_gun_epvsp_shell/wav/04.wav) | Verified | Wide Charged Shelling explosion (regardless of hit) | |
-| [**5**](../../original/audio_files/wp07_gun_epvsp_shell/wav/05.wav) | Unused | | New sound effects added in Iceborne |
-| [**6**](../../original/audio_files/wp07_gun_epvsp_shell/wav/06.wav) | Unused | | New sound effects added in Iceborne |
-| [**7**](../../original/audio_files/wp07_gun_epvsp_shell/wav/07.wav) | Unused | | New sound effects added in Iceborne |
-| [**8**(4)](../../original/audio_files/wp07_gun_epvsp_shell/wav/08.wav) | Pending | Residual flames after Long shelling explosion | |
-| [**9**(5)](../../original/audio_files/wp07_gun_epvsp_shell/wav/09.wav) | Verified | Full Burst `5` primer ignition and explosion when firing shells (regardless of hit) | |
-| [**10**(6)](../../original/audio_files/wp07_gun_epvsp_shell/wav/10.wav) | Unresolved |                                                       |                                            |
-| [**11**](../../original/audio_files/wp07_gun_epvsp_shell/wav/11.wav) | Unused | | New sound effects added in Iceborne |
-| [**12**](../../original/audio_files/wp07_gun_epvsp_shell/wav/12.wav) | Pending | Detaching after setting a Wyrmstake | New sound effects added in Iceborne |
-| [**13**(7)](../../original/audio_files/wp07_gun_epvsp_shell/wav/13.wav) | Verified | Explosion sounds for Mounted Finishers and Clutch Claw Weapon Attack | |
-| [**14**(8)](../../original/audio_files/wp07_gun_epvsp_shell/wav/14.wav) | Verified | Wyrmstake Cannon shell hitting the ground when it misses | |
-| [**15**(9)](../../original/audio_files/wp07_gun_epvsp_shell/wav/15.wav) | Verified | Full Burst `4` primer ignition and explosion when firing shells (regardless of hit) | For Wide Gunlance, this sound effect triggers regardless of the number of shells |
-| [**16**](../../original/audio_files/wp07_gun_epvsp_shell/wav/16.wav) | Unused | | New sound effects added in Iceborne |
-| [**17**](../../original/audio_files/wp07_gun_epvsp_shell/wav/17.wav) | Unused | Jet sound after setting a Wyrmstake | New sound effects added in Iceborne |
-| [**18**(10)](../../original/audio_files/wp07_gun_epvsp_shell/wav/18.wav) | Unresolved | Wyrmstake / Wyrmstake Cannon miss (steam sound) | |
-| [**19**(11)](../../original/audio_files/wp07_gun_epvsp_shell/wav/19.wav) | Verified | Wyrmstake Blast explosion (Right Channel) | |
-| [**20**(12)](../../original/audio_files/wp07_gun_epvsp_shell/wav/20.wav) | Pending | Long shelling explosion (regardless of hit) | |
-| [**21**](../../original/audio_files/wp07_gun_epvsp_shell/wav/21.wav) | Unused | | New sound effects added in Iceborne |
-| [**22**(13)](../../original/audio_files/wp07_gun_epvsp_shell/wav/22.wav) | Verified | Normal shelling explosion (regardless of hit) | |
-| [**23**(14)](../../original/audio_files/wp07_gun_epvsp_shell/wav/23.wav) | Verified | Wyvern's Fire charge | |
-| [**24**](../../original/audio_files/wp07_gun_epvsp_shell/wav/24.wav) | Pending | Wyrmstake Blast running out of propellant | New sound effects added in Iceborne |
-| [**25**](../../original/audio_files/wp07_gun_epvsp_shell/wav/25.wav) | Unused | | New sound effects added in Iceborne |
-| [**26**](../../original/audio_files/wp07_gun_epvsp_shell/wav/26.wav) | Unused | | New sound effects added in Iceborne |
-| [**27**(15)](../../original/audio_files/wp07_gun_epvsp_shell/wav/27.wav) | Verified | Charged Shelling charge | |
-| [**28**(16)](../../original/audio_files/wp07_gun_epvsp_shell/wav/28.wav) | Verified | Wyrmstake Cannon hit and release | |
-| [**29**(17)](../../original/audio_files/wp07_gun_epvsp_shell/wav/29.wav) | Verified | Wyvern's Fire explosion (left channel) | |
-| [**30**(18)](../../original/audio_files/wp07_gun_epvsp_shell/wav/30.wav) | Verified | Full Burst `2` primer ignition and explosion when firing shells (regardless of hit) | |
-| [**31**](../../original/audio_files/wp07_gun_epvsp_shell/wav/31.wav) | Unused | | New sound effects added in Iceborne |
-| [**32**(19)](../../original/audio_files/wp07_gun_epvsp_shell/wav/32.wav) | Verified | Wide shelling explosion (regardless of hit) | |
-| [**33**(20)](../../original/audio_files/wp07_gun_epvsp_shell/wav/33.wav) | Pending | Long charged shelling explosion (regardless of hit) | |
-| [**34**(21)](../../original/audio_files/wp07_gun_epvsp_shell/wav/34.wav) | Verified | Full Burst `1` primer ignition and explosion when firing shells (regardless of hit) | |
-| [**35**](../../original/audio_files/wp07_gun_epvsp_shell/wav/35.wav) | Unused | | New sound effects added in Iceborne |
-| [**36**(22)](../../original/audio_files/wp07_gun_epvsp_shell/wav/36.wav) | Unused     |                                                       |                                            |
-| [**37**(23)](../../original/audio_files/wp07_gun_epvsp_shell/wav/37.wav) | Verified | Normal charged shelling explosion (regardless of hit) | |
-| [**38**(24)](../../original/audio_files/wp07_gun_epvsp_shell/wav/38.wav) | Verified | Wyrmstake Cannon miss and release | |
-| [**39**](../../original/audio_files/wp07_gun_epvsp_shell/wav/39.wav) | Unused | | New sound effects added in Iceborne |
-| [**40**(25)](../../original/audio_files/wp07_gun_epvsp_shell/wav/40.wav) | Verified | Wyrmstake Cannon hit and explosion | |
-| [**41**](../../original/audio_files/wp07_gun_epvsp_shell/wav/41.wav) | Unused | | New sound effects added in Iceborne |
-| [**42**](../../original/audio_files/wp07_gun_epvsp_shell/wav/42.wav) | Unused | | New sound effects added in Iceborne |
+| Wem# New(Old)                                                            | Status     | Description                                                                         | Notes                                                                            |
+|--------------------------------------------------------------------------|------------|-------------------------------------------------------------------------------------|----------------------------------------------------------------------------------|
+| [**1**](../../original/audio_files/wp07_gun_epvsp_shell/wav/01.wav)      |            |                                                                                     | New sound effects added in Iceborne                                              |
+| [**2**(1)](../../original/audio_files/wp07_gun_epvsp_shell/wav/02.wav)   | Verified   | Full Burst `3` primer ignition and explosion when firing shells (regardless of hit) |                                                                                  |
+| [**3**(2)](../../original/audio_files/wp07_gun_epvsp_shell/wav/03.wav)   | Verified   | Wyrmstake Cannon extension from the barrel and insertion (regardless of hit)        |                                                                                  |
+| [**4**(3)](../../original/audio_files/wp07_gun_epvsp_shell/wav/04.wav)   | Verified   | Wide Charged Shelling explosion (regardless of hit)                                 |                                                                                  |
+| [**5**](../../original/audio_files/wp07_gun_epvsp_shell/wav/05.wav)      |            |                                                                                     | New sound effects added in Iceborne                                              |
+| [**6**](../../original/audio_files/wp07_gun_epvsp_shell/wav/06.wav)      |            |                                                                                     | New sound effects added in Iceborne                                              |
+| [**7**](../../original/audio_files/wp07_gun_epvsp_shell/wav/07.wav)      |            |                                                                                     | New sound effects added in Iceborne                                              |
+| [**8**(4)](../../original/audio_files/wp07_gun_epvsp_shell/wav/08.wav)   |            | Residual flames after Long shelling explosion                                       |                                                                                  |
+| [**9**(5)](../../original/audio_files/wp07_gun_epvsp_shell/wav/09.wav)   | Verified   | Full Burst `5` primer ignition and explosion when firing shells (regardless of hit) |                                                                                  |
+| [**10**(6)](../../original/audio_files/wp07_gun_epvsp_shell/wav/10.wav)  | Unresolved |                                                                                     |                                                                                  |
+| [**11**](../../original/audio_files/wp07_gun_epvsp_shell/wav/11.wav)     |            |                                                                                     | New sound effects added in Iceborne                                              |
+| [**12**](../../original/audio_files/wp07_gun_epvsp_shell/wav/12.wav)     |            | Detaching after setting a Wyrmstake                                                 | New sound effects added in Iceborne                                              |
+| [**13**(7)](../../original/audio_files/wp07_gun_epvsp_shell/wav/13.wav)  | Verified   | Explosion sounds for Mounted Finishers and Clutch Claw Weapon Attack                |                                                                                  |
+| [**14**(8)](../../original/audio_files/wp07_gun_epvsp_shell/wav/14.wav)  | Verified   | Wyrmstake Cannon shell hitting the ground when it misses                            |                                                                                  |
+| [**15**(9)](../../original/audio_files/wp07_gun_epvsp_shell/wav/15.wav)  | Verified   | Full Burst `4` primer ignition and explosion when firing shells (regardless of hit) | For Wide Gunlance, this sound effect triggers regardless of the number of shells |
+| [**16**](../../original/audio_files/wp07_gun_epvsp_shell/wav/16.wav)     |            |                                                                                     | New sound effects added in Iceborne                                              |
+| [**17**](../../original/audio_files/wp07_gun_epvsp_shell/wav/17.wav)     |            | Jet sound after setting a Wyrmstake                                                 | New sound effects added in Iceborne                                              |
+| [**18**(10)](../../original/audio_files/wp07_gun_epvsp_shell/wav/18.wav) | Unresolved | Wyrmstake / Wyrmstake Cannon miss (steam sound)                                     |                                                                                  |
+| [**19**(11)](../../original/audio_files/wp07_gun_epvsp_shell/wav/19.wav) | Verified   | Wyrmstake Blast explosion (Right Channel)                                           |                                                                                  |
+| [**20**(12)](../../original/audio_files/wp07_gun_epvsp_shell/wav/20.wav) |            | Long shelling explosion (regardless of hit)                                         |                                                                                  |
+| [**21**](../../original/audio_files/wp07_gun_epvsp_shell/wav/21.wav)     |            |                                                                                     | New sound effects added in Iceborne                                              |
+| [**22**(13)](../../original/audio_files/wp07_gun_epvsp_shell/wav/22.wav) | Verified   | Normal shelling explosion (regardless of hit)                                       |                                                                                  |
+| [**23**(14)](../../original/audio_files/wp07_gun_epvsp_shell/wav/23.wav) | Verified   | Wyvern's Fire charge                                                                |                                                                                  |
+| [**24**](../../original/audio_files/wp07_gun_epvsp_shell/wav/24.wav)     |            | Wyrmstake Blast running out of propellant                                           | New sound effects added in Iceborne                                              |
+| [**25**](../../original/audio_files/wp07_gun_epvsp_shell/wav/25.wav)     |            |                                                                                     | New sound effects added in Iceborne                                              |
+| [**26**](../../original/audio_files/wp07_gun_epvsp_shell/wav/26.wav)     |            |                                                                                     | New sound effects added in Iceborne                                              |
+| [**27**(15)](../../original/audio_files/wp07_gun_epvsp_shell/wav/27.wav) | Verified   | Charged Shelling charge                                                             |                                                                                  |
+| [**28**(16)](../../original/audio_files/wp07_gun_epvsp_shell/wav/28.wav) | Verified   | Wyrmstake Cannon hit and release                                                    |                                                                                  |
+| [**29**(17)](../../original/audio_files/wp07_gun_epvsp_shell/wav/29.wav) | Verified   | Wyvern's Fire explosion (left channel)                                              |                                                                                  |
+| [**30**(18)](../../original/audio_files/wp07_gun_epvsp_shell/wav/30.wav) | Verified   | Full Burst `2` primer ignition and explosion when firing shells (regardless of hit) |                                                                                  |
+| [**31**](../../original/audio_files/wp07_gun_epvsp_shell/wav/31.wav)     |            |                                                                                     | New sound effects added in Iceborne                                              |
+| [**32**(19)](../../original/audio_files/wp07_gun_epvsp_shell/wav/32.wav) | Verified   | Wide shelling explosion (regardless of hit)                                         |                                                                                  |
+| [**33**(20)](../../original/audio_files/wp07_gun_epvsp_shell/wav/33.wav) |            | Long charged shelling explosion (regardless of hit)                                 |                                                                                  |
+| [**34**(21)](../../original/audio_files/wp07_gun_epvsp_shell/wav/34.wav) | Verified   | Full Burst `1` primer ignition and explosion when firing shells (regardless of hit) |                                                                                  |
+| [**35**](../../original/audio_files/wp07_gun_epvsp_shell/wav/35.wav)     |            |                                                                                     | New sound effects added in Iceborne                                              |
+| [**36**(22)](../../original/audio_files/wp07_gun_epvsp_shell/wav/36.wav) |            |                                                                                     |                                                                                  |
+| [**37**(23)](../../original/audio_files/wp07_gun_epvsp_shell/wav/37.wav) | Verified   | Normal charged shelling explosion (regardless of hit)                               |                                                                                  |
+| [**38**(24)](../../original/audio_files/wp07_gun_epvsp_shell/wav/38.wav) | Verified   | Wyrmstake Cannon miss and release                                                   |                                                                                  |
+| [**39**](../../original/audio_files/wp07_gun_epvsp_shell/wav/39.wav)     |            |                                                                                     | New sound effects added in Iceborne                                              |
+| [**40**(25)](../../original/audio_files/wp07_gun_epvsp_shell/wav/40.wav) | Verified   | Wyrmstake Cannon hit and explosion                                                  |                                                                                  |
+| [**41**](../../original/audio_files/wp07_gun_epvsp_shell/wav/41.wav)     |            |                                                                                     | New sound effects added in Iceborne                                              |
+| [**42**](../../original/audio_files/wp07_gun_epvsp_shell/wav/42.wav)     |            |                                                                                     | New sound effects added in Iceborne                                              |

@@ -41,6 +41,10 @@ List only final repository audio with links relative to the design file:
 Identify each final WAV by its repository-relative link only. Do not record a
 whole-file hash for an audio file in the design.
 
+Use `conda run -n nanoha-gunlance-mod ffmpeg ...` to extract, trim, or convert
+source audio and video. For WEM conversion and verification, use the commands
+in [soundbank-workflow](../../soundbank-workflow/SKILL.md).
+
 Record replacement versus independent append, sharing, synchronization, delay, and distinct spatial paths. Measure
 integrated loudness read-only with FFmpeg
 `loudnorm` and use its unrounded `input_i` to validate the inclusive

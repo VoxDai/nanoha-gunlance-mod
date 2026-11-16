@@ -69,7 +69,7 @@ probe. Preserve the rest of nativePC.
 
 ## Examples
 
-- Mounted finisher candidates. Use separate Mandarin cues for candidate
+- Mounted finisher candidates. Use separate spoken cues for candidate
   Motions in one package and a distinct load-control cue. Observe actual
   head, back, or tail placement and phase before mapping any body part.
   Test other branches after a positive when needed.
@@ -81,3 +81,9 @@ probe. Preserve the rest of nativePC.
   positive package. Then vary one file set based on the results. A working
   load control establishes loading only. If the previous positive also
   fails, keep the cause open until evidence identifies the affected file.
+
+## External Reference
+
+[Player Weapon Action IDs](https://github.com/AniBullet/MonsterHunterWorldModding/wiki/Player-Weapon-Action-IDs)
+helps identify weapon actions when tracing move events or reading FSM data.
+Verify candidate Motion IDs and sound requests against the vanilla files.

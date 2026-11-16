@@ -5,12 +5,12 @@ Player feedback sounds for taking hits, guarding, healing, and status effects.
 | Wem# New(Old)                                                        | Status   | Description                                               | Notes            |
 |----------------------------------------------------------------------|----------|-----------------------------------------------------------|------------------|
 | [**1**](../../original/audio_files/hm_cm00_epvsp/wav/001.wav)        |          |                                                           |                  |
-| [**2**(2)](../../original/audio_files/hm_cm00_epvsp/wav/002.wav)     | Pending  | Healing finished                                          |                  |
+| [**2**(2)](../../original/audio_files/hm_cm00_epvsp/wav/002.wav)     |          | Healing finished                                          |                  |
 | [**3**](../../original/audio_files/hm_cm00_epvsp/wav/003.wav)        |          |                                                           |                  |
-| [**4**(4)](../../original/audio_files/hm_cm00_epvsp/wav/004.wav)     | Pending  | Healing (potion, health booster)                          |                  |
+| [**4**(4)](../../original/audio_files/hm_cm00_epvsp/wav/004.wav)     |          | Healing (potion, health booster)                          |                  |
 | [**5**](../../original/audio_files/hm_cm00_epvsp/wav/005.wav)        |          |                                                           |                  |
 | [**6**](../../original/audio_files/hm_cm00_epvsp/wav/006.wav)        |          | Lightning sounds?                                         |                  |
-| [**7**(7)](../../original/audio_files/hm_cm00_epvsp/wav/007.wav)     | Pending  | Lance shield guard                                        |                  |
+| [**7**(7)](../../original/audio_files/hm_cm00_epvsp/wav/007.wav)     |          | Lance shield guard                                        |                  |
 | [**8**](../../original/audio_files/hm_cm00_epvsp/wav/008.wav)        |          |                                                           |                  |
 | [**9**](../../original/audio_files/hm_cm00_epvsp/wav/009.wav)        |          |                                                           |                  |
 | [**10**](../../original/audio_files/hm_cm00_epvsp/wav/010.wav)       |          | Placing shock trap                                        |                  |
@@ -46,7 +46,7 @@ Player feedback sounds for taking hits, guarding, healing, and status effects.
 | [**40**](../../original/audio_files/hm_cm00_epvsp/wav/040.wav)       |          | Curing fireblight                                         | Not Blast Blight |
 | [**41**](../../original/audio_files/hm_cm00_epvsp/wav/041.wav)       |          |                                                           |                  |
 | [**42**](../../original/audio_files/hm_cm00_epvsp/wav/042.wav)       |          |                                                           |                  |
-| [**43**(36)](../../original/audio_files/hm_cm00_epvsp/wav/043.wav)   | Pending  | Defense boost effect                                      |                  |
+| [**43**(36)](../../original/audio_files/hm_cm00_epvsp/wav/043.wav)   |          | Defense boost effect                                      |                  |
 | [**44**](../../original/audio_files/hm_cm00_epvsp/wav/044.wav)       |          |                                                           |                  |
 | [**45**](../../original/audio_files/hm_cm00_epvsp/wav/045.wav)       |          |                                                           |                  |
 | [**46**](../../original/audio_files/hm_cm00_epvsp/wav/046.wav)       |          |                                                           |                  |
@@ -57,7 +57,7 @@ Player feedback sounds for taking hits, guarding, healing, and status effects.
 | [**51**](../../original/audio_files/hm_cm00_epvsp/wav/051.wav)       |          | Blast blight                                              |                  |
 | [**52**](../../original/audio_files/hm_cm00_epvsp/wav/052.wav)       |          |                                                           |                  |
 | [**53**](../../original/audio_files/hm_cm00_epvsp/wav/053.wav)       |          | Evasion mantle proc?                                      |                  |
-| [**54**(46)](../../original/audio_files/hm_cm00_epvsp/wav/054.wav)   | Pending  | SnS Shield guard                                          |                  |
+| [**54**(46)](../../original/audio_files/hm_cm00_epvsp/wav/054.wav)   |          | SnS Shield guard                                          |                  |
 | [**55**](../../original/audio_files/hm_cm00_epvsp/wav/055.wav)       |          |                                                           |                  |
 | [**56**](../../original/audio_files/hm_cm00_epvsp/wav/056.wav)       |          |                                                           |                  |
 | [**57**](../../original/audio_files/hm_cm00_epvsp/wav/057.wav)       |          |                                                           |                  |
@@ -67,13 +67,13 @@ Player feedback sounds for taking hits, guarding, healing, and status effects.
 | [**61**](../../original/audio_files/hm_cm00_epvsp/wav/061.wav)       |          |                                                           |                  |
 | [**62**](../../original/audio_files/hm_cm00_epvsp/wav/062.wav)       |          |                                                           |                  |
 | [**63**](../../original/audio_files/hm_cm00_epvsp/wav/063.wav)       |          |                                                           |                  |
-| [**64**(54)](../../original/audio_files/hm_cm00_epvsp/wav/064.wav)   | Pending  | Charge Blade shield guard                                 |                  |
+| [**64**(54)](../../original/audio_files/hm_cm00_epvsp/wav/064.wav)   |          | Charge Blade shield guard                                 |                  |
 | [**65**](../../original/audio_files/hm_cm00_epvsp/wav/065.wav)       |          | Some buff activating                                      |                  |
 | [**66**](../../original/audio_files/hm_cm00_epvsp/wav/066.wav)       |          |                                                           |                  |
-| [**67**(57)](../../original/audio_files/hm_cm00_epvsp/wav/067.wav)   | Pending  | Great sword shield guard                                  |                  |
+| [**67**(57)](../../original/audio_files/hm_cm00_epvsp/wav/067.wav)   |          | Great sword shield guard                                  |                  |
 | [**68**](../../original/audio_files/hm_cm00_epvsp/wav/068.wav)       |          |                                                           |                  |
 | [**69**](../../original/audio_files/hm_cm00_epvsp/wav/069.wav)       |          |                                                           |                  |
-| [**70**(59)](../../original/audio_files/hm_cm00_epvsp/wav/070.wav)   | Pending  | Status healer effect (herbal medicine, nulberry)          |                  |
+| [**70**(59)](../../original/audio_files/hm_cm00_epvsp/wav/070.wav)   |          | Status healer effect (herbal medicine, nulberry)          |                  |
 | [**71**](../../original/audio_files/hm_cm00_epvsp/wav/071.wav)       |          |                                                           |                  |
 | [**72**](../../original/audio_files/hm_cm00_epvsp/wav/072.wav)       |          | Also similar to 4                                         |                  |
 | [**73**](../../original/audio_files/hm_cm00_epvsp/wav/073.wav)       |          |                                                           |                  |
@@ -91,19 +91,19 @@ Player feedback sounds for taking hits, guarding, healing, and status effects.
 | [**85**](../../original/audio_files/hm_cm00_epvsp/wav/085.wav)       |          | Maybe crystal burst?                                      |                  |
 | [**86**](../../original/audio_files/hm_cm00_epvsp/wav/086.wav)       |          |                                                           |                  |
 | [**87**](../../original/audio_files/hm_cm00_epvsp/wav/087.wav)       |          |                                                           |                  |
-| [**88**(73)](../../original/audio_files/hm_cm00_epvsp/wav/088.wav) | Verified | Gunlance shield guard on a successful block | |
+| [**88**(73)](../../original/audio_files/hm_cm00_epvsp/wav/088.wav)   | Verified | Gunlance shield guard on a successful block               |                  |
 | [**89**](../../original/audio_files/hm_cm00_epvsp/wav/089.wav)       |          |                                                           |                  |
 | [**90**](../../original/audio_files/hm_cm00_epvsp/wav/090.wav)       |          |                                                           |                  |
-| [**91**(76)](../../original/audio_files/hm_cm00_epvsp/wav/091.wav)   | Pending  | Player hit [1/4]                                          |                  |
+| [**91**(76)](../../original/audio_files/hm_cm00_epvsp/wav/091.wav)   |          | Player hit (1/4)                                          |                  |
 | [**92**](../../original/audio_files/hm_cm00_epvsp/wav/092.wav)       |          |                                                           |                  |
 | [**93**](../../original/audio_files/hm_cm00_epvsp/wav/093.wav)       |          | Ziplining                                                 |                  |
-| [**94**(79)](../../original/audio_files/hm_cm00_epvsp/wav/094.wav)   | Pending  | Generic used effect                                       |                  |
+| [**94**(79)](../../original/audio_files/hm_cm00_epvsp/wav/094.wav)   |          | Generic used effect                                       |                  |
 | [**95**](../../original/audio_files/hm_cm00_epvsp/wav/095.wav)       |          |                                                           |                  |
 | [**96**](../../original/audio_files/hm_cm00_epvsp/wav/096.wav)       |          |                                                           |                  |
 | [**97**](../../original/audio_files/hm_cm00_epvsp/wav/097.wav)       |          | Fortify activating?                                       |                  |
 | [**98**](../../original/audio_files/hm_cm00_epvsp/wav/098.wav)       |          |                                                           |                  |
 | [**99**](../../original/audio_files/hm_cm00_epvsp/wav/099.wav)       |          |                                                           |                  |
-| [**100**(85)](../../original/audio_files/hm_cm00_epvsp/wav/100.wav)  | Pending  | Player stun begin                                         |                  |
+| [**100**(85)](../../original/audio_files/hm_cm00_epvsp/wav/100.wav)  |          | Player stun begin                                         |                  |
 | [**101**](../../original/audio_files/hm_cm00_epvsp/wav/101.wav)      |          |                                                           |                  |
 | [**102**](../../original/audio_files/hm_cm00_epvsp/wav/102.wav)      |          |                                                           |                  |
 | [**103**](../../original/audio_files/hm_cm00_epvsp/wav/103.wav)      |          |                                                           |                  |
@@ -113,7 +113,7 @@ Player feedback sounds for taking hits, guarding, healing, and status effects.
 | [**107**](../../original/audio_files/hm_cm00_epvsp/wav/107.wav)      |          |                                                           |                  |
 | [**108**](../../original/audio_files/hm_cm00_epvsp/wav/108.wav)      |          |                                                           |                  |
 | [**109**](../../original/audio_files/hm_cm00_epvsp/wav/109.wav)      |          |                                                           |                  |
-| [**110**(94)](../../original/audio_files/hm_cm00_epvsp/wav/110.wav)  | Pending  | Player stun loop                                          |                  |
+| [**110**(94)](../../original/audio_files/hm_cm00_epvsp/wav/110.wav)  |          | Player stun loop                                          |                  |
 | [**111**](../../original/audio_files/hm_cm00_epvsp/wav/111.wav)      |          |                                                           |                  |
 | [**112**](../../original/audio_files/hm_cm00_epvsp/wav/112.wav)      |          | Paralysis loop                                            |                  |
 | [**113**](../../original/audio_files/hm_cm00_epvsp/wav/113.wav)      |          |                                                           |                  |
@@ -126,13 +126,13 @@ Player feedback sounds for taking hits, guarding, healing, and status effects.
 | [**120**](../../original/audio_files/hm_cm00_epvsp/wav/120.wav)      |          |                                                           |                  |
 | [**121**](../../original/audio_files/hm_cm00_epvsp/wav/121.wav)      |          |                                                           |                  |
 | [**122**](../../original/audio_files/hm_cm00_epvsp/wav/122.wav)      |          |                                                           |                  |
-| [**123**(105)](../../original/audio_files/hm_cm00_epvsp/wav/123.wav) | Pending  | Player hit [2/4]                                          |                  |
-| [**124**(106)](../../original/audio_files/hm_cm00_epvsp/wav/124.wav) | Pending  | Player hit [3/4]                                          |                  |
+| [**123**(105)](../../original/audio_files/hm_cm00_epvsp/wav/123.wav) |          | Player hit (2/4)                                          |                  |
+| [**124**(106)](../../original/audio_files/hm_cm00_epvsp/wav/124.wav) |          | Player hit (3/4)                                          |                  |
 | [**125**](../../original/audio_files/hm_cm00_epvsp/wav/125.wav)      |          |                                                           |                  |
-| [**126**(108)](../../original/audio_files/hm_cm00_epvsp/wav/126.wav) | Pending  | Attack boost effect                                       |                  |
-| [**127**(109)](../../original/audio_files/hm_cm00_epvsp/wav/127.wav) | Pending  | Begin healing (potion, health booster)                    |                  |
+| [**126**(108)](../../original/audio_files/hm_cm00_epvsp/wav/126.wav) |          | Attack boost effect                                       |                  |
+| [**127**(109)](../../original/audio_files/hm_cm00_epvsp/wav/127.wav) |          | Begin healing (potion, health booster)                    |                  |
 | [**128**](../../original/audio_files/hm_cm00_epvsp/wav/128.wav)      |          |                                                           |                  |
-| [**129**(111)](../../original/audio_files/hm_cm00_epvsp/wav/129.wav) | Pending  | Player hit [4/4]                                          |                  |
+| [**129**(111)](../../original/audio_files/hm_cm00_epvsp/wav/129.wav) |          | Player hit (4/4)                                          |                  |
 | [**130**](../../original/audio_files/hm_cm00_epvsp/wav/130.wav)      |          |                                                           |                  |
 | [**131**](../../original/audio_files/hm_cm00_epvsp/wav/131.wav)      |          |                                                           |                  |
 | [**132**](../../original/audio_files/hm_cm00_epvsp/wav/132.wav)      |          |                                                           |                  |

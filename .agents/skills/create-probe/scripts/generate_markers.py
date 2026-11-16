@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate Chinese probe labels using local macOS speech; never installs a Mod."""
+"""Generate spoken English probe markers using local macOS speech."""
 from __future__ import annotations
 
 import argparse
@@ -18,14 +18,6 @@ def run(args: list[str]) -> None:
     result = subprocess.run(args, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(f"Command failed: {args[0]}\n{result.stderr.strip()}")
-
-
-def chinese_number(value: int) -> str:
-    digits = '零一二三四五六七八九'
-    if value < 10:
-        return digits[value]
-    tens, ones = divmod(value, 10)
-    return (digits[tens] if tens > 1 else '') + '十' + (digits[ones] if ones else '')
 
 
 def read_pcm(path: Path) -> tuple[bytes, dict]:
@@ -50,7 +42,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output-dir', required=True, type=Path)
     parser.add_argument('--count', required=True, type=int, help='Number of candidate labels (1–99)')
-    parser.add_argument('--voice', default='Tingting', help='Installed zh_CN voice')
+    parser.add_argument('--voice', default='Samantha', help='Installed English voice')
     parser.add_argument('--rate', default=200, type=int, help='Speech rate in words per minute')
     args = parser.parse_args()
     if not 1 <= args.count <= 99 or args.rate <= 0:
@@ -66,17 +58,21 @@ def main() -> int:
     if not say or not ffmpeg:
         parser.error('Requires local macOS say and FFmpeg; use the nanoha-gunlance-mod conda environment')
     voices = subprocess.run([say, '-v', '?'], capture_output=True, text=True, check=True).stdout
-    if not any(line.startswith(args.voice + ' ') and 'zh_CN' in line for line in voices.splitlines()):
-        parser.error(f'Installed zh_CN voice unavailable: {args.voice}; choose one from say -v "?"')
+    for line in voices.splitlines():
+        fields = line.partition('#')[0].rsplit(maxsplit=1)
+        if len(fields) == 2 and fields[0] == args.voice and fields[1].startswith('en_'):
+            break
+    else:
+        parser.error(f'Installed English voice unavailable: {args.voice}; choose one from say -v "?"')
     # Build off to the side. Neither conversion failures nor decoding failures publish partial output.
     out.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.probe-markers-', dir=out.parent) as temp:
         stage = Path(temp) / 'markers'
         stage.mkdir()
-        labels = [('load_check', '加载成功')]
-        labels += [(f'trigger_{i}', f'触发{chinese_number(i)}') for i in range(1, args.count + 1)]
+        labels = [('load_check', 'Load successful')]
+        labels += [(f'trigger_{i}', f'Trigger {i}') for i in range(1, args.count + 1)]
         manifest = {'voice': args.voice, 'rate': args.rate,
-                    'speech_engine': say, 'ffmpeg': ffmpeg,
+                    'speech_engine': Path(say).name, 'ffmpeg': Path(ffmpeg).name,
                     'count': args.count, 'in_game_tested': False, 'markers': []}
         for stem, text in labels:
             (stage / f'{stem}.txt').write_text(text + '\n', encoding='utf-8')

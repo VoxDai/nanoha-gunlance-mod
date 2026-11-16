@@ -138,3 +138,12 @@ When a request resolves incorrectly:
 - Byte comparisons establish preservation, not loudness or subjective quality.
 - Game testing establishes trigger, timing, mix, positioning, interruption,
   and conflict behavior for the scenarios actually exercised.
+
+## External References
+
+- [MHW:IB Labelled Audio](https://docs.google.com/spreadsheets/d/10A_YEfm7KV0ATw7uD-3_o_ZOGSlGXtzWWMGXKs_neYM/edit)
+  catalogs NBNK and NPCK uses, WEM IDs, bank indices, character voice presets,
+  and audition notes. Verify uncertain and older entries against vanilla files.
+- [Modding MH:W — wwiseutil Wiki](https://github.com/hpxro7/wwiseutil/wiki/Modding-MH%3AW)
+  documents NBNK, NPCK, and WEM structures and replacement workflows. Use the
+  project's wwiser submodule to parse sound banks.

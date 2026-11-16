@@ -61,20 +61,23 @@ the baseline input set explicitly. Deliver directories without ZIP archives.
    candidates when they are numerous or may overlap. Narrow the route before
    testing phases, sharing, and negative cases. Include an easy positive load
    control in each candidate variant when feasible.
-4. For one marker, use `assets/source_audio/testing/trigger.wav` if suitable.
-   Generate distinct spoken Mandarin markers for multiple candidates, with a
-   separate load-success phrase. Use spoken phrases throughout.
+4. Use distinct spoken phrases for each candidate and a separate
+   load-control phrase. Reuse
+   `assets/source_audio/testing/trigger.wav` for a single marker if its
+   language and cue are suitable.
 
    ```sh
    conda run -n nanoha-gunlance-mod python .agents/skills/create-probe/scripts/generate_markers.py --output-dir <probe>/src/markers --count 3
    ```
 
-   The script uses the local macOS `say` voice `Tingting` by default. Use
-   `--voice` to select another installed Mandarin voice. Report missing voices
-   without downloading a voice or substituting counted beeps. The script saves
-   the phrases, synthesis settings, original synthesis audio, 48 kHz stereo
-   16-bit WAVs, WEMs, and decode verification. Check markers for nonempty
-   audio, clipping, and audibility, and link the WAV previews. Probe markers
+   The script uses the local macOS `say` voice `Samantha` by default. Use
+   `--voice` to select another installed English voice. If `say` or the
+   selected voice is unavailable, use locally recorded or synthesized spoken
+   WAVs. Record the phrases and how the clips were made, convert them to
+   48 kHz stereo 16-bit PCM, and verify their WEMs by decoding them with the
+   project tools. The script automates those checks and saves the phrases,
+   synthesis settings, source audio, WAVs, and WEMs. Check all markers for
+   nonempty audio, clipping, and audibility, and link the WAV previews. Probe markers
    are exempt from final WAV naming and loudness rules. Phrase duration,
    leading silence, and inherited mixing can affect perceived timing.
 5. Save the reproducible build script and route evidence under `src/`. Require

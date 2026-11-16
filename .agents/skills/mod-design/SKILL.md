@@ -8,6 +8,7 @@ description: "Create or update Nanoha Gunlance Mod sound effects by changing the
 Deliver the selected playback behavior through a contract in `designs/` and
 its executable implementation in `builders/` in the same task. Builders
 declare their plans explicitly and never parse design Markdown at runtime.
+Preserve technical identifiers and quoted source material.
 
 ## Scope
 

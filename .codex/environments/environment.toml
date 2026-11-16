@@ -20,8 +20,8 @@ if [ "$assets_source" = "$assets_link" ]; then
 fi
 
 if [ ! -d "$assets_source" ]; then
-  echo "Main project assets directory does not exist: $assets_source" >&2
-  exit 1
+  echo "Skipping optional assets link because the main project has no local assets directory."
+  exit 0
 fi
 
 # Allow the script to run repeatedly.
