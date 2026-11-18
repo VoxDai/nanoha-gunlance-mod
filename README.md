@@ -1,6 +1,6 @@
 # Nanoha Gunlance Mod
 
-A Monster Hunter: World Gunlance mod features voice lines from *Magical Girl Lyrical NANOHA*.
+A Monster Hunter: World Gunlance mod features voice lines from *Magical Girl Lyrical NANOHA*. Watch [demo video](https://www.bilibili.com/zh-Hans/video/BV1qWsm6bEPZ/).
 
 ## Install
 
